@@ -139,6 +139,16 @@ const bashPlugin = tokenizer([
   [/&&|\|\||>|>>|<|\||;/,                         'keyword'],
 ]);
 
+const lispPlugin = tokenizer([
+  [/;.*$/m,                                'comment'],
+  [/"(?:[^"\\]|\\.)*"/,                       'string'],
+  [/\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/,     'number'],
+  [/\b(?:defun|defvar|defconst|lambda|if|else|cond|let|progn|quote|function|setf|setq|car|cdr|cons|list|append|mapcar|reduce|apply|funcall)\b/, 'keyword'],
+  [/[()]/,                                  'keyword'],
+  [/\b[A-Za-z_+\-*/<>=!?&%$#][A-Za-z0-9_+\-*/<>=!?&%$#]*\b/, 'type'],
+]);
+
+
 const defaultRegistry = {
   js: jsPlugin, javascript: jsPlugin, mjs: jsPlugin,
   ts: tsPlugin, typescript: tsPlugin,
@@ -150,6 +160,7 @@ const defaultRegistry = {
   rust: rustPlugin, rs: rustPlugin,
   css: cssPlugin,
   sh: bashPlugin, bash: bashPlugin, shell: bashPlugin,
+  lisp: lispPlugin, commonlisp: lispPlugin, cl: lispPlugin,
 };
 
 export { tokenizer, highlight, defaultRegistry };
