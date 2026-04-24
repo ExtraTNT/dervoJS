@@ -139,4 +139,4 @@ const validateForm = schema => values =>
 const isFormValid = errors =>
   Object.values(errors).every(e => e === null);
 
-export { required, minLength, maxLength, email, pattern, range, validate, validateForm, isFormValid };
+export { required, minLength, maxLength, ip, email, pattern, range, validate, validateForm, isFormValid };
