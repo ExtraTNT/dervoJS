@@ -15,7 +15,7 @@ export { initStyles, injectStyles, toggleTheme, setTheme, setTokens, resetTokens
 export { createStore, mount, getRenderLog, getProfilerFrame, enableProfiler, disableProfiler } from './state.js';
 
 // ── Validation ─────────────────────────────────────────────────────────────
-export { required, minLength, maxLength, email, pattern, range, validate, validateForm, isFormValid } from './validate.js';
+export { required, minLength, maxLength, ip, email, pattern, range, validate, validateForm, isFormValid } from './validate.js';
 
 // ── Caching / memoization ──────────────────────────────────────────────────
 export { memoComponent, memoLeaf, memoize, stableKey } from './cache.js';

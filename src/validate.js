@@ -43,6 +43,14 @@ const email = (msg = 'Must be a valid email address') =>
   v => (!v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim())) ? null : msg;
 
 /**
+ * IP address format check.
+ * @param {string} [msg]
+ * @returns {function} rule
+ */
+const ip = (msg = 'Must be a valid IP address') =>
+  v => (!v || /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/.test(String(v).trim())) ? null : msg;
+
+/**
  * Regex pattern check.
  * @param {RegExp} re
  * @param {string} [msg]
