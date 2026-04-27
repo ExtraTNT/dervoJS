@@ -4,7 +4,10 @@ import {
   startCountdown, pauseCountdown, resetCountdown, setCountdown,
   startCountup, pauseCountup, resetCountup,
   startFeed, stopFeed, clearFeed,
+  timerCtrl,
 } from '../store.js';
+
+import { doc } from '../components/doc.js';
 
 export const clockPanel = state =>
   div({})([
@@ -29,6 +32,13 @@ export const clockPanel = state =>
           Button({ variant: 'ghost', onClick: resetCountdown })(['Reset']),
         ]),
       ]),
+      doc([
+`Clock({
+  time: state.countdown,
+  size: 'lg',
+  label: 'remaining',
+  running: state.countdownRunning
+})`]),
     ]),
 
     div({ style: 'margin-top:16px' })([
@@ -44,9 +54,17 @@ export const clockPanel = state =>
                 Button({ variant: 'ghost', size: 'sm', onClick: resetCountup })(['Reset']),
               ]),
             ]),
-          ]),
-        ]),
+            doc([`Clock({ time: state.countup, running: state.countupRunning, label: 'elapsed' })
 
+// Drive it with createInterval (outside the view):
+const stopwatch = createInterval(
+  () => setState(s => ({ countup: s.countup + 1 }))
+)({ ms: 1000 });
+stopwatch.start();
+stopwatch.stop();
+// reset: setState({ countup: 0 })`]),
+        ]),
+      ]),
         Col({ span: 12, md: 6 })([
           Card({
             title: 'createInterval — event feed',
@@ -73,8 +91,49 @@ export const clockPanel = state =>
                 'Start the feed to see events appear every 2 seconds.',
               ]),
             }),
+            doc([`// createInterval — curried: createInterval(fn)(opts)
+const feed = createInterval(
+  () => setState(s => ({ feedItems: [newItem(), ...s.feedItems.slice(0, 7)] }))
+)({ ms: 2000 });
+feed.start();
+feed.stop();
+feed.toggle();
+feed.restart();
+feed.isRunning(); // boolean`]),
           ]),
         ]),
       ]),
     ]),
-  ]);
+      Card({
+        title: 'createTimer — Task-based store-slice timer',
+        footer: [
+          span({ style: 'font-size:12px; color:var(--text-muted)' })([
+            'Driven by a lazy Task chain — no setInterval handle.',
+          ]),
+        ],
+      })([
+        div({ style: 'display:flex; flex-direction:column; align-items:center; gap:16px; padding:16px 0' })([
+          Clock({
+            time:     state.timer.elapsed,
+            running:  state.timer.running,
+            size:     'lg',
+            label:    'elapsed',
+            controls: timerCtrl,
+          }),
+        ]),
+        doc([`// createTimer drives a store slice via lazy Task chain (no setInterval)
+const timer = createTimer({ store, key: 'timer', step: 1 });
+timer.start();   // begin ticking
+timer.pause();   // freeze
+timer.reset();   // pause + set elapsed = 0
+timer.toggle();  // flip running
+
+// Pass controls to Clock for built-in Start/Pause + Reset buttons:
+Clock({
+  time:     state.timer.elapsed,
+  running:  state.timer.running,
+  size:     'lg',
+  controls: timer,
+})`]),
+      ]),
+    ]);

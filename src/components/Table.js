@@ -65,7 +65,7 @@ const sortBy = key => (a, b) => {
  * Apply per-column filters to a row list.
  * Each column's filterFn defaults to filterBy(key) when not provided.
  */
-const applyColumnFilters = (rows, columns, columnFilters) =>
+const applyColumnFilters = rows => columns => columnFilters =>
   Object.entries(columnFilters || {}).reduce((acc, [key, val]) => {
     if (val === '' || val == null) return acc;
     const col = columns.find(c => c.key === key);
@@ -137,7 +137,7 @@ const Table = ({
   noResults = p({ className: 'table-no-results' })(['No results match your filter.']),
 } = {}) => {
   // ── Data pipeline: column filters → global filter → sort ──────────────
-  const afterColFilter    = applyColumnFilters(rows, columns, columnFilters);
+  const afterColFilter    = applyColumnFilters(rows)(columns)(columnFilters);
   const hasGlobal         = filter !== '' && filter != null;
   const afterGlobalFilter = hasGlobal
     ? afterColFilter.filter(row => filterFn(row, filter))

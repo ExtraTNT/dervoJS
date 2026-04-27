@@ -1,6 +1,7 @@
 import { div, Card, Row, Col, Stack, p, span, strong } from '../../src/index.js';
 import { Img, Video, Audio, VideoStream, Dropzone, Divider, Spacer, AspectBox, Float, Clearfix, Badge, Button } from '../../src/index.js';
 import { setState } from '../store.js';
+import { doc } from '../components/doc.js';
 
 // Seeded picsum URL — seed changes on each visit so the browser fetches a
 // different image rather than serving the cached one.
@@ -39,6 +40,9 @@ export const mediaPanel = state => {
           ]),
         ]),
       ]),
+      doc([`Img({ src: '/photo.jpg', alt: 'Landscape', aspect: '16/9', rounded: true })
+Img({ src: '/photo.jpg', alt: 'Portrait', aspect: '4/3', fit: 'contain' })
+Img({ src: '/avatar.jpg', alt: 'Avatar', circle: true, width: 80, height: 80 })`]),
     ]),
 
     // ── Divider ─────────────────────────────────────────────────────────────
@@ -61,6 +65,17 @@ export const mediaPanel = state => {
             strong({})(['B (fixed 32px gap)']),
           ]),
         ]),
+        doc([`Divider()
+Divider({ label: 'or continue with' })
+
+// Spacer — fills available flex space
+div({ style: 'display:flex' })([
+  strong({})(['Left']),
+  Spacer(),
+  Badge({})(['Right']),
+])
+// Spacer with fixed width:
+Spacer({ size: 32 })`]),
       ]),
     ]),
 
@@ -81,6 +96,9 @@ export const mediaPanel = state => {
             ]),
           ]),
         ]),
+        doc([`AspectBox({ ratio: '16/9' })([ iframeOrVideo ])
+AspectBox({ ratio: '1/1' })([ squareContent ])
+// ratio: any valid CSS aspect-ratio string`]),
       ]),
     ]),
 
@@ -98,6 +116,10 @@ export const mediaPanel = state => {
             'This paragraph text flows around the floated image on the left. Clearfix ensures the card\'s container fully wraps both the float and the text, preventing the classic collapsing parent problem that floats are notorious for. Resize the window to see how the text reflows.',
           ]),
         ]),
+        doc([`Clearfix()([
+  Float({ side: 'left' })([ Img({ src, width: 120, rounded: true }) ]),
+  p({})(['Text flows around the floated image.']),
+])`]),
       ]),
     ]),
 
@@ -144,6 +166,18 @@ export const mediaPanel = state => {
           controls: true,
           caption:  'Video({ tracks: [{ src, kind: "subtitles", srclang: "en", label: "English", default: true }] })',
         }),
+        doc([`Video({
+  sources: [
+    { src: '/intro.webm', type: 'video/webm' },
+    { src: '/intro.mp4',  type: 'video/mp4'  },
+  ],
+  poster:   '/thumb.jpg',
+  aspect:   '16/9',
+  controls: true,
+  caption:  'Introduction',
+})
+// Short-hand single source:
+Video({ src: '/clip.mp4', aspect: '16/9', controls: true })`]),
       ]),
     ]),
 
@@ -165,6 +199,16 @@ export const mediaPanel = state => {
             caption:  'SoundHelix Song 2 — looping example',
           }),
         ]),
+        doc([`Audio({
+  sources: [
+    { src: '/track.ogg', type: 'audio/ogg'  },
+    { src: '/track.mp3', type: 'audio/mpeg' },
+  ],
+  controls: true,
+  caption:  'Song title',
+})
+// Short-hand:
+Audio({ src: '/track.mp3', controls: true, loop: true })`]),
       ]),
     ]),
 
@@ -231,6 +275,15 @@ export const mediaPanel = state => {
             ]
           : []
         ),
+        doc([`Dropzone({
+  accept: 'image/*,.pdf',
+  multiple: true,
+  active: state.dzActive,
+  onDragEnter: () => setState({ dzActive: true }),
+  onDragLeave: () => setState({ dzActive: false }),
+  onDrop:      files => setState({ dzActive: false, dzFiles: Array.from(files).map(f => f.name) }),
+  onFileSelect: files => setState({ dzFiles: Array.from(files).map(f => f.name) }),
+})(['Drop files here or click to browse'])`]),
       ]),
     ]),
   ]);

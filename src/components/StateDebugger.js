@@ -172,7 +172,6 @@ const StateDebugger = ({ state, setState, getState }) => {
               actionBtn({ cls: 'dbg-btn-del' })('✕')('Delete key')(() => {
                 const next = {};
                 Object.keys(getState()).filter(x => x !== k).forEach(x => { next[x] = getState()[x]; });
-                console.log(next)
                 setState(next);
               }),
             ]),

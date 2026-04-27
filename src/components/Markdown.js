@@ -31,6 +31,7 @@ const startsWith = pfx => s => s.startsWith(pfx);
 const not = f => (...args) => !f(...args);
 const isBlank = pipe(trim, eq(''));
 
+// this is a old hack from bardos, that should technically get removed
 const normalizeLang = raw => {
     const k = (raw || '').trim().toLowerCase();
     return ({ 'c#': 'csharp', cs: 'csharp', python3: 'python', py3: 'python' })[k] || k;

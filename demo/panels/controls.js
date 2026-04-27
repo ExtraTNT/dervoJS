@@ -2,6 +2,8 @@ import { div, Card, Row, Col, Stack, span, p, strong } from '../../src/index.js'
 import { Slider, ProgressBar, Button } from '../../src/index.js';
 import { setState, startProgress, resetProgress } from '../store.js';
 
+import { doc } from '../components/doc.js';
+
 export const controlsPanel = state =>
   div({})([
     // ── Sliders ────────────────────────────────────────────────────────────
@@ -37,6 +39,13 @@ export const controlsPanel = state =>
           disabled: true,
         }),
       ]),
+      doc([`
+Slider({id: 'sliderA', label: 'Volume', value: state.sliderA, onInput: e => setState({ sliderA: +e.target.value }),}),
+Slider({ id: 'sliderB', label: 'Brightness', value: state.sliderB, min: 0, max: 100, onInput: e => setState({ sliderB: +e.target.value }),}),
+Slider({id: 'sliderC', label: 'Zoom', value: state.sliderC, min: 10, max: 200, step: 10, onInput: e => setState({ sliderC: +e.target.value }),}),
+Slider({id: 'sliderDis', label: 'Disabled', value: 60, disabled: true,}),
+`
+      ]),
     ]),
 
     // ── Progress bars ──────────────────────────────────────────────────────
@@ -59,6 +68,12 @@ export const controlsPanel = state =>
           })(['▶ Animate']),
           Button({ variant: 'ghost', size: 'sm', onClick: resetProgress })(['Reset']),
         ]),
+        doc([
+`ProgressBar({ value: state.progress, label: 'Upload', showValue: true }),
+ProgressBar({ value: state.progress, variant: 'success', label: 'Storage', showValue: true, size: 'lg' }),
+ProgressBar({ value: state.progress, variant: 'warning', label: 'Memory', showValue: true, striped: true }),
+ProgressBar({ value: state.progress, variant: 'danger', striped: true, animated: state.progressRunning, size: 'sm' }),
+ProgressBar({ indeterminate: state.progressRunning, label: 'Indeterminate' }),`])
       ]),
     ]),
 

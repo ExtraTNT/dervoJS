@@ -1,16 +1,25 @@
 import { div, Card, Button, p } from '../../src/index.js';
-import { setState, showAlert } from '../store.js';
+import { setState } from '../store.js';
+import { doc } from '../components/doc.js';
 
 export const buttonsPanel = state =>
   div({})([
     Card({ title: 'Variants' })([
       div({ style: 'display:flex; gap:10px; flex-wrap:wrap; align-items:center' })([
-        Button({ onClick: () => showAlert('success', 'Primary!') })(['Primary']),
-        Button({ variant: 'secondary', onClick: () => showAlert('info', 'Secondary!') })(['Secondary']),
-        Button({ variant: 'danger',    onClick: () => showAlert('error', 'Danger!') })(['Danger']),
-        Button({ variant: 'success',   onClick: () => showAlert('success', 'Success!') })(['Success']),
-        Button({ variant: 'ghost',     onClick: () => showAlert('info', 'Ghost!') })(['Ghost']),
+        Button({ onClick: () => alert('Primary!') })(['Primary']),
+        Button({ variant: 'secondary', onClick: () => alert('Secondary!') })(['Secondary']),
+        Button({ variant: 'danger',    onClick: () => alert('Danger!') })(['Danger']),
+        Button({ variant: 'success',   onClick: () => alert('Success!') })(['Success']),
+        Button({ variant: 'ghost',     onClick: () => alert('Ghost') })(['Ghost']),
         Button({ disabled: true })(['Disabled']),
+      ]),
+      doc([
+        `Button({ onClick: () => alert('Primary!') })(['Primary']),
+Button({ variant: 'secondary', onClick: () => alert('Secondary!') })(['Secondary']),
+Button({ variant: 'danger',    onClick: () => alert('Danger!') })(['Danger']),
+Button({ variant: 'success',   onClick: () => alert('Success!') })(['Success']),
+Button({ variant: 'ghost',     onClick: () => alert('Ghost') })(['Ghost']),
+Button({ disabled: true })(['Disabled']),`
       ]),
     ]),
 
@@ -20,6 +29,11 @@ export const buttonsPanel = state =>
           Button({ size: 'sm' })(['Small']),
           Button({ size: 'md' })(['Medium']),
           Button({ size: 'lg' })(['Large']),
+        ]),
+        doc([
+          `Button({ size: 'sm' })(['Small']),
+Button({ size: 'md' })(['Medium']),
+Button({ size: 'lg' })(['Large']),`
         ]),
       ]),
     ]),
@@ -33,6 +47,11 @@ export const buttonsPanel = state =>
           Button({ variant: 'secondary', size: 'sm', onClick: () => setState(s => ({ count: s.count - 1 })) })(['− 1']),
           Button({ size: 'sm',           onClick: () => setState(s => ({ count: s.count + 1 })) })(['+ 1']),
           Button({ variant: 'ghost',     size: 'sm', onClick: () => setState({ count: 0 }) })(['Reset']),
+        ]),
+      doc([
+        `Button({ variant: 'secondary', size: 'sm', onClick: () => setState(s => ({ count: s.count - 1 })) })(['− 1']),
+Button({ size: 'sm',           onClick: () => setState(s => ({ count: s.count + 1 })) })(['+ 1']),
+Button({ variant: 'ghost',     size: 'sm', onClick: () => setState({ count: 0 }) })(['Reset']),`
         ]),
       ]),
     ]),

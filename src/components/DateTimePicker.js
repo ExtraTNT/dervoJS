@@ -120,21 +120,21 @@ const DateTimePicker = ({
   const nextMonth = () => fire(onViewChange)(nextMonthOf(vy)(vm));
 
   // ── Day predicates ────────────────────────────────────────────────────────
-  const isDisabled = (year, month, day) => {
+  const isDisabled = year => month => day => {
     const d = { year, month, day };
     return toMaybe(minD)(() => false)(m => cmpDate(d)(m) < 0)
         || toMaybe(maxD)(() => false)(m => cmpDate(d)(m) > 0);
   };
 
-  const isToday = (year, month, day) =>
+  const isToday = year => month => day =>
     year === today.getFullYear() && month === today.getMonth() && day === today.getDate();
 
-  const isSelected = (year, month, day) =>
+  const isSelected = year => month => day =>
     sel != null && year === sel.year && month === sel.month && day === sel.day;
 
   // ── Day selection ─────────────────────────────────────────────────────────
-  const selectDay = (year, month, day) => {
-    if (isDisabled(year, month, day)) return;
+  const selectDay = year => month => day => {
+    if (isDisabled(year)(month)(day)) return;
     fire(onChange)(formatISO({ year, month, day, hour: selHour, minute: selMinute }, showTime));
   };
 
@@ -148,18 +148,18 @@ const DateTimePicker = ({
 
   const dayCells = Array.from({ length: daysInMonth(vy, vm) }, (_, i) => {
     const d        = i + 1;
-    const disabled = isDisabled(vy, vm, d);
+    const disabled = isDisabled(vy)(vm)(d);
     return div({
       className: cn(
         'date-cell',
-        isToday(vy, vm, d)    && 'date-cell-today',
-        isSelected(vy, vm, d) && 'date-cell-selected',
+        isToday(vy)(vm)(d)    && 'date-cell-today',
+        isSelected(vy)(vm)(d) && 'date-cell-selected',
         disabled              && 'date-cell-disabled',
       ),
-      onclick:         disabled ? null : () => selectDay(vy, vm, d),
+      onclick:         disabled ? null : () => selectDay(vy)(vm)(d),
       role:            'button',
       tabIndex:        disabled ? '-1' : '0',
-      'aria-pressed':  String(!!isSelected(vy, vm, d)),
+      'aria-pressed':  String(!!isSelected(vy)(vm)(d)),
       'aria-disabled': String(disabled),
     })([String(d)]);
   });

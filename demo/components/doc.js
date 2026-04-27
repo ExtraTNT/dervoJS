@@ -1,0 +1,2 @@
+import { pre } from '../../src/index.js'
+export const doc = pre({ style: 'margin:12px 0 0; font-size:11.5px; font-family:monospace; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:10px 12px; overflow-x:auto; color:var(--text-muted); white-space:pre' });

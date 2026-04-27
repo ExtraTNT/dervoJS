@@ -1,5 +1,5 @@
+import { Pair, fst, snd } from '../lib/odocosjs/src/core.js';
 import { Observable } from '../lib/odocosjs/src/Observable.js';
-import { createNode } from '../lib/odocosjs/src/render.js';
 
 // ── Focus helpers ─────────────────────────────────────────────────────────
 
@@ -53,11 +53,36 @@ const vnodeKey = c => (c && typeof c === 'object' ? (c.props?.key ?? null) : nul
 
 const _prevProps = new WeakMap();
 
+// ── SVG-aware node creation ───────────────────────────────────────────────
+const _SVG_NS  = 'http://www.w3.org/2000/svg';
+const _SVG_SET = new Set([
+  'svg','g','path','circle','ellipse','rect','line','polyline','polygon',
+  'text','tspan','defs','use','symbol','clipPath','mask',
+  'linearGradient','radialGradient','stop','title','desc',
+]);
+
+const _buildNode = vnode => {
+  if (typeof vnode === 'string') return document.createTextNode(vnode);
+  const isSvg = _SVG_SET.has(vnode.tag);
+  const node  = isSvg
+    ? document.createElementNS(_SVG_NS, vnode.tag)
+    : document.createElement(vnode.tag);
+  const props = vnode.props || {};
+  for (const k in props) {
+    if (k === 'key')         continue;
+    if (k.startsWith('on')) { node[k] = props[k]; continue; }
+    if (isSvg)               node.setAttribute(k, props[k]);
+    else                     node[k] = props[k];
+  }
+  const ch = vnode.children || [];
+  if (typeof ch.map !== 'function')
+    console.error("Can't render vnode due to invalid children", vnode);
+  else
+    ch.map(_buildNode).forEach(c => node.appendChild(c));
+  return node;
+};
+
 // ── Tracked node creation ─────────────────────────────────────────────────
-// createNode (library) sets DOM props from vnode.props but never touches
-// _prevProps. On the first patch of such a node prev={}, so the cleanup loop
-// has nothing to remove — props set at creation time (e.g. className:'stack')
-// silently persist when the node is later reused for content that omits them.
 // _registerProps walks the just-created DOM tree and seeds _prevProps so
 // every subsequent patch has accurate "what was previously set" tracking.
 const _registerProps = (vnode, dom) => {
@@ -69,7 +94,7 @@ const _registerProps = (vnode, dom) => {
 };
 
 const _createNode = vnode => {
-  const node = createNode(vnode);
+  const node = _buildNode(vnode);
   _registerProps(vnode, node);
   return node;
 };
@@ -77,16 +102,25 @@ const _createNode = vnode => {
 /** Curried: _patchProps(el)(newProps) */
 const _patchProps = el => newProps => {
   if (_profiling) _ops.propPatches++;
-  const prev = _prevProps.get(el) || {};
+  const isSvg = el.namespaceURI === _SVG_NS;
+  const prev  = _prevProps.get(el) || {};
   Object.keys(prev)
     .filter(k => !(k in newProps))
     .forEach(k => {
-      if      (typeof prev[k] === 'function') el[k] = null;
-      else if (typeof prev[k] === 'boolean')  el[k] = false;
-      else                                     el[k] = '';
+      if (k === 'key')                           return;
+      if (typeof prev[k] === 'function')       { el[k] = null; return; }
+      if (isSvg)                               { el.removeAttribute(k); return; }
+      if (typeof prev[k] === 'boolean')          el[k] = false;
+      else                                       el[k] = '';
     });
   Object.keys(newProps).forEach(k => {
-    if (k === 'style' || el[k] !== newProps[k]) el[k] = newProps[k];
+    if (k === 'key') return;
+    if (k.startsWith('on')) { if (el[k] !== newProps[k]) el[k] = newProps[k]; return; }
+    if (isSvg) {
+      if (el.getAttribute(k) !== String(newProps[k])) el.setAttribute(k, newProps[k]);
+    } else {
+      if (k === 'style' || el[k] !== newProps[k]) el[k] = newProps[k];
+    }
   });
   _prevProps.set(el, newProps);
 };
@@ -243,24 +277,31 @@ const mount = store => root => view => {
   // _runFast is the hot path: zero overhead, no timing calls.
   // _runProfiled measures compute + patch and feeds the ring buffer.
   let _prevRenderState = null;   // snapshot from last completed render, for changedKeys diff
+  const mainRenderFunc = store => toList(view(store.getState()));
   const _runFast = () => {
-    render(toList(view(store.getState())));
+    //console.log("fast");
+    render(mainRenderFunc(store));
     _prevRenderState = store.getState();
   };
   const _runProfiled = () => {
-    const prevState = _prevRenderState ?? store.getState();
+    // Flush the previous frame's data into the log BEFORE the view runs,
+    // so the profiler UI reads up-to-date entries.
+    _flushPendingLog();
+
+    const prevState   = _prevRenderState ?? store.getState();
     _resetOps();
-    const t0        = performance.now();
-    const vnodes    = toList(view(store.getState()));
-    const t1        = performance.now();
+    const t0          = performance.now();
+    const vnodes      = mainRenderFunc(store);
+    const t1          = performance.now();
     render(vnodes);
-    const t2        = performance.now();
+    const t2          = performance.now();
     const curState    = store.getState();
     const changedKeys = prevState !== null && typeof prevState === 'object'
-      ? Object.keys({ ...prevState, ...curState }).filter(k => prevState[k] !== curState[k])
+      ? Object.keys({ ...prevState, ...curState }).filter(k => prevState[k] !== curState[k]).map(k => Pair(k)(curState[k]))
       : [];
     _prevRenderState = curState;
-    _logFrame(t1 - t0, t2 - t1, { ..._ops }, changedKeys);
+    //console.log(changedKeys.map(x => [x(fst), x(snd)]))
+    _bufferFrame(t1 - t0, t2 - t1, { ..._ops }, changedKeys);
   };
 
   // Mutable reference so enableProfiler / disableProfiler can swap it live.
@@ -293,22 +334,34 @@ const _resetOps = () => {
   _ops.inserts = _ops.propPatches = _ops.textUpdates = 0;
 };
 
-const _logFrame = (computeMs, patchMs, ops, changedKeys) => {
+// Deferred logging: frame data is buffered here and flushed at the START
+// of the next profiled render, so the view function always reads an
+// up-to-date _renderLog (instead of being 1 frame behind).
+let _pendingLog = null;
+
+const _flushPendingLog = () => {
+  if (!_pendingLog) return;
+  const p = _pendingLog;
+  _pendingLog = null;
   _renderLog.unshift({
     frame:       ++_frameIdx,
-    computeMs:   +computeMs.toFixed(3),
-    patchMs:     +patchMs.toFixed(3),
-    totalMs:     +(computeMs + patchMs).toFixed(3),
-    ts:          new Date().toTimeString().slice(0, 8),
-    ops:         ops        ?? { vnodes:0, creates:0, replaces:0, removes:0, inserts:0, propPatches:0, textUpdates:0 },
-    changedKeys: changedKeys ?? [],
+    computeMs:   +p.computeMs.toFixed(3),
+    patchMs:     +p.patchMs.toFixed(3),
+    totalMs:     +(p.computeMs + p.patchMs).toFixed(3),
+    ts:          p.ts,
+    ops:         p.ops,
+    changedKeys: p.changedKeys,
   });
   if (_renderLog.length > 100) _renderLog.length = 100;
 };
 
-const enableProfiler  = () => { if (_profiling) return; _profiling = true;  _runners.forEach(r => r.enable());  };
-const disableProfiler = () => { if (!_profiling) return; _profiling = false; _runners.forEach(r => r.disable()); };
-const getRenderLog    = () => { enableProfiler(); return _renderLog; };
+const _bufferFrame = (computeMs, patchMs, ops, changedKeys) => {
+  _pendingLog = { computeMs, patchMs, ts: new Date().toTimeString().slice(0, 8), ops, changedKeys };
+};
+
+const enableProfiler  = () => {console.debug("Profiler up"); if (_profiling) return; _profiling = true;  _runners.forEach(r => r.enable());  };
+const disableProfiler = () => {console.debug("Profiler down"); if (!_profiling) return; _flushPendingLog(); _profiling = false; _runners.forEach(r => r.disable()); };
+const getRenderLog    = () => _renderLog;
 const getProfilerFrame = () => _frameIdx;
 
 export { createStore, mount, getRenderLog, getProfilerFrame, enableProfiler, disableProfiler };

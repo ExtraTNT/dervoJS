@@ -3,6 +3,7 @@ import {
   Card, Row, Col, Stack,
   Typography, H1, H2, H3, H4, H5, H6, P, Code, Pre, Quote,
 } from '../../src/index.js';
+import { doc } from '../components/doc.js';
 
 /* ── Sample long-form content rendered once (not reactive) ─────────────── */
 const sampleContent = [
@@ -90,5 +91,12 @@ export const typographyPanel = () =>
       div({ style: 'border:1px solid var(--border); border-radius:var(--radius); padding:24px; background:var(--surface)' })([
         Typography({ toc: true, tocPosition: 'right', tocSticky: true })(sampleContent),
       ]),
+      doc([`Typography({ toc: true, tocPosition: 'right', tocSticky: true })([
+  H1({})(['Page Title']),
+  H2({})(['Section']),
+  P({})(['Body text…']),
+  Pre({ lang: 'js' })(['const x = 1;']),
+  Quote({ cite: 'Knuth' })(['Premature optimisation is the root of all evil.']),
+])`   ]),
     ]),
   ]);

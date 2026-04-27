@@ -1,5 +1,6 @@
 import { div, Card, TextInput, Select, Table, filterAll, filterExact, sortBy } from '../../src/index.js';
 import { setState, TABLE_ROWS, TABLE_COLS } from '../store.js';
+import { doc } from '../components/doc.js';
 
 export const tablePanel = state =>
   div({})([
@@ -23,6 +24,15 @@ export const tablePanel = state =>
           caption: 'Programming languages',
         }),
       ]),
+      doc([`Table({
+  columns: TABLE_COLS,  // [{ key, label, render? }]
+  rows: TABLE_ROWS,     // plain objects, keys match column keys
+  striped: true,
+  scroll: true,
+  filter: state.tableFilter,
+  filterFn: filterAll,  // searches all column values (case-insensitive substring)
+  caption: 'Programming languages',
+})`]),
     ]),
 
     div({ style: 'margin-top:16px' })([
@@ -30,8 +40,8 @@ export const tablePanel = state =>
         Select({
           id: 'paradigmSelect',
           label: 'Filter by paradigm',
-          placeholder: 'Show all',
           options: [
+            { value: '', label: 'Show all' },
             { value: 'Multi',      label: 'Multi' },
             { value: 'Functional', label: 'Functional' },
           ],
@@ -49,6 +59,16 @@ export const tablePanel = state =>
             filterFn: filterExact('paradigm'),
           }),
         ]),
+        doc([`// filterExact(key) — strict equality on one column
+Table({
+  filter: state.paradigmFilter,
+  filterFn: filterExact('paradigm'),
+  rows: TABLE_ROWS,
+  columns: TABLE_COLS,
+})
+
+// filterBy(key) — substring match on one column
+Table({ filter: q, filterFn: filterBy('lang'), ... })`]),
       ]),
     ]),
 
@@ -65,6 +85,16 @@ export const tablePanel = state =>
           filterFn: filterAll,
           caption: 'Scrollable — 14 rows, 220px height',
         }),
+        doc([`// showFilter=true renders the search input inside the table header
+Table({
+  showFilter: true,
+  filterId: 'builtinFilter',
+  filter: state.builtinFilter,
+  onFilterChange: v => setState({ builtinFilter: v }),
+  filterFn: filterAll,
+  maxHeight: '220px',  // enables vertical scroll with sticky header
+  rows, columns,
+})`]),
       ]),
     ]),
 
@@ -88,6 +118,18 @@ export const tablePanel = state =>
           showColumnFilters: true,
           caption: 'Click a column header to sort · type in a column input to filter',
         }),
+        doc([`Table({
+  columns: [
+    { key: 'lang',  label: 'Language', sort: true, filter: true },
+    { key: 'year',  label: 'Year',     sort: true, sortFn: sortBy('year') },
+  ],
+  rows: TABLE_ROWS,
+  sort: state.tableSort,
+  onSort: (key, dir) => setState({ tableSort: { key, dir } }),
+  columnFilters: state.tableColFilters,
+  onColumnFilter: (key, val) => setState(s => ({ tableColFilters: { ...s.tableColFilters, [key]: val } })),
+  showColumnFilters: true,
+})`]),
       ]),
     ]),
 

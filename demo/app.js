@@ -22,7 +22,11 @@ import { markdownPanel   } from './panels/markdown.js';
 import { themePanel      } from './panels/theme.js';
 import { typographyPanel } from './panels/typography.js';
 import { pickersPanel    } from './panels/pickers.js';
-import { debugPanel      } from './panels/debug.js';
+import { philosophyPanel } from './panels/philosophy.js';
+import { routerPanel     } from './panels/router.js';
+import { websocketPanel  } from './panels/websocket.js';
+import { chartsPanel     } from './panels/charts.js';
+import { keymapPanel     } from './panels/keymap.js';
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 initStyles();
@@ -35,6 +39,7 @@ document.addEventListener('keydown', e => {
 
 // ── Nav ────────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
+  { id: 'philosophy', icon: '☯', label: 'Philosophy'},
   { id: 'buttons',    icon: '◈', label: 'Buttons' },
   { id: 'clock',      icon: '◷', label: 'Clock & Interval' },
   { id: 'controls',   icon: '⊶', label: 'Sliders & Progress' },
@@ -52,6 +57,10 @@ const NAV_ITEMS = [
   { id: 'theme',      icon: '◐', label: 'Theme & Tokens' },
   { id: 'toggles',    icon: '⏻', label: 'Toggles' },
   { id: 'typography', icon: '¶', label: 'Typography' },
+  { id: 'websocket',  icon: '⇌', label: 'WebSocket' },
+  { id: 'router',     icon: '⋱', label: 'Router & Nav' },
+  { id: 'charts',     icon: '◉', label: 'Charts' },
+  { id: 'keymap',     icon: '⌘', label: 'KeyMap' },
 ];
 
 // Panels marked `unload: true` in NAV_ITEMS have their DOM torn down and
@@ -69,12 +78,13 @@ const UNLOAD_PANELS = new Set(NAV_ITEMS.filter(i => i.unload).map(i => i.id));
 
 const renderPanel = state => {
   const id    = state.activeTab;
-  const vnode = (PANELS[id] || PANELS.buttons)(state);
+  const vnode = (PANELS[id] || PANELS.philosophy)(state);
   const key   = UNLOAD_PANELS.has(id) ? id : 'panel';
   return { ...vnode, props: { ...vnode.props, key } };
 };
 
 const PANELS = {
+  philosophy: philosophyPanel,
   buttons:    buttonsPanel,
   inputs:     inputsPanel,
   toggles:    togglesPanel,
@@ -91,6 +101,10 @@ const PANELS = {
   pickers:    pickersPanel,
   markdown:   markdownPanel,
   docs:       docsPanel,
+  websocket:  websocketPanel,
+  router:     routerPanel,
+  charts:     chartsPanel,
+  keymap:     keymapPanel,
 };
 
 // ── Root view ──────────────────────────────────────────────────────────────
@@ -167,7 +181,7 @@ const view = state => [
     initialH: 560,
   })([
     StateDebugger({ state, setState, getState }),
-    RenderProfiler({ setState }),
+    RenderProfiler({ setState, active: state.debugOpen }),
   ]),
 ];
 

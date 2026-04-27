@@ -1,6 +1,9 @@
 import { div, span, button, table, th, td, tr, tbody, thead } from '../elements.js';
+import { fst, snd } from '../../lib/odocosjs/src/core.js'
 import { cn } from '../utils.js';
 import { getRenderLog, getProfilerFrame, enableProfiler, disableProfiler } from '../state.js';
+import { Button } from './Button.js';
+import { BarChart, MultiLineChart } from './Charts.js';
 
 // ── Module-level UI state ────────────────────────────────────────────────
 const _ui = {
@@ -14,16 +17,38 @@ const _ui = {
 const fmt = n => n < 0.1 ? '<0.1' : n.toFixed(2);
 const hot = ms => ms > 16.67;
 
-// Stacked compute/patch breakdown bar (fixed 200px wide)
-const breakdownBar = e => {
-  const total  = e.totalMs || 0.001;
-  const cPct   = (e.computeMs / total * 100).toFixed(1);
-  const pPct   = (e.patchMs   / total * 100).toFixed(1);
-  return div({ className: 'rp-breakdown' })([
-    div({ className: 'rp-bd-segment rp-bd-compute', style: `width:${cPct}%`, title: `compute ${fmt(e.computeMs)}ms` })([]),
-    div({ className: 'rp-bd-segment rp-bd-patch',   style: `width:${pPct}%`, title: `patch   ${fmt(e.patchMs)}ms`   })([]),
+// Colours
+const C_COMPUTE = '#76b7b2';
+const C_PATCH   = '#f28e2b';
+const C_TOTAL   = '#4e79a7';
+const C_HOT     = '#e15759';
+
+// Mini 2-bar breakdown (compute vs patch for a single frame)
+const breakdownChart = e =>
+  BarChart({
+    width: 170, height: 84, paddingX: 44, paddingY: 12, gap: 14, gridLines: false,
+    showValues: true,
+    valueFmt:   v => (v < 0.1 ? '<0.1' : v.toFixed(2)) + 'ms',
+  })([
+    { label: 'compute', value: e.computeMs, color: C_COMPUTE },
+    { label: 'patch',   value: e.patchMs,   color: C_PATCH   },
   ]);
-};
+
+// Expanded detail for a frame
+const frameDetail = e =>
+  div({ className: 'rp-detail-inner' })([
+    div({})([breakdownChart(e)]),
+    keysRow(e),
+    opsRow(e),
+  ]);
+
+const detailRow = e =>
+  tr({ className: 'rp-detail-row', key: `d${e.frame}` })([
+    td({ className: 'rp-detail-cell', colSpan: 5 })([
+      keysRow(e),
+      opsRow(e),
+    ]),
+  ]);
 
 // Changed-keys badge row
 const keysRow = e => {
@@ -31,14 +56,14 @@ const keysRow = e => {
   return div({ className: 'rp-detail-labels', style: 'gap:4px' })([]
     .concat(span({ className: 'rp-ops-lbl', style: 'margin-right:4px; flex-shrink:0' })(['changed keys']))
     .concat(keys.length > 0
-      ? keys.map(k => span({ className: 'rp-badge' })([k]))
+      ? keys.map(k => Button({ className: 'rp-badge', onClick: () => console.log(k(snd)), toolTip: "click to log value" })([k(fst)]))
       : [span({ style: 'color:var(--text-muted)' })(['—'])]
     )
   );
 };
 
 // DOM op chip
-const opsChip = (label, val) =>
+const opsChip = label => val =>
   span({ className: 'rp-ops-chip' })([
     span({ className: 'rp-ops-val' })([String(val)]),
     span({ className: 'rp-ops-lbl' })([label]),
@@ -50,13 +75,13 @@ const opsRow = e => {
   const total = (ops.creates ?? 0) + (ops.replaces ?? 0) + (ops.removes ?? 0) + (ops.inserts ?? 0);
   const rate  = (ops.vnodes ?? 0) > 0 ? Math.round(total / ops.vnodes * 100) : 0;
   return div({ className: 'rp-ops-row' })([
-    opsChip('visited',   ops.vnodes      ?? 0),
-    opsChip('created',   ops.creates     ?? 0),
-    opsChip('replaced',  ops.replaces    ?? 0),
-    opsChip('removed',   ops.removes     ?? 0),
-    opsChip('moved',     ops.inserts     ?? 0),
-    opsChip('propSets',  ops.propPatches ?? 0),
-    opsChip('textEdits', ops.textUpdates ?? 0),
+    opsChip('visited')(ops.vnodes       ?? 0),
+    opsChip('created')(ops.creates      ?? 0),
+    opsChip('replaced')(ops.replaces    ?? 0),
+    opsChip('removed')(ops.removes      ?? 0),
+    opsChip('moved')(ops.inserts        ?? 0),
+    opsChip('propSets')(ops.propPatches  ?? 0),
+    opsChip('textEdits')(ops.textUpdates ?? 0),
     span({
       className: 'rp-ops-rate',
       title: `${total} DOM mutations out of ${ops.vnodes ?? 0} nodes visited`,
@@ -64,27 +89,9 @@ const opsRow = e => {
   ]);
 };
 
-const detailRow = e =>
-  tr({ className: 'rp-detail-row', key: `d${e.frame}` })([
-    td({ className: 'rp-detail-cell', colSpan: 5 })([
-      div({ className: 'rp-detail-inner' })([
-        div({ className: 'rp-detail-labels' })([
-          span({})([` ${fmt(e.computeMs)}ms (${(e.computeMs / e.totalMs * 100).toFixed(0)}%)`]),
-          span({})([` ${fmt(e.patchMs)}ms (${(e.patchMs / e.totalMs * 100).toFixed(0)}%)`]),
-          span({ style: 'margin-left:12px; color:var(--text-muted)' })([`total ${fmt(e.totalMs)}ms`]),
-        ]),
-        breakdownBar(e),
-        keysRow(e),
-        opsRow(e),
-      ]),
-    ]),
-  ]);
-
 // ── Component ─────────────────────────────────────────────────────────────
 
 /**
- * RenderProfiler — live render-timing monitor.
- *
  * Auto-detaches (calls disableProfiler) when it stops being rendered,
  * e.g. when the debug panel is closed.
  *
@@ -172,9 +179,19 @@ const detailRow = e =>
  *   changed keys = {} on every frame → setState({}) is being called too often
  *                                       (likely a polling or timer re-render).
  */
-const RenderProfiler = ({ setState = () => {} } = {}) => {
+let _wasActive = false;
+
+const RenderProfiler = ({ setState = () => {}, active = true } = {}) => {
+  if (!active) { _wasActive = false; return div({ style: 'display:none' })([]); }
+  const justActivated = !_wasActive;
+  _wasActive = true;
   enableProfiler();
   const force = () => setState({});
+
+  // On first active render, this frame ran as _runFast (profiling was off
+  // when the rAF fired). Kick one follow-up so the first profiled frame
+  // captures real data and the UI isn't empty.
+  if (justActivated) { queueMicrotask(force); }
 
   // ── auto-detach: if the frame counter hasn't advanced since last render,
   //    we're still alive; if it HAS advanced but we weren't called, we won't
@@ -184,7 +201,6 @@ const RenderProfiler = ({ setState = () => {} } = {}) => {
   _ui.lastSeenFrame = getProfilerFrame();
 
   const log = getRenderLog().slice(0, _ui.limit);
-
   if (!log.length)
     return div({ className: 'rp-empty' })(['No renders recorded yet.']);
 
@@ -196,51 +212,30 @@ const RenderProfiler = ({ setState = () => {} } = {}) => {
   const sorted  = [...totals].sort((a, b) => a - b);
   const p95     = sorted[Math.floor(sorted.length * 0.95)] ?? maximum;
 
-  // ── bar chart ────────────────────────────────────────────────────────
-  const barMax = Math.max(maximum, 16);
-  const barH   = 48;
-  const bars   = log.slice().reverse().map(e => {
-    const h      = Math.max(2, Math.round((e.totalMs / barMax) * barH));
-    const isOpen = _ui.expandedFrame === e.frame;
-    return div({
-      className: cn('rp-bar', hot(e.totalMs) && 'rp-bar-hot', isOpen && 'rp-bar-selected'),
-      style:     `height:${h}px`,
-      title:     `#${e.frame}  ${e.ts}\ntotal ${e.totalMs}ms\ncompute ${e.computeMs}ms\npatch ${e.patchMs}ms`,
-      key:       String(e.frame),
-      onclick:   () => { _ui.expandedFrame = isOpen ? null : e.frame; force(); },
-    })([]);
-  });
-
-  // ── expanded bar detail (below chart) ────────────────────────────────
-  const expanded = _ui.expandedFrame != null
-    ? log.find(e => e.frame === _ui.expandedFrame)
+  // ── chart series (oldest → newest) ────────────────────────────────────────
+  const frames       = log.slice().reverse();
+  const highlightIdx = _ui.expandedFrame != null
+    ? frames.findIndex(f => f.frame === _ui.expandedFrame)
     : null;
+  const chartSeries  = [
+    { label: 'total',   color: C_TOTAL,   data: frames.map(f => f.totalMs)   },
+    { label: 'compute', color: C_COMPUTE, data: frames.map(f => f.computeMs) },
+    { label: 'patch',   color: C_PATCH,   data: frames.map(f => f.patchMs)   },
+  ];
+  const xLabels      = frames.map(f => `#${f.frame}`);
 
-  const chartDetail = expanded
-    ? div({ className: 'rp-chart-detail' })([
-        div({ className: 'rp-cd-timing' })([
-          span({ className: 'rp-cd-frame' })([`#${expanded.frame}  ${expanded.ts}`]),
-          breakdownBar(expanded),
-          div({ className: 'rp-detail-labels' })([
-            span({})([` ${fmt(expanded.computeMs)}ms`]),
-            span({})([` ${fmt(expanded.patchMs)}ms`]),
-            span({ style: 'margin-left:10px; color:var(--text-muted); font-size:11px' })([`total ${fmt(expanded.totalMs)}ms`]),
-          ]),
-        ]),
-        keysRow(expanded),
-        opsRow(expanded),
-      ])
-    : div({ style: 'display:none' })([]);
+  // ── expanded frame ────────────────────────────────────────────────────
+  const expanded = highlightIdx != null ? frames[highlightIdx] : null;
 
   return div({ className: 'rp-root' })([
 
     // ── stat chips ───────────────────────────────────────────────────────
     div({ className: 'rp-stats' })([
-      statChip('last',   `${fmt(last)}ms`,    hot(last)),
-      statChip('avg',    `${fmt(avg)}ms`,     hot(avg)),
-      statChip('max',    `${fmt(maximum)}ms`, hot(maximum)),
-      statChip('p95',    `${fmt(p95)}ms`,     hot(p95)),
-      statChip('frames', String(getRenderLog().length), false),
+      statChip('last')(`${fmt(last)}ms`)(hot(last)),
+      statChip('avg')(`${fmt(avg)}ms`)(hot(avg)),
+      statChip('max')(`${fmt(maximum)}ms`)(hot(maximum)),
+      statChip('p95')(`${fmt(p95)}ms`)(hot(p95)),
+      statChip('frames')(String(getRenderLog().length))(false),
       div({ style: 'flex:1' })([]),
       button({
         className: 'rp-btn',
@@ -256,18 +251,27 @@ const RenderProfiler = ({ setState = () => {} } = {}) => {
       })(['≡']),
     ]),
 
-    // ── sparkline ────────────────────────────────────────────────────────
-    div({ className: 'rp-chart' })([
-      div({ className: 'rp-bars' })([...bars]),
-      div({ className: 'rp-chart-scale' })([
-        span({})([`${fmt(barMax)}ms`]),
-        span({})(['16.67']),
-        span({})(['0']),
-      ]),
-    ]),
+    // ── timing / history multi-line chart ────────────────────────────────────────────
+    MultiLineChart({
+      width: 840, height: 130, paddingX: 36, paddingY: 14,
+      gridLines: true, dots: true, dotR: 3, legend: true,
+      xLabels,
+      highlightIdx,
+      onPointClick: i => {
+        _ui.expandedFrame = i === highlightIdx ? null : frames[i].frame;
+        force();
+      },
+    })(chartSeries),
 
-    // ── expanded bar breakdown ────────────────────────────────────────────
-    chartDetail,
+    // ── expanded frame detail ────────────────────────────────────────────────────
+    expanded
+      ? div({ className: 'rp-chart-detail' })([
+          span({ className: 'rp-cd-frame', style: 'font-size:11px; color:var(--text-muted); display:block; margin-bottom:6px' })([
+            `#${expanded.frame}  ${expanded.ts}  —  total ${fmt(expanded.totalMs)}ms`,
+          ]),
+          frameDetail(expanded),
+        ])
+      : div({ style: 'display:none' })([]),
 
     // ── table ────────────────────────────────────────────────────────────
     _ui.showTable
@@ -306,7 +310,7 @@ const RenderProfiler = ({ setState = () => {} } = {}) => {
   ]);
 };
 
-const statChip = (label, value, isHot) =>
+const statChip = label => value => isHot =>
   div({ className: 'rp-stat' })([
     span({ className: 'rp-stat-label' })([label]),
     span({ className: cn('rp-stat-val', isHot && 'rp-stat-hot') })([value]),

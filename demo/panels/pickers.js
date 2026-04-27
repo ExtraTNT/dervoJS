@@ -1,12 +1,12 @@
 import {
   div, span, strong, p,
-  Card, Row, Col, Stack,
-  Badge,
+  Card, Row, Col, Stack, pre,
   NumberInput,
   ColorPicker,
   DateTimePicker,
 } from '../../src/index.js';
 import { setState } from '../store.js';
+import { doc } from '../components/doc.js';
 
 /* ── Result display helper ─────────────────────────────────────────────── */
 const Val = (v, muted = false) =>
@@ -50,6 +50,16 @@ export const pickersPanel = state =>
           ]),
         ]),
       ]),
+      doc([
+`NumberInput({
+  label: 'Quantity (0–99)',
+  value: state.pickerNumber,
+  min: 0,
+  max: 99,
+  step: 1,
+  onChange: v => setState({ pickerNumber: v }),
+})`
+      ]),
     ]),
 
     // ── ColorPicker ─────────────────────────────────────────────────────────
@@ -74,6 +84,13 @@ export const pickersPanel = state =>
               ]),
             ]),
           ]),
+        ]),
+        doc([
+`ColorPicker({
+  label: 'Brand colour',
+  value: state.pickerColor,
+  onChange: v => setState({ pickerColor: v }),
+})`
         ]),
       ]),
     ]),
@@ -114,7 +131,17 @@ export const pickersPanel = state =>
             ]),
           ]),
         ]),
+        doc([
+`DateTimePicker({
+  label: 'Pick a date and time',
+  value: state.pickerDateTime,
+  viewYear: state.pickerDtYear,
+  viewMonth: state.pickerDtMonth,
+  showTime: true,
+  onChange: v => setState({ pickerDateTime: v }),
+  onViewChange: ({ year, month }) => setState({ pickerDtYear: year, pickerDtMonth: month }),
+})`
+        ]),
       ]),
     ]),
-
   ]);

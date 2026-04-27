@@ -1,6 +1,7 @@
 import { div, Card, Row, Col, Stack, Grid, Container, Tabs, List, Badge, p, span, li, strong } from '../../src/index.js';
 import { DragList, useDragListGroup } from '../../src/index.js';
 import { setState, getState, MemoBadge } from '../store.js';
+import { doc } from '../components/doc.js';
 
 const demoBox = (label, accent = false) =>
   div({
@@ -33,6 +34,12 @@ export const layoutPanel = state =>
           Col({ span: 12, sm: 6, md: 3 })([ demoBox('12 / sm:6 / md:3') ]),
         ]),
       ]),
+      doc([`Row({ gap: 12 })([
+  Col({ span: 12, md: 8 })([ main   ]),  // full → 8 cols on md
+  Col({ span: 12, md: 4 })([ aside  ]),  // full → 4 cols on md
+])
+// Breakpoints: span (default) · sm (≥576px) · md (≥768px) · lg (≥1024px)
+Col({ span: 12, sm: 6, md: 3 })([ item ])`]),
     ]),
 
     div({ style: 'margin-top:16px' })([
@@ -48,6 +55,9 @@ export const layoutPanel = state =>
           demoBox('Item 5', true),
           demoBox('Item 6', true),
         ]),
+        doc([`Grid({ cols: 1, sm: 2, md: 3, gap: 10 })([ item1, item2, item3, item4 ])
+// styled=true adds surface background + padding
+Grid({ cols: 3, gap: 12, styled: true })([ card1, card2, card3 ])`]),
       ]),
     ]),
 
@@ -90,6 +100,9 @@ export const layoutPanel = state =>
             ]),
           ]),
         ]),
+        doc([`Stack({ gap: 8 })([ item1, item2, item3 ])
+// align: 'start' | 'center' | 'end' | 'stretch' (default)
+Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
       ]),
     ]),
 
@@ -101,6 +114,9 @@ export const layoutPanel = state =>
           Container({ maxWidth: 'lg', styled: false })([ demoBox('maxWidth: lg — unstyled') ]),
           Container({ maxWidth: 320, styled: true })([ demoBox('maxWidth: 320 (number) + styled') ]),
         ]),
+        doc([`Container({ maxWidth: 'md', styled: true })([ content ])
+// maxWidth: 'sm'(640) | 'md'(768) | 'lg'(1024) | 'xl'(1280) | 'full' | number(px)
+// styled: adds surface background, border, and box-shadow`]),
       ]),
     ]),
 
@@ -129,8 +145,13 @@ export const layoutPanel = state =>
                 MemoBadge({ variant: i % 2 === 0 ? 'blue' : 'purple' })([`#${i + 1}`]),
               ]),
             ]),
-        }),
-      ]),
+        }),        doc([`List({
+  items: state.langs,
+  renderItem: (item, i) => li({ className: 'list-item' })([
+    div({})([span({})([item]), Badge({ variant: 'blue' })([String(i + 1)])]),
+  ]),
+  empty: p({})(['No items.']),
+})`]),      ]),
     ]),
 
     div({ style: 'margin-top:16px' })([
@@ -147,8 +168,14 @@ export const layoutPanel = state =>
           p({})(['Content for tab 1 — nested tabs work the same way.']),
           p({})(['Content for tab 2.']),
           p({})(['Content for tab 3.']),
-        ]),
-      ]),
+        ]),        doc([`Tabs({
+  tabs: [{ id: 'one', label: 'Tab 1' }, { id: 'two', label: 'Tab 2' }],
+  activeTab: state.innerTab,
+  onTabChange: id => setState({ innerTab: id }),
+})([
+  p({})(['Content for Tab 1']),
+  p({})(['Content for Tab 2']),
+])`]),      ]),
     ]),
 
     // ── DragList ────────────────────────────────────────────────────────────
@@ -162,6 +189,11 @@ export const layoutPanel = state =>
           onChange:   dragKeep => setState({ dragKeep }),
           renderItem: item => span({ style: 'font-size:14px' })([item.label]),
         }),
+        doc([`DragList({
+  items:      state.items,  // each item needs a unique .id
+  onChange:   items => setState({ items }),
+  renderItem: item => span({})([item.label]),
+})`]),
       ]),
     ]),
 

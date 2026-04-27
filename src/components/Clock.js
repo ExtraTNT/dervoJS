@@ -1,4 +1,5 @@
-import { div, span } from '../elements.js';
+import { button, div, span } from '../elements.js';
+import Task from '../../lib/odocosjs/src/Task.js';
 
 /**
  * Formats a total seconds count as HH:MM:SS (when hours > 0) or MM:SS.
@@ -25,23 +26,24 @@ const formatTime = secs => {
 
 /**
  * Creates a background interval that calls `fn` every `ms` milliseconds.
+ * Curried: createInterval(fn)(opts).
  *
  * Completely decoupled from application state — use the returned controller
  * to drive setState calls, fetch data, or trigger any side-effect on a
  * repeating schedule. Start/stop independently of rendering.
  *
  * @param {function} fn               Callback invoked on each tick.
+ * @returns {function}                opts => { start, stop, restart, toggle, isRunning }
+ *
  * @param {Object}   [opts={}]
  * @param {number}   [opts.ms=1000]   Milliseconds between ticks.
  * @param {boolean}  [opts.autoStart=false]  Call start() immediately on creation.
- * @returns {{ start, stop, restart, toggle, isRunning }}
  *
  * @example
  *   // Count up every second
  *   const ticker = createInterval(
- *     () => setState(s => ({ elapsed: s.elapsed + 1 })),
- *     { ms: 1000 }
- *   );
+ *     () => setState(s => ({ elapsed: s.elapsed + 1 }))
+ *   )({ ms: 1000 });
  *   ticker.start();     // begin
  *   ticker.stop();      // pause
  *   ticker.restart();   // stop then start
@@ -50,9 +52,9 @@ const formatTime = secs => {
  *
  * @example
  *   // Poll every 5 seconds, start immediately
- *   const poller = createInterval(fetchLatest, { ms: 5000, autoStart: true });
+ *   const poller = createInterval(fetchLatest)({ ms: 5000, autoStart: true });
  */
-const createInterval = (fn, { ms = 1000, autoStart = false } = {}) => {
+const createInterval = fn => ({ ms = 1000, autoStart = false } = {}) => {
   let id      = null;
   let running = false;
 
@@ -78,41 +80,115 @@ const createInterval = (fn, { ms = 1000, autoStart = false } = {}) => {
   return { start, stop, restart, toggle, isRunning };
 };
 
+// ── Task helpers ──────────────────────────────────────────────────────────
+
+/** Task that resolves after `ms` milliseconds. */
+const delay = ms => new Task((_rej, res) => setTimeout(res, ms));
+
+/** Lift a synchronous side-effect into a resolved Task. */
+const effect = f => new Task((_rej, res) => { f(); res(); });
+
 /**
- * Clock — a stateless vnode display for a seconds value.
+ * Creates a timer controller that drives a store slice.
  *
- * Wire it to your store and drive re-renders with `createInterval`:
- *   1. Store the current time in seconds: `{ elapsed: 0 }`
- *   2. Create an interval that calls setState each tick.
- *   3. Pass store value to Clock in your view.
+ * Each tick is a lazy Task chain: delay(step s) → update state → chain(tick).
+ * The loop stops when `cancelled` is flipped — no interval handle, no leaks.
+ *
+ * @param {Object}   opts
+ * @param {Object}   opts.store         Store from createStore().
+ * @param {string}   [opts.key='timer'] Namespace prefix for state keys.
+ * @param {number}   [opts.step=1]      Seconds added per tick.
+ * @returns {{ start, pause, reset, toggle }}
+ *
+ * @example
+ *   const store = createStore({ timer: { elapsed: 0, running: false } });
+ *   const timer = createTimer({ store, key: 'timer' });
+ *   timer.start();    // starts ticking
+ *   timer.pause();    // freezes
+ *   timer.reset();    // back to 0:00
+ *   timer.toggle();   // flips running
+ *
+ *   // In view — pass controls to Clock for built-in buttons:
+ *   Clock({ time: state.timer.elapsed, running: state.timer.running, controls: timer })
+ */
+const createTimer = ({ store, key = 'timer', step = 1 } = {}) => {
+  let cancelled = true;
+
+  const getSlice = () => store.getState()[key] ?? { elapsed: 0, running: false };
+  const setSlice = patch => store.setState({ [key]: { ...getSlice(), ...patch } });
+
+  const tick = () =>
+    delay(1000 * step).chain(() =>
+      cancelled
+        ? Task.of(null)
+        : effect(() => setSlice({ elapsed: getSlice().elapsed + step })).chain(tick)
+    );
+
+  const start = () => {
+    if (!cancelled) return;
+    cancelled = false;
+    setSlice({ running: true });
+    tick().fork(() => {}, () => {});
+  };
+
+  const pause = () => {
+    cancelled = true;
+    setSlice({ running: false });
+  };
+
+  const reset = () => {
+    pause();
+    setSlice({ elapsed: 0 });
+  };
+
+  const toggle = () => (getSlice().running ? pause : start)();
+
+  return { start, pause, reset, toggle };
+};
+
+// ── Internal button helper (curried) ──────────────────────────────────────
+const _btn = label => onClick => variant =>
+  button({ className: `btn btn-${variant} btn-sm`, onclick: onClick, type: 'button' })([label]);
+
+/**
+ * Clock — stateless time display, optionally with inline controls.
+ *
+ * Without `controls`, renders the formatted time (and optional label).
+ * With `controls` (a { start, pause, reset, toggle } from createTimer),
+ * also renders Start/Pause and Reset buttons — replacing TimerDisplay.
  *
  * @param {Object}           opts
- * @param {number}           [opts.time=0]      Seconds to display (may be negative).
- * @param {string}           [opts.label]       Small caption below the digits.
- * @param {'sm'|'md'|'lg'}  [opts.size='md']   Digit display size.
- * @param {boolean}          [opts.running=false]  Highlights digits in accent colour.
+ * @param {number}           [opts.time=0]       Seconds to display (may be negative).
+ * @param {string}           [opts.label]        Caption below the digits.
+ * @param {'sm'|'md'|'lg'}  [opts.size='md']    Digit display size.
+ * @param {boolean}          [opts.running=false] Highlights digits in accent colour.
+ * @param {Object}           [opts.controls]     { start, pause, reset } from createTimer.
+ * @param {string}           [opts.className=''] Extra CSS class(es) on root element.
+ * @param {string}           [opts.style='']     Extra inline CSS on root element.
  * @returns {vnode}
  *
  * @example
+ *   // Display only
  *   Clock({ time: state.elapsed, size: 'lg', label: 'elapsed', running: state.running })
  *
  * @example
- *   // Countdown that stops at zero
- *   let ctrl;
- *   ctrl = createInterval(
- *     () => setState(s => {
- *       const next = s.countdown - 1;
- *       if (next <= 0) { ctrl.stop(); return { countdown: 0, running: false }; }
- *       return { countdown: next };
- *     }),
- *     { ms: 1000 }
- *   );
- *   // In view: Clock({ time: state.countdown, running: state.running, label: 'remaining' })
+ *   // With built-in controls via createTimer
+ *   const timer = createTimer({ store, key: 'timer' });
+ *   Clock({ time: state.timer.elapsed, running: state.timer.running, controls: timer })
  */
-const Clock = ({ time = 0, label, size = 'md', running = false, className = '', style = '' } = {}) =>
+const Clock = ({ time = 0, label, size = 'md', running = false, className = '', style = '', controls } = {}) =>
   div({ className: ['clock', `clock-${size}`, className].filter(Boolean).join(' '), style })([
     span({ className: ['clock-display', running && 'clock-running'].filter(Boolean).join(' ') })([formatTime(time)]),
-    ...(label ? [span({ className: 'clock-label' })([label])] : []),
+    ...(label    ? [span({ className: 'clock-label' })([label])] : []),
+    ...(controls ? [div({ className: 'clock-controls' })([
+      ...(running
+        ? [_btn('Pause')(controls.pause)('secondary')]
+        : [_btn('Start')(controls.start)('primary')]),
+      _btn('Reset')(controls.reset)('ghost'),
+    ])] : []),
   ]);
 
-export { createInterval, Clock, formatTime };
+/** Alias for Clock — kept for back-compat; prefer Clock({ controls }) directly. */
+const TimerDisplay = Clock;
+
+export { formatTime, createInterval, createTimer, Clock, TimerDisplay };

@@ -1,5 +1,6 @@
 import { div, Card, p, strong, span, Grid, Row, Col, Table, Button, Badge } from '../../src/index.js';
 import { setState } from '../store.js';
+import { doc } from '../components/doc.js';
 
 export const pageLayoutDemoPanel = state =>
   div({})([
@@ -37,6 +38,18 @@ export const pageLayoutDemoPanel = state =>
         p({ style: 'margin:10px 0 0; font-size:13px; color:var(--text-muted)' })([
           'Both panels animate with a CSS width transition. The right panel content is only mounted when this tab is active.',
         ]),
+        doc([`PageLayout({
+  topBar:        TopBar(state),
+  sidebar:       Nav(state),
+  sidebarOpen:   state.sidebarOpen,
+  sidebarWidth:  '240px',
+  rightBar:      Details(state),
+  rightBarOpen:  state.rightBarOpen,
+  footer:        Footer(),
+  bottomBar:     StatusBar(),
+})([
+  MainContent(state),
+])`]),
       ]),
     ]),
 

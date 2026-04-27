@@ -44,5 +44,5 @@ const Modal = ({
         ]),
       ])
     : div({ style: 'display:none' })([]);
-
+    
 export { Modal };

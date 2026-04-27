@@ -32,7 +32,7 @@ export { List }                          from './components/List.js';
 export { Modal }                         from './components/Modal.js';
 export { Tabs }                          from './components/Tabs.js';
 export { Table, filterAll, filterBy, filterExact, sortBy } from './components/Table.js';
-export { createInterval, Clock, formatTime }        from './components/Clock.js';
+export { createInterval, createTimer, Clock, TimerDisplay, formatTime } from './components/Clock.js';
 export { Toggle }                                from './components/Toggle.js';
 export { Slider }                                from './components/Slider.js';
 export { ProgressBar }                           from './components/ProgressBar.js';
@@ -54,5 +54,17 @@ export { ColorPicker, DEFAULT_SWATCHES }                            from './comp
 export { DateTimePicker }                                            from './components/DateTimePicker.js';
 export { Typography, H1, H2, H3, H4, H5, H6, P, Code, Pre, Quote, collectHeadings, slugify } from './components/Typography.js';
 
+// ── Charts ─────────────────────────────────────────────────────────────────
+export { PieChart, BarChart, LineChart, MultiLineChart, SparkLine, PALETTE } from './components/Charts.js';
+
 // ── Listeners / Event system ───────────────────────────────────────────────
 export { addListener, debounce, createBus, onWindowResize, onBreakpoint, onKeydown, onKeyup, createAlarm, onVisibilityChange } from './listeners.js';
+
+// ── WebSocket ─────────────────────────────────────────────────────────────
+export { createWS } from './ws.js';
+
+// ── Router / Navigation ───────────────────────────────────────────────────
+export { createRouter, Link, NavLink, NavBar, NavMenu, Breadcrumbs } from './router.js';
+
+// ── KeyMap ────────────────────────────────────────────────────────────────
+export { createKeymap, parseCombo, matchCombo, formatCombo } from './components/KeyMap.js';

@@ -1,6 +1,7 @@
 import {
   createStore,
   createInterval,
+  createTimer,
   memoComponent,
   Badge,
   validate,
@@ -19,15 +20,16 @@ export const formSchema = {
     [v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v || '').trim()), 'Enter a valid email address'],
   ),
   age: validate(
+    [v => !isNaN(Number(v)) && Number(v) > 0, 'Age must be a number greater than 0'],
     [v => Boolean(v && v.trim()), 'Age is required'],
-    v => !isNaN(Number(v)) && Number(v) > 0,
     [v => Number(v) <= 120, 'That\'s a bold claim'],
   ),
 };
 
 // ── Store ──────────────────────────────────────────────────────────────────
+// Initial state
 export const store = createStore({
-  activeTab: 'buttons',
+  activeTab: 'philosophy',
   sidebarOpen: true,
   debugOpen: false,
   rightBarOpen: false,
@@ -47,6 +49,7 @@ export const store = createStore({
   countupRunning:   false,
   feedItems:        [],
   feedRunning:      false,
+  timer:            { elapsed: 0, running: false },
   tableFilter: '',
   paradigmFilter: '',
   tableSort: null,
@@ -99,6 +102,20 @@ export const store = createStore({
   pickerDpMonth: new Date().getMonth(),
   pickerDtYear: new Date().getFullYear(),
   pickerDtMonth: new Date().getMonth(),
+  // websocket demo
+  wsDemo: { status: 'closed', messages: [], draft: '', retries: 0 },
+  // router demo
+  routerDemo: { page: 'home', currentPath: '/', ctx: {} },
+  // charts demo
+  chartsDemo: { hovered: null, chartHighlight: null },
+  // keymap demo
+  keymapDemo: {
+    log:         [],    // [{ id, ts, scope, key, action }]
+    activeScope: null,  // 'zone-a' | 'zone-b' | null
+    zoneACount:  0,
+    zoneBPings:  0,
+    showHelp:    false,
+  },
 });
 
 export const { getState, setState } = store;
@@ -110,14 +127,12 @@ countdownCtrl = createInterval(
     const next = s.countdown - 1;
     if (next <= 0) { countdownCtrl.stop(); return { countdown: 0, countdownRunning: false }; }
     return { countdown: next };
-  }),
-  { ms: 1000 }
-);
+  })
+)({ ms: 1000 });
 
 export const countupCtrl = createInterval(
-  () => setState(s => ({ countup: s.countup + 1 })),
-  { ms: 1000 }
-);
+  () => setState(s => ({ countup: s.countup + 1 }))
+)({ ms: 1000 });
 
 export const FEED_MSGS = [
   'User signed in',      'File uploaded',       'Report generated',
@@ -132,9 +147,8 @@ export const feedCtrl = createInterval(
       { id: Date.now(), time: new Date().toLocaleTimeString(), msg: FEED_MSGS[Math.floor(Math.random() * FEED_MSGS.length)] },
       ...s.feedItems.slice(0, 7),
     ],
-  })),
-  { ms: 2000 }
-);
+  }))
+)({ ms: 2000 });
 
 // ── Parse clock input ──────────────────────────────────────────────────────
 export const parseClockInput = raw => {
@@ -166,6 +180,9 @@ export const startFeed = () => { feedCtrl.start(); setState({ feedRunning: true 
 export const stopFeed  = () => { feedCtrl.stop();  setState({ feedRunning: false }); };
 export const clearFeed = () => { feedCtrl.stop();  setState({ feedItems: [], feedRunning: false }); };
 
+// ── Task-based timer (createTimer) ─────────────────────────────────────────
+export const timerCtrl = createTimer({ store, key: 'timer' });
+
 // ── Progress controller ────────────────────────────────────────────────────
 export let progressCtrl;
 progressCtrl = createInterval(
@@ -173,26 +190,16 @@ progressCtrl = createInterval(
     const next = s.progress + 2;
     if (next >= 100) { progressCtrl.stop(); return { progress: 100, progressRunning: false }; }
     return { progress: next };
-  }),
-  { ms: 80 }
-);
+  })
+)({ ms: 80 });
 export const startProgress = () => { progressCtrl.start(); setState({ progressRunning: true }); };
 export const resetProgress = () => { progressCtrl.stop(); setState({ progress: 0, progressRunning: false }); };
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-let _alertTimer = null;
-export const showAlert = (variant, message) => {
-  clearTimeout(_alertTimer);
-  setState({ alert: { variant, message } });
-  _alertTimer = setTimeout(() => setState({ alert: null }), 4000);
-};
 
 export const submitForm = () => {
   const { name, email, age } = getState();
   const errors = validateForm(formSchema)({ name, email, age });
   if (isFormValid(errors)) {
     setState({ errors: { name: null, email: null, age: null }, submitted: true });
-    showAlert('success', `Submitted: ${name} <${email}>, age ${age}`);
   } else {
     setState({ errors, submitted: false });
   }

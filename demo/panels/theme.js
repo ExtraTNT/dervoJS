@@ -9,13 +9,13 @@ const LIGHT = tokens.light;
 
 // ── Token group definitions ───────────────────────────────────────────────
 const HEX_GROUPS = [
-  { label: 'Accent',   keys: ['accent', 'accent-hover'] },
+  { label: 'Accent',   keys: ['accent', 'accent-hover', 'accent-ring'] },
   { label: 'Surfaces', keys: ['bg', 'surface', 'surface-2', 'border', 'border-2'] },
   { label: 'Text',     keys: ['text', 'text-muted', 'text-subtle'] },
-  { label: 'Danger',   keys: ['danger', 'danger-bg', 'danger-text'] },
-  { label: 'Success',  keys: ['success', 'success-bg', 'success-text'] },
-  { label: 'Warning',  keys: ['warning', 'warning-bg', 'warning-text'] },
-  { label: 'Info',     keys: ['info', 'info-bg', 'info-text'] },
+  { label: 'Danger',   keys: ['danger', 'danger-bg', 'danger-text', 'danger-border'] },
+  { label: 'Success',  keys: ['success', 'success-bg', 'success-text', 'success-border'] },
+  { label: 'Warning',  keys: ['warning', 'warning-bg', 'warning-text', 'warning-border'] },
+  { label: 'Info',     keys: ['info', 'info-bg', 'info-text', 'info-border'] },
   { label: 'Badges', keys: [
     'badge-blue-bg', 'badge-blue-text',
     'badge-green-bg', 'badge-green-text',
@@ -24,6 +24,12 @@ const HEX_GROUPS = [
     'badge-purple-bg', 'badge-purple-text',
   ]},
   { label: 'Syntax Highlight', keys: ['hl-keyword', 'hl-string', 'hl-number', 'hl-comment', 'hl-type'] },
+  /*{ label: 'clr-blue', keys: ['clr-blue-50', 'clr-blue-100', 'clr-blue-500', 'clr-blue-700', 'clr-blue-800', 'clr-blue-dark', 'clr-blue-dark-text'] },
+  { label: 'clr-green', keys: ['clr-green-50', 'clr-green-100', 'clr-green-700', 'clr-green-dark', 'clr-green-dark-text'] },
+  { label: 'clr-yellow', keys: ['clr-yellow-50', 'clr-yellow-100', 'clr-yellow-700', 'clr-yellow-800', 'clr-yellow-dark', 'clr-yellow-dark-text'] },
+  { label: 'clr-red', keys: ['clr-red-50', 'clr-red-100', 'clr-red-500', 'clr-red-600', 'clr-red-700', 'clr-red-800', 'clr-red-dark', 'clr-red-dark-text'] },
+  { label: 'clr-purple', keys: ['clr-purple-100', 'clr-purple-700', 'clr-purple-dark', 'clr-purple-dark-text'] },
+  { label: 'clr-special', keys: ['clr-amber-500', 'clr-emerald-600', 'clr-emerald-700' ]}*/
 ];
 
 const TEXT_GROUPS = [
@@ -34,12 +40,14 @@ const TEXT_GROUPS = [
 // Is `val` a plain hex color usable by <input type=color>?
 const isHex = val => /^#[0-9a-fA-F]{6}$/.test((val || '').trim());
 
+const isRGBA = val => /^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(,\s*(0|1|0?\.\d+)\s*)?\)$/.test((val || '').trim());
+
 // ── Token row ─────────────────────────────────────────────────────────────
 const tokenRow = (key, effective, overrides) => {
   const val     = effective[key] ?? LIGHT[key] ?? '';
   const changed = key in overrides;
   const hex     = isHex(val);
-
+  const rgba    = isRGBA(val);
   return div({ style: 'display:flex; align-items:center; gap:6px; padding:4px 0; border-bottom:1px solid var(--border-2)' })([
     // Swatch
     div({ style: `width:18px; height:18px; border-radius:3px; flex-shrink:0; background:${val}; border:1px solid var(--border)` })([]),
@@ -47,9 +55,10 @@ const tokenRow = (key, effective, overrides) => {
     span({ style: `font-family:ui-monospace,monospace; font-size:11px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:${changed ? 'var(--accent)' : 'var(--text-muted)'}` })([`--${key}`]),
     // Input
     inp({
-      type:  hex ? 'color' : 'text',
+      type:  (hex || rgba) ? 'color' : 'text',
       value: val,
-      style: hex
+      alpha: rgba ? val.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)?.slice(1,4).map(Number) : undefined,
+      style: (hex || rgba)
         ? 'width:26px; height:22px; padding:1px 2px; border:1px solid var(--border); border-radius:3px; cursor:pointer; flex-shrink:0; background:none'
         : 'width:120px; font-family:ui-monospace,monospace; font-size:10px; padding:2px 6px; border:1px solid var(--border); border-radius:3px; background:var(--surface); color:var(--text); flex-shrink:0',
       oninput: e => {

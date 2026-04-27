@@ -230,21 +230,22 @@ const DOCS = [
   },
   {
     name: 'Clock',
-    description: 'Stateless time display. Pair with createInterval to drive re-renders.',
-    example: "Clock({ time: s.elapsed, size: 'lg', label: 'elapsed', running: s.running })",
+    description: 'Stateless time display. Add controls from createTimer for built-in Start/Pause/Reset buttons. Pair with createInterval for custom tick logic.',
+    example: "// Display only\nClock({ time: s.elapsed, size: 'lg', label: 'elapsed', running: s.running })\n\n// With built-in controls via createTimer\nconst timer = createTimer({ store, key: 'timer' });\nClock({ time: s.timer.elapsed, running: s.timer.running, controls: timer })",
     props: [
       { name: 'time',      type: 'number',  default: '0',     desc: 'Seconds to display (may be negative)' },
       { name: 'label',     type: 'string',  default: '—',     desc: 'Caption below the digits' },
       { name: 'size',      type: 'string',  default: "'md'",  desc: 'sm (28px) | md (48px) | lg (72px)' },
       { name: 'running',   type: 'boolean', default: 'false', desc: 'Highlights digits in accent colour' },
+      { name: 'controls',  type: 'object',  default: '—',     desc: '{ start, pause, reset } from createTimer — renders Start/Pause + Reset buttons' },
       { name: 'className', type: 'string',  default: "''",    desc: 'Extra CSS class(es) on root element' },
       { name: 'style',     type: 'string',  default: "''",    desc: 'Extra inline CSS on root element' },
     ],
   },
   {
     name: 'createInterval',
-    description: 'Background ticker decoupled from state. Returns a start/stop controller.',
-    example: "const t = createInterval(() => setState(s => ({n: s.n+1})), { ms: 1000 }); t.start();",
+    description: 'Background ticker decoupled from state. Curried: createInterval(fn)(opts). Returns a start/stop controller.',
+    example: "const t = createInterval(\n  () => setState(s => ({ n: s.n + 1 }))\n)({ ms: 1000 });\nt.start();",
     props: [
       { name: 'fn',             type: 'function', default: '—',      desc: 'Callback on each tick' },
       { name: 'opts.ms',        type: 'number',   default: '1000',   desc: 'Milliseconds between ticks' },
@@ -254,6 +255,20 @@ const DOCS = [
       { name: '→ .restart()',   type: 'function', default: '—',      desc: 'stop() then start()' },
       { name: '→ .toggle()',    type: 'function', default: '—',      desc: 'Flip the running state' },
       { name: '→ .isRunning()', type: 'function', default: '—',      desc: 'Returns boolean' },
+    ],
+  },
+  {
+    name: 'createTimer',
+    description: 'Task-based timer that drives a named store slice. No setInterval — each tick is a lazy Task chain, so the loop stops the moment you pause with zero leaks.',
+    example: "const store = createStore({ timer: { elapsed: 0, running: false } });\nconst timer = createTimer({ store, key: 'timer' });\ntimer.start();   // starts ticking\ntimer.pause();   // freezes\ntimer.reset();   // back to 0:00\n\n// In view — pass controls to Clock for built-in buttons:\nClock({ time: state.timer.elapsed, running: state.timer.running, controls: timer })",
+    props: [
+      { name: 'opts.store',         type: 'object', default: '—',       desc: 'Store from createStore()' },
+      { name: 'opts.key',           type: 'string', default: "'timer'", desc: 'State key holding { elapsed, running }' },
+      { name: 'opts.step',          type: 'number', default: '1',       desc: 'Seconds added per tick' },
+      { name: '→ .start()',         type: 'fn',     default: '—',       desc: 'Begin ticking (no-op if already running)' },
+      { name: '→ .pause()',         type: 'fn',     default: '—',       desc: 'Freeze the timer' },
+      { name: '→ .reset()',         type: 'fn',     default: '—',       desc: 'Pause and set elapsed back to 0' },
+      { name: '→ .toggle()',        type: 'fn',     default: '—',       desc: 'Flip running state' },
     ],
   },
   {
@@ -744,7 +759,7 @@ DragList({ groupId:'review', listId:'del',  onTransfer, items: state.del,  onCha
   {
     name: 'onWindowResize',
     description: 'Debounced window resize listener. Calls cb with { width, height }. Returns { destroy, getSize }.',
-    example: "const r = onWindowResize(({width}) => setState({w: width}), { debounce: 100 });\nr.getSize(); // { width, height }\nr.destroy(); // remove listener",
+    example: "const r = onWindowResize(({width}) => setState({w: width}))({ debounce: 100 });\nr.getSize(); // { width, height }\nr.destroy(); // remove listener",
     props: [
       { name: 'cb',              type: 'function', default: '—',    desc: 'Called with { width, height }' },
       { name: 'opts.debounce',   type: 'number',   default: '50',   desc: 'Debounce delay ms' },
@@ -755,7 +770,7 @@ DragList({ groupId:'review', listId:'del',  onTransfer, items: state.del,  onCha
   {
     name: 'onBreakpoint',
     description: 'Reactive CSS media query observer. Fires immediately on mount and again whenever the query changes.',
-    example: "const bp = onBreakpoint('(max-width:768px)', matches => setState({ mobile: matches }));\nbp.matches(); // current boolean",
+    example: "const bp = onBreakpoint('(max-width:768px)')(matches => setState({ mobile: matches }));\nbp.matches(); // current boolean",
     props: [
       { name: 'query',         type: 'string',   default: '—',   desc: 'CSS media query string' },
       { name: 'cb',            type: 'function', default: '—',   desc: 'Called with boolean (matches)' },
@@ -766,7 +781,7 @@ DragList({ groupId:'review', listId:'del',  onTransfer, items: state.del,  onCha
   {
     name: 'onKeydown / onKeyup',
     description: 'Global keyboard listener with optional key / modifier filter.',
-    example: "onKeydown(e => closeModal(), { key: 'Escape' });\nonKeydown(e => save(), { key: 's', ctrl: true });",
+    example: "onKeydown(e => closeModal())({ key: 'Escape' }); onKeydown(e => save())({ key: 's', ctrl: true });",
     props: [
       { name: 'cb',           type: 'function',        default: '—',   desc: 'Receives the KeyboardEvent' },
       { name: 'opts.key',     type: 'string|string[]', default: '—',   desc: 'Key name(s) to match; omit = all keys' },
@@ -779,7 +794,7 @@ DragList({ groupId:'review', listId:'del',  onTransfer, items: state.del,  onCha
   {
     name: 'createAlarm',
     description: 'Schedule a one-shot or repeating callback after a delay. Returns { destroy, reset }.',
-    example: "const t = createAlarm(() => notify('Time!'), { delay: 5000, repeat: false });\nt.reset(); // restart the timer\nt.destroy(); // cancel",
+    example: "const t = createAlarm(() => notify('Time!'))({ delay: 5000, repeat: false });\nt.reset(); // restart the timer\nt.destroy(); // cancel",
     props: [
       { name: 'cb',              type: 'function', default: '—',     desc: 'Callback to invoke' },
       { name: 'opts.delay',      type: 'number',   default: '1000',  desc: 'Milliseconds before first (and each repeated) call' },
@@ -877,6 +892,176 @@ export const debugPanel = state =>
       { name: 'propSets',      type: 'n',        default: '—', desc: 'Elements that entered prop-diffing. O(elements in tree) per frame — normal reconciler overhead, not a mutation count.' },
       { name: 'textEdits',     type: 'n',        default: '—', desc: 'Text node nodeValue writes. Each is one direct DOM mutation. High textEdits = many interpolated strings changing every frame.' },
       { name: 'mutation rate', type: '%',        default: '—', desc: '(created + replaced + removed + moved) / visited × 100 %. 0–5 % = healthy large stable tree. >30 % on a minor state change = nodes are being rebuilt — add stable keys to your lists.' },
+    ],
+  },
+  {
+    name: 'createWS',
+    description: 'Curried WebSocket factory. Auto-reconnect with exponential backoff. send() accepts strings or objects (auto-JSON.stringify). onMessage delivers parsed JSON when the frame is valid JSON, raw string otherwise.',
+    example:
+      "const ws = createWS({\n" +
+      "  url: 'wss://echo.websocket.org',\n" +
+      "  reconnect: true, maxRetries: 5, baseDelay: 1000, maxDelay: 30000,\n" +
+      "})({\n" +
+      "  onOpen:      ()    => setState({ status: 'open' }),\n" +
+      "  onClose:     code  => setState({ status: 'closed' }),\n" +
+      "  onMessage:   data  => setState(s => ({ msgs: [...s.msgs, data] })),\n" +
+      "  onReconnect: n     => setState({ retries: n }),\n" +
+      "  onGiveUp:    ()    => setState({ status: 'failed' }),\n" +
+      "});\n" +
+      "ws.send('hello');           // string\n" +
+      "ws.send({ type: 'ping' });  // auto JSON.stringify\n" +
+      "ws.close();   // clean close (no reconnect)\n" +
+      "ws.destroy(); // tear down everything",
+    props: [
+      { name: 'url',        type: 'string',   default: '—',       desc: 'WebSocket endpoint URL' },
+      { name: 'protocols',  type: 'string[]', default: '[]',      desc: 'Sub-protocol list passed to WebSocket constructor' },
+      { name: 'reconnect',  type: 'boolean',  default: 'false',   desc: 'Auto-reconnect on unexpected close' },
+      { name: 'maxRetries', type: 'number',   default: '5',       desc: 'Maximum reconnect attempts before giving up' },
+      { name: 'baseDelay',  type: 'number',   default: '1000',    desc: 'Initial reconnect delay in ms (doubles each retry)' },
+      { name: 'maxDelay',   type: 'number',   default: '30000',   desc: 'Maximum reconnect delay cap in ms' },
+      { name: 'send()',     type: 'fn',       default: '—',       desc: 'Send a message. Accepts string or object (auto JSON.stringify)' },
+      { name: 'close()',    type: 'fn',       default: '—',       desc: 'Clean close — does not reconnect' },
+      { name: 'destroy()',  type: 'fn',       default: '—',       desc: 'Close and cancel all retry timers permanently' },
+      { name: 'status()',   type: 'fn',       default: '—',       desc: 'Returns current state string: connecting | open | closed | failed' },
+    ],
+  },
+  {
+    name: 'createRouter',
+    description: 'Curried client-side router. Supports hash (#/path) and history (pushState) modes. Routes matched in order; named params (:id) land in ctx.params, query strings in ctx.query.',
+    example:
+      "const router = createRouter([\n" +
+      "  { path: '/',         handler: ctx => setState({ page: 'home' }) },\n" +
+      "  { path: '/user/:id', handler: ctx => setState({ page: 'user', userId: ctx.params.id }) },\n" +
+      "  { path: '*',         handler: ctx => setState({ page: '404' }) },\n" +
+      "], { mode: 'hash' })({\n" +
+      "  onChange: ctx => setState({ currentPath: ctx.path }),\n" +
+      "});\n" +
+      "router.push('/user/42');\n" +
+      "router.replace('/about');\n" +
+      "router.back();\n" +
+      "router.destroy();",
+    props: [
+      { name: 'routes',      type: 'array',    default: '—',         desc: 'Array of { path, handler(ctx) }. Supports /exact, /:param, /*, * (catch-all)' },
+      { name: 'mode',        type: 'string',   default: "'history'", desc: "hash | history" },
+      { name: 'base',        type: 'string',   default: "''",        desc: 'Base path prefix stripped before matching (history mode)' },
+      { name: 'push()',      type: 'fn',       default: '—',         desc: 'Navigate to path, push history entry' },
+      { name: 'replace()',   type: 'fn',       default: '—',         desc: 'Navigate to path, replace history entry' },
+      { name: 'back()',      type: 'fn',       default: '—',         desc: 'history.back()' },
+      { name: 'forward()',   type: 'fn',       default: '—',         desc: 'history.forward()' },
+      { name: 'getPath()',   type: 'fn',       default: '—',         desc: 'Returns current matched path string' },
+      { name: 'getHref()',   type: 'fn',       default: '—',         desc: 'Returns current full href' },
+      { name: 'destroy()',   type: 'fn',       default: '—',         desc: 'Remove event listeners and tear down router' },
+    ],
+  },
+  {
+    name: 'Link / NavLink / NavBar / NavMenu / Breadcrumbs',
+    description: 'Navigation components. All curried: Component(opts)(children). NavLink marks itself active when current path matches href (prefix by default; exact: true for strict). NavBar is a horizontal flex row; NavMenu is a vertical flex column.',
+    example:
+      "NavBar({ gap: 16 })([\n" +
+      "  NavLink({ href: '/',      current: path, push: router.push })(['Home']),\n" +
+      "  NavLink({ href: '/about', current: path, push: router.push })(['About']),\n" +
+      "])\n\n" +
+      "NavMenu({ width: 180 })([\n" +
+      "  NavLink({ href: '/docs',  current: path, push: router.push })(['Docs']),\n" +
+      "])\n\n" +
+      "Breadcrumbs({ crumbs: [\n" +
+      "  { label: 'Home', href: '/' },\n" +
+      "  { label: 'Users', href: '/users' },\n" +
+      "  { label: 'Alice' },\n" +
+      "], push: router.push })",
+    props: [
+      { name: 'Link href',          type: 'string',   default: '—',          desc: 'Target path' },
+      { name: 'Link push',          type: 'fn',       default: '—',          desc: 'router.push to use for navigation' },
+      { name: 'NavLink current',    type: 'string',   default: '—',          desc: 'Current path (from state) for active matching' },
+      { name: 'NavLink exact',      type: 'boolean',  default: 'false',      desc: 'Require exact path match for active class' },
+      { name: 'NavLink activeClass', type: 'string',  default: "'active'",   desc: 'CSS class added when link is active' },
+      { name: 'NavBar gap',         type: 'number',   default: '0',          desc: 'Gap between items in px' },
+      { name: 'NavBar align',       type: 'string',   default: "'center'",   desc: 'align-items value' },
+      { name: 'NavMenu width',      type: 'number',   default: '—',          desc: 'Fixed width in px' },
+      { name: 'NavMenu gap',        type: 'number',   default: '4',          desc: 'Gap between items in px' },
+      { name: 'Breadcrumbs crumbs', type: 'array',    default: '—',          desc: 'Array of { label, href? }. Last item rendered as plain text.' },
+      { name: 'Breadcrumbs divider', type: 'string',  default: "'/'",        desc: 'Separator character between crumbs' },
+    ],
+  },
+  {
+    name: 'PieChart',
+    description: 'SVG pie or donut chart. Set innerRadius 0.1–0.9 for a donut ring. Percentage labels appear on slices ≥5%. HTML colour legend rendered below. Optional onSliceHover callback.',
+    example: "PieChart({ size: 220, innerRadius: 0.55, legend: true })([\n  { label: 'N. America', value: 42 },\n  { label: 'Europe',     value: 28 },\n])",
+    props: [
+      { name: 'size',         type: 'number',   default: '260',        desc: 'SVG width and height in px' },
+      { name: 'innerRadius',  type: 'number',   default: '0',          desc: '0=pie; 0.1–0.9=donut (fraction of outer radius)' },
+      { name: 'gapDeg',       type: 'number',   default: '1',          desc: 'Gap between slices in degrees' },
+      { name: 'legend',       type: 'boolean',  default: 'true',       desc: 'Show colour swatch legend below chart' },
+      { name: 'palette',      type: 'string[]', default: 'PALETTE',    desc: 'Colour palette; overridden per-item by item.color' },
+      { name: 'onSliceHover', type: 'function', default: '—',          desc: '(item | null, index | -1) → void' },
+    ],
+  },
+  {
+    name: 'BarChart',
+    description: 'SVG vertical bar chart with auto-computed nice Y-axis grid lines. Bar colours come from the palette or per-item .color. Optional hover callback.',
+    example: "BarChart({ width: 400, gap: 8 })([\n  { label: 'Jan', value: 31 },\n  { label: 'Feb', value: 52 },\n])",
+    props: [
+      { name: 'width',      type: 'number',   default: '400',        desc: 'SVG width in px' },
+      { name: 'height',     type: 'number',   default: '240',        desc: 'SVG height in px' },
+      { name: 'paddingX',   type: 'number',   default: '48',         desc: 'Left/right padding — Y labels live here' },
+      { name: 'paddingY',   type: 'number',   default: '24',         desc: 'Top/bottom padding' },
+      { name: 'gap',        type: 'number',   default: '6',          desc: 'Pixel gap between bars' },
+      { name: 'color',      type: 'string',   default: '—',          desc: 'Default bar fill; overridden by item.color' },
+      { name: 'gridLines',  type: 'boolean',  default: 'true',       desc: 'Show horizontal grid lines' },
+      { name: 'legend',     type: 'boolean',  default: 'false',      desc: 'Show colour legend' },
+      { name: 'onBarHover', type: 'function', default: '—',          desc: '(item | null, index | -1) → void' },
+    ],
+  },
+  {
+    name: 'LineChart',
+    description: 'SVG line chart. Optional area fill, Catmull-Rom smooth curves, and data-point dots. baseline:true forces Y axis to start at 0.',
+    example: "LineChart({ width: 400, fill: true, smooth: true, color: '#e15759' })([\n  { label: 'Mon', value: 1240 },\n  { label: 'Tue', value: 1850 },\n])",
+    props: [
+      { name: 'width',        type: 'number',   default: '400',       desc: 'SVG width in px' },
+      { name: 'height',       type: 'number',   default: '220',       desc: 'SVG height in px' },
+      { name: 'color',        type: 'string',   default: "'#4e79a7'", desc: 'Line and dot colour' },
+      { name: 'fill',         type: 'boolean',  default: 'false',     desc: 'Area fill under the line' },
+      { name: 'dots',         type: 'boolean',  default: 'true',      desc: 'Show data-point dots' },
+      { name: 'dotR',         type: 'number',   default: '3.5',       desc: 'Dot radius in px' },
+      { name: 'smooth',       type: 'boolean',  default: 'false',     desc: 'Catmull-Rom smooth curve' },
+      { name: 'baseline',     type: 'boolean',  default: 'true',      desc: 'Force Y axis to start at 0' },
+      { name: 'gridLines',    type: 'boolean',  default: 'true',      desc: 'Show horizontal grid lines' },
+      { name: 'onPointHover', type: 'function', default: '—',         desc: '(item | null, index | -1) → void' },
+    ],
+  },
+  {
+    name: 'SparkLine',
+    description: 'Minimal inline SVG trend line — no axes, no labels. Accepts a plain number[]. Perfect for table cells and stat cards.',
+    example: "SparkLine({ width: 100, height: 28, color: '#59a14f', fill: true })([3, 6, 4, 8, 5, 9, 7])",
+    props: [
+      { name: 'width',  type: 'number',  default: '80',         desc: 'SVG width in px' },
+      { name: 'height', type: 'number',  default: '24',         desc: 'SVG height in px' },
+      { name: 'color',  type: 'string',  default: "'#4e79a7'",  desc: 'Line colour' },
+      { name: 'fill',   type: 'boolean', default: 'false',      desc: 'Area fill under the line' },
+      { name: 'smooth', type: 'boolean', default: 'false',      desc: 'Catmull-Rom smooth curve' },
+    ],
+  },
+  {
+    name: 'MultiLineChart',
+    description: 'SVG multi-series line chart sharing one Y scale. Highlight a point by index; click strips call onPointClick. Legend and sparse X labels rendered automatically.',
+    example: "MultiLineChart({\n  width: 520, height: 180, legend: true,\n  highlightIdx: state.sel,\n  onPointClick: i => setState({ sel: i === state.sel ? null : i }),\n})([\n  { label: 'total',   color: '#4e79a7', data: totals },\n  { label: 'compute', color: '#76b7b2', data: computes },\n])",
+    props: [
+      { name: 'width',        type: 'number',   default: '400',     desc: 'SVG width in px' },
+      { name: 'height',       type: 'number',   default: '200',     desc: 'SVG height in px' },
+      { name: 'paddingX',     type: 'number',   default: '48',      desc: 'Left/right padding — Y labels live here' },
+      { name: 'paddingY',     type: 'number',   default: '24',      desc: 'Top/bottom padding' },
+      { name: 'gridLines',    type: 'boolean',  default: 'true',    desc: 'Horizontal grid lines' },
+      { name: 'smooth',       type: 'boolean',  default: 'false',   desc: 'Catmull-Rom smooth curves' },
+      { name: 'dots',         type: 'boolean',  default: 'true',    desc: 'Show data-point dots' },
+      { name: 'dotR',         type: 'number',   default: '3',       desc: 'Normal dot radius in px' },
+      { name: 'baseline',     type: 'boolean',  default: 'true',    desc: 'Force Y axis to start at 0' },
+      { name: 'xLabels',      type: 'string[]', default: 'null',    desc: 'Label for each data index; sparse (every ~10th shown)' },
+      { name: 'legend',       type: 'boolean',  default: 'true',    desc: 'HTML colour legend below chart' },
+      { name: 'highlightIdx', type: 'number',   default: 'null',    desc: 'Index of the highlighted point — dashed guide + larger dots' },
+      { name: 'onPointClick', type: 'function', default: '—',       desc: '(index) → void — called when a click strip is clicked' },
+      { name: 'className',    type: 'string',   default: "''",      desc: 'Extra CSS class(es)' },
+      { name: 'style',        type: 'string',   default: "''",      desc: 'Extra inline CSS' },
+      { name: '(series)',     type: 'Array',    default: '[]',      desc: 'Array of { label, color, data: number[] }' },
     ],
   },
 ];

@@ -1,5 +1,6 @@
 import { div, Card, Row, Col, Stack, Toggle } from '../../src/index.js';
 import { setState } from '../store.js';
+import { doc } from '../components/doc.js';
 
 export const togglesPanel = state =>
   div({})([
@@ -27,6 +28,9 @@ export const togglesPanel = state =>
           disabled: true,
         })(['Disabled (on)']),
       ]),
+      doc([`Toggle({ on: state.toggleA, onChange: v => setState({ toggleA: v }) })(['Notifications'])
+Toggle({ on: state.toggleB, onChange: v => setState({ toggleB: v }) })(['Dark mode'])
+Toggle({ on: false, disabled: true })(['Disabled (off)'])`]),
     ]),
 
     div({ style: 'margin-top:16px' })([
@@ -36,6 +40,8 @@ export const togglesPanel = state =>
           Toggle({ on: !state.toggleD, onChange: v => setState({ toggleD: !v }) })([]),
           Toggle({ on: false, onChange: () => {}, disabled: true })([]),
         ]),
+        doc([`// No label — pass an empty array as children
+Toggle({ on: state.x, onChange: v => setState({ x: v }) })([])`]),
       ]),
     ]),
 

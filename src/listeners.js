@@ -5,11 +5,13 @@
  * (plus optional helpers) so tear-down is always a single call.
  *
  * Public utilities (also exported for direct use):
- *   addListener(target, event, handler, opts?) → teardownFn
- *   debounce(fn, ms) → debouncedFn
+ *   addListener(target)(event)(handler)(opts?) → teardownFn
+ *   debounce(fn)(ms) → debouncedFn
  */
 
 // ── Shared utilities ───────────────────────────────────────────────────────
+
+//TODO: clean this up, together with clock and timer
 
 /**
  * Attach an event listener and return a function that removes it.
@@ -22,10 +24,10 @@
  * @returns {() => void}  teardown
  *
  * @example
- *   const off = addListener(window, 'resize', handler, { passive: true });
+ *   const off = addListener(window)('resize')(handler)({ passive: true });
  *   off(); // equivalent to window.removeEventListener('resize', handler)
  */
-const addListener = (target, event, handler, opts) => {
+const addListener = target => event => handler => (opts = undefined) => {
   target.addEventListener(event, handler, opts);
   return () => target.removeEventListener(event, handler, opts);
 };
@@ -38,7 +40,7 @@ const addListener = (target, event, handler, opts) => {
  * @param {number}   ms
  * @returns {function}
  */
-const debounce = (fn, ms) => {
+const debounce = fn => ms => {
   let id;
   return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), ms); };
 };
@@ -87,9 +89,9 @@ const createBus = () => {
  * @param {number}   [opts.debounce=50]
  * @returns {{ destroy, getSize }}
  */
-const onWindowResize = (callback, { debounce: wait = 50 } = {}) => {
+const onWindowResize = callback => ({ debounce: wait = 50 } = {}) => {
   const getSize = () => ({ width: window.innerWidth, height: window.innerHeight });
-  const destroy = addListener(window, 'resize', debounce(() => callback(getSize()), wait), { passive: true });
+  const destroy = addListener(window)('resize')(debounce(() => callback(getSize()))(wait))({ passive: true });
   return { destroy, getSize };
 };
 
@@ -101,10 +103,10 @@ const onWindowResize = (callback, { debounce: wait = 50 } = {}) => {
  * @param {function} callback  Called with { matches: boolean }
  * @returns {{ destroy, matches }}
  */
-const onBreakpoint = (query, callback) => {
+const onBreakpoint = query => callback => {
   const mql = window.matchMedia(query);
   const handler = e => callback({ matches: e.matches });
-  const destroy = addListener(mql, 'change', handler);
+  const destroy = addListener(mql)('change')(handler)();
   // Fire immediately so the caller doesn't need a separate initial check
   callback({ matches: mql.matches });
   return { destroy, matches: () => mql.matches };
@@ -117,7 +119,7 @@ const onBreakpoint = (query, callback) => {
  * @param {'keydown'|'keyup'} event
  * @returns {(callback, opts?) => { destroy }}
  */
-const _mkKeyListener = event => (callback, opts = {}) => {
+const _mkKeyListener = event => callback => (opts = {}) => {
   const { key, ctrl, shift, alt } = opts;
   const keys = key != null ? [].concat(key) : null;
 
@@ -129,7 +131,7 @@ const _mkKeyListener = event => (callback, opts = {}) => {
     callback(e);
   };
 
-  return { destroy: addListener(window, event, handler) };
+  return { destroy: addListener(window)(event)(handler)() };
 };
 
 /**
@@ -195,7 +197,7 @@ const createAlarm = callback => (opts = {}) => {
  */
 const onVisibilityChange = callback => {
   const handler = () => callback({ visible: !document.hidden });
-  return { destroy: addListener(document, 'visibilitychange', handler) };
+  return { destroy: addListener(document)('visibilitychange')(handler)() };
 };
 
 export {
