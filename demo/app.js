@@ -27,6 +27,7 @@ import { routerPanel     } from './panels/router.js';
 import { websocketPanel  } from './panels/websocket.js';
 import { chartsPanel     } from './panels/charts.js';
 import { keymapPanel     } from './panels/keymap.js';
+import { glitchPanel     } from './panels/glitch.js';
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 initStyles();
@@ -61,6 +62,7 @@ const NAV_ITEMS = [
   { id: 'router',     icon: '⋱', label: 'Router & Nav' },
   { id: 'charts',     icon: '◉', label: 'Charts' },
   { id: 'keymap',     icon: '⌘', label: 'KeyMap' },
+  { id: 'glitch',     icon: '◈', label: 'Glitch', unload: true },
 ];
 
 // Panels marked `unload: true` in NAV_ITEMS have their DOM torn down and
@@ -105,6 +107,7 @@ const PANELS = {
   router:     routerPanel,
   charts:     chartsPanel,
   keymap:     keymapPanel,
+  glitch:     glitchPanel,
 };
 
 // ── Root view ──────────────────────────────────────────────────────────────

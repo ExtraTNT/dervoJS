@@ -68,3 +68,7 @@ export { createRouter, Link, NavLink, NavBar, NavMenu, Breadcrumbs } from './rou
 
 // ── KeyMap ────────────────────────────────────────────────────────────────
 export { createKeymap, parseCombo, matchCombo, formatCombo } from './components/KeyMap.js';
+
+// ── Glitch ────────────────────────────────────────────────────────────────
+export { GlitchImg, GlitchCanvas } from './components/GlitchImg.js';
+export { CanvasBg } from './components/CanvasBg.js';
