@@ -39,4 +39,21 @@ const cn = (...classes) => classes.filter(Boolean).join(' ');
  */
 const fire = fn => fromMaybe(() => {})(toMaybe(fn));
 
-export { cn, fire };
+/**
+ * Defaults helper for curried components.
+ * 
+ * TODO: use this for other components, as it looks better
+ *
+ * `defaults(defaultsObj)(optsObj)` merges `optsObj` on top of `defaultsObj`,
+ * returning a new object with all default values filled in.
+ * 
+ * @param {Object} defaultsObj
+ * @returns {function}  optsObj => mergedObj
+ *
+ * @example
+ *   const withDefaults = defaults({ size: 'md', variant: 'primary' });
+ *   withDefaults({ variant: 'danger' });  // { size: 'md', variant: 'danger' }
+ */
+const defaults = d => o => ({ ...d, ...o });
+
+export { cn, fire, defaults };

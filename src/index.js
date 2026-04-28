@@ -72,3 +72,7 @@ export { createKeymap, parseCombo, matchCombo, formatCombo } from './components/
 // ── Glitch ────────────────────────────────────────────────────────────────
 export { GlitchImg, GlitchCanvas } from './components/GlitchImg.js';
 export { CanvasBg } from './components/CanvasBg.js';
+export { ImageBg } from './components/ImageBg.js';
+export { MultiStep } from './components/MultiStep.js';
+export { VisuallyHidden } from './components/VisuallyHidden.js';
+export { SkipLink } from './components/SkipLink.js';

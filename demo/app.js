@@ -1,8 +1,7 @@
 import {
   div, p, span, strong, button,
   initStyles, toggleTheme,
-  mount, disableProfiler,
-  Alert, Badge, PageLayout,
+  mount, disableProfiler, Badge, PageLayout,
   FloatingPanel, StateDebugger, RenderProfiler,
 } from '../src/index.js';
 import { store, setState, getState } from './store.js';
@@ -17,6 +16,7 @@ import { modalPanel      } from './panels/modal.js';
 import { docsPanel       } from './panels/docs.js';
 import { togglesPanel    } from './panels/toggles.js';
 import { controlsPanel   } from './panels/controls.js';
+import { multistepPanel  } from './panels/multistep.js';
 import { mediaPanel      } from './panels/media.js';
 import { markdownPanel   } from './panels/markdown.js';
 import { themePanel      } from './panels/theme.js';
@@ -28,6 +28,8 @@ import { websocketPanel  } from './panels/websocket.js';
 import { chartsPanel     } from './panels/charts.js';
 import { keymapPanel     } from './panels/keymap.js';
 import { glitchPanel     } from './panels/glitch.js';
+import { headerPanel     } from './panels/header.js';
+import { a11yPanel       } from './panels/a11y.js';
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 initStyles();
@@ -44,6 +46,7 @@ const NAV_ITEMS = [
   { id: 'buttons',    icon: '◈', label: 'Buttons' },
   { id: 'clock',      icon: '◷', label: 'Clock & Interval' },
   { id: 'controls',   icon: '⊶', label: 'Sliders & Progress' },
+  { id: 'multistep',  icon: '➤', label: 'Multi-step' },
   { id: 'docs',       icon: '≡', label: 'Docs' },
   { id: 'feedback',   icon: '◎', label: 'Feedback' },
   { id: 'inputs',     icon: '✏', label: 'Inputs' },
@@ -62,7 +65,9 @@ const NAV_ITEMS = [
   { id: 'router',     icon: '⋱', label: 'Router & Nav' },
   { id: 'charts',     icon: '◉', label: 'Charts' },
   { id: 'keymap',     icon: '⌘', label: 'KeyMap' },
+  { id: 'header',     icon: '≣', label: 'Header Demo' },
   { id: 'glitch',     icon: '◈', label: 'Glitch', unload: true },
+  { id: 'a11y',       icon: '♿', label: 'Accessibility' },
 ];
 
 // Panels marked `unload: true` in NAV_ITEMS have their DOM torn down and
@@ -107,7 +112,10 @@ const PANELS = {
   router:     routerPanel,
   charts:     chartsPanel,
   keymap:     keymapPanel,
+  header:     headerPanel,
   glitch:     glitchPanel,
+  multistep:  multistepPanel,
+  a11y:       a11yPanel
 };
 
 // ── Root view ──────────────────────────────────────────────────────────────

@@ -445,6 +445,74 @@ const DOCS = [
     ],
   },
   {
+    name: 'ImageBg',
+    description: 'CSS background-image wrapper with optional overlay. Curried: ImageBg(opts)(children).',
+    example: "ImageBg({ src: '/hero.jpg', height: '320px', overlay: 'rgba(0,0,0,.35)' })([ h1({})(['Title']) ])",
+    props: [
+      { name: 'src',       type: 'string', default: '—',        desc: 'Background image URL (CSS background-image)' },
+      { name: 'height',    type: 'string', default: "'320px'", desc: 'CSS height for the wrapper' },
+      { name: 'size',      type: 'string', default: "'cover'", desc: 'background-size: cover | contain | auto' },
+      { name: 'position',  type: 'string', default: "'center'", desc: 'background-position CSS value' },
+      { name: 'repeat',    type: 'string', default: "'no-repeat'", desc: 'background-repeat' },
+      { name: 'overlay',   type: 'string', default: "'rgba(0,0,0,0.35)'", desc: 'Optional overlay colour or gradient' },
+      { name: 'className', type: 'string', default: "''",      desc: 'Extra CSS class(es) on wrapper' },
+      { name: 'style',     type: 'string', default: "''",      desc: 'Extra inline CSS on wrapper' },
+    ],
+  },
+  {
+    name: 'CanvasBg',
+    description: 'Canvas placeholder wrapper for mounting canvas-based background effects. Curried: CanvasBg(opts)(children).',
+    example: "CanvasBg({ id: 'bg1', height: '240px' })([ h1({})(['Title']) ]) // then mount effect: GlitchImg({ src })(document.getElementById('bg1'))",
+    props: [
+      { name: 'id',        type: 'string', default: '—',        desc: 'ID assigned to the <canvas> element (for mounting effects)' },
+      { name: 'height',    type: 'string', default: "'240px'", desc: 'CSS height for the wrapper' },
+      { name: 'className', type: 'string', default: "''",      desc: 'Extra CSS class(es) on wrapper' },
+      { name: 'style',     type: 'string', default: "''",      desc: 'Extra inline CSS on wrapper' },
+    ],
+  },
+  {
+    name: 'GlitchImg',
+    description: 'Canvas-based glitch effect. Imperative mount: GlitchImg(opts)(el) → { stop, pause, resume }. Use GlitchCanvas() to declare the canvas vnode.',
+    example: "GlitchCanvas({ id: 'g1' })\nconst fx = GlitchImg({ src: '/photo.jpg', fps: 30 })(document.getElementById('g1'))",
+    props: [
+      { name: 'src',             type: 'string',  default: '—',    desc: 'Image URL (must be CORS-accessible for pixel read)' },
+      { name: 'fps',             type: 'number',  default: '30',   desc: 'Target frames per second' },
+      { name: 'flowSpeed',       type: 'number',  default: '8',    desc: 'Scanline scroll px/frame' },
+      { name: 'flowBrightness',  type: 'number',  default: '60',   desc: 'Brightness boost for the scanline' },
+      { name: 'shiftLines',      type: 'number',  default: '6',    desc: 'Number of random horizontal band shifts per frame' },
+      { name: 'scatCount',       type: 'number',  default: '3',    desc: 'Scatter rect slot count' },
+      { name: 'rgb',             type: 'boolean', default: 'true', desc: 'Enable chromatic aberration (RGB channel offsets)' },
+    ],
+  },
+  {
+    name: 'VisuallyHidden',
+    description: 'Utility to render content only visible to screen readers.',
+    example: "VisuallyHidden()( ['Only screen readers read this'] )",
+    props: [
+      { name: 'as',        type: 'string', default: "'span'", desc: 'Element tag to render' },
+      { name: 'className', type: 'string', default: "''",     desc: 'Extra CSS classes' },
+    ],
+  },
+  {
+    name: 'SkipLink',
+    description: 'Accessible skip-to-content link that appears on keyboard focus.',
+    example: "SkipLink({ target: '#main', label: 'Skip to content' })()",
+    props: [
+      { name: 'target', type: 'string', default: "'#main'", desc: 'Selector to focus when activated' },
+      { name: 'label',  type: 'string', default: "'Skip to content'", desc: 'Text label for the link' },
+    ],
+  },
+  {
+    name: 'MultiStep',
+    description: 'Imperative wizard component. Call MultiStep(opts)(el) to mount.',
+    example: "const w = MultiStep({ steps, onDone })(document.getElementById('wizard')); w.stop();",
+    props: [
+      { name: 'steps',   type: 'Array', default: '—', desc: 'Array of { title, render, validate? }' },
+      { name: 'initial', type: 'number', default: '0', desc: 'Initial step index' },
+      { name: 'onDone',  type: 'fn', default: '—', desc: 'Called when wizard finishes: onDone({ values })' },
+    ],
+  },
+  {
     name: 'Video',
     description: 'Pure-functional HTML5 video player with aspect ratio, multi-source fallbacks, poster image, WebVTT tracks, and optional caption.',
     example: `Video({

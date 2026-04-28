@@ -80,6 +80,16 @@ const createBus = () => {
   return { on, off, emit, once, destroy };
 };
 
+// Simple registry for named buses so components can publish/subscribe
+// by id. This keeps buses in-memory and avoids global leaks — callers
+// can destroy a bus when no longer needed via `getBus(id).destroy()`.
+const _busRegistry = new Map();
+const getBus = id => {
+  if (!id) return null;
+  if (!_busRegistry.has(id)) _busRegistry.set(id, createBus());
+  return _busRegistry.get(id);
+};
+
 // ── Window resize ──────────────────────────────────────────────────────────
 /**
  * Listen to window size changes with a configurable debounce.
@@ -206,6 +216,7 @@ export {
   debounce,
   // High-level factories
   createBus,
+  getBus,
   onWindowResize,
   onBreakpoint,
   onKeydown,
