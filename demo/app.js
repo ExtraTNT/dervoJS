@@ -2,7 +2,7 @@ import {
   div, p, span, strong, button,
   initStyles, toggleTheme,
   mount, disableProfiler, Badge, PageLayout,
-  FloatingPanel, StateDebugger, RenderProfiler,
+  FloatingPanel, StateDebugger, RenderProfiler, ListenersDebugger,
 } from '../src/index.js';
 import { store, setState, getState } from './store.js';
 import { buttonsPanel              } from './panels/buttons.js';
@@ -193,6 +193,7 @@ const view = state => [
   })([
     StateDebugger({ state, setState, getState }),
     RenderProfiler({ setState, active: state.debugOpen }),
+    ListenersDebugger({ setState }),
   ]),
 ];
 

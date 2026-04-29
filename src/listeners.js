@@ -77,7 +77,10 @@ const createBus = () => {
 
   const destroy = () => map.clear();
 
-  return { on, off, emit, once, destroy };
+  // Return a snapshot of events and handlers for debugging/inspection
+  const events = () => Array.from(map.entries()).map(([event, handlers]) => ({ event, handlers: Array.from(handlers) }));
+
+  return { on, off, emit, once, destroy, events };
 };
 
 // Simple registry for named buses so components can publish/subscribe
@@ -89,6 +92,8 @@ const getBus = id => {
   if (!_busRegistry.has(id)) _busRegistry.set(id, createBus());
   return _busRegistry.get(id);
 };
+
+const listBusIds = () => Array.from(_busRegistry.keys());
 
 // ── Window resize ──────────────────────────────────────────────────────────
 /**
@@ -217,6 +222,7 @@ export {
   // High-level factories
   createBus,
   getBus,
+  listBusIds,
   onWindowResize,
   onBreakpoint,
   onKeydown,

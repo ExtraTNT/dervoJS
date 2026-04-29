@@ -1,7 +1,7 @@
 import {
-  div, span, p, pre, strong, code,
-  Card, Badge, Alert, Stack, Row, Col,
-  NavBar, NavMenu, NavLink, Link, Breadcrumbs,
+  div, span, p, strong, code,
+  Card, Badge, Alert, Row, Col,
+  NavBar, NavMenu, NavLink, Breadcrumbs,
   createRouter,
 } from '../../src/index.js';
 import { setState, getState } from '../store.js';
@@ -24,12 +24,14 @@ const _ensureRouter = () => {
   });
 };
 
+const pConP = p({ style: 'margin:4px 0 0; color:var(--text-muted)' })
+
 const _pageContent = (page, ctx) => {
-  if (page === 'home')   return div({})([strong({})(['Home']), p({ style: 'margin:4px 0 0; color:var(--text-muted)' })(['Welcome to the router demo.'])]);
-  if (page === 'about')  return div({})([strong({})(['About']), p({ style: 'margin:4px 0 0; color:var(--text-muted)' })(['This page was rendered by the router.'])]);
-  if (page === 'user')   return div({})([strong({})([`User: ${ctx?.params?.id ?? '?'}`]), p({ style: 'margin:4px 0 0; color:var(--text-muted)' })(['Named param extracted from the path.'])]);
-  if (page === 'search') return div({})([strong({})(['Search']), p({ style: 'margin:4px 0 0; color:var(--text-muted)' })([`query.q = ${ctx?.query?.q ?? '(none)'}`])]);
-  return div({})([strong({ style: 'color:var(--danger)' })(['404']), p({ style: 'margin:4px 0 0; color:var(--text-muted)' })(['No route matched.'])]);
+  if (page === 'home')   return div({})([strong({})(['Home']), pConP(['Welcome to the router demo.'])]);
+  if (page === 'about')  return div({})([strong({})(['About']), pConP(['This page was rendered by the router.'])]);
+  if (page === 'user')   return div({})([strong({})([`User: ${ctx?.params?.id ?? '?'}`]), pConP(['Named param extracted from the path.'])]);
+  if (page === 'search') return div({})([strong({})(['Search']), pConP([`query.q = ${ctx?.query?.q ?? '(none)'}`])]);
+  return div({})([strong({ style: 'color:var(--danger)' })(['404']), pConP(['No route matched.'])]);
 };
 
 export const routerPanel = state => {

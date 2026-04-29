@@ -1,5 +1,4 @@
 import { div, Card, Alert, Badge, Button } from '../../src/index.js';
-import { pre } from '../../src/elements.js';
 import { doc } from '../components/doc.js'
 
 export const feedbackPanel = () =>
