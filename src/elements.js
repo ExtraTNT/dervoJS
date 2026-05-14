@@ -188,3 +188,21 @@ export const inlineFlex = sspan('display:inline-flex; align-items:center');
 export const relDiv     = sdiv('position:relative');
 export const absDiv     = sdiv('position:absolute; inset:0');
 export const fillDiv    = sdiv('flex:1; min-width:0; min-height:0');
+
+export const empty = [];
+
+/**
+ * vst - virtual styled template
+ * is a helper to write cleaner code when using vsnodes without properties
+ * 
+ * @param {function} sNode  A vsnode partially applied with the tag
+ * @param {string} style
+ * @returns {function}  children => fully applied vnode
+ * 
+ * @example
+ *  vst(sdiv)('display:flex; flex-direction:row;')(['Child 1', 'Child 2'])
+ *   // is equivalent to: sdiv('display:flex; flex-direction:row;')({})(['Child 1', 'Child 2'])
+ *   const vst(sdiv) // creates a div factory that takes style and children
+ *   const vst(sdiv)('display:flex;') // creates a div factory that takes only children.
+ */
+export const vst = vsn => style => vsn(style)({});
