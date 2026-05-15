@@ -31,6 +31,7 @@ import { glitchPanel     } from './panels/glitch.js';
 import { headerPanel     } from './panels/header.js';
 import { a11yPanel       } from './panels/a11y.js';
 import { showcasePanel   } from './panels/showcase.js';
+import { crudPanel       } from './panels/crud.js';
 
 //  Styles 
 initStyles();
@@ -48,6 +49,7 @@ const NAV_ITEMS = [
   { id: 'buttons',    icon: '◈', label: 'Buttons' },
   { id: 'clock',      icon: '◷', label: 'Clock & Interval' },
   { id: 'controls',   icon: '⊶', label: 'Sliders & Progress' },
+  { id: 'crud',       icon: '⊜', label: 'CRUD (OpenAPI)' },
   { id: 'multistep',  icon: '➤', label: 'Multi-step' },
   { id: 'docs',       icon: '≡', label: 'Docs' },
   { id: 'feedback',   icon: '◎', label: 'Feedback' },
@@ -99,6 +101,7 @@ const PANELS = {
   inputs:     inputsPanel,
   toggles:    togglesPanel,
   controls:   controlsPanel,
+  crud:       crudPanel,
   feedback:   feedbackPanel,
   table:      tablePanel,
   clock:      clockPanel,

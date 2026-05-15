@@ -62,8 +62,13 @@ export { PieChart, BarChart, LineChart, MultiLineChart, SparkLine, PALETTE } fro
 export { addListener, debounce, createBus, onWindowResize, onBreakpoint, onKeydown, onKeyup, createAlarm, onVisibilityChange } from './listeners.js';
 export { listBusIds, getBus } from './listeners.js';
 
-//  WebSocket 
+//  WebSocket
 export { createWS } from './ws.js';
+
+//  HTTP / CRUD
+export { createHttp, defaultHttp }      from './http.js';
+export { compileResource, resolveRef }  from './openapi.js';
+export { createCrud }                   from './components/CrudResource.js';
 
 //  Router / Navigation 
 export { createRouter, Link, NavLink, NavBar, NavMenu, Breadcrumbs } from './router.js';

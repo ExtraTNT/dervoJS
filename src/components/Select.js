@@ -29,13 +29,15 @@ const Select = ({
   value,
   disabled = false,
   placeholder,
+  hint,
+  error,
   onChange,
   className = '',
   style = '',
 } = {}) =>
   div({ className: ['field', className].filter(Boolean).join(' '), style })([
     ...(labelText ? [labelEl({ htmlFor: id, className: 'field-label' })([labelText])] : []),
-    select({ id, className: 'select', disabled, onchange: onChange })([
+    select({ id, className: ['select', error && 'input-error'].filter(Boolean).join(' '), disabled, onchange: onChange })([
       ...(placeholder
         ? [option({ value: '', disabled: true, selected: !value })([placeholder])]
         : []),
@@ -43,6 +45,8 @@ const Select = ({
         option({ value: opt.value, selected: opt.value === value })([opt.label])
       ),
     ]),
+    ...(error          ? [span({ className: 'field-error' })([error])] : []),
+    ...(hint && !error ? [span({ className: 'field-hint'  })([hint])]  : []),
   ]);
 
 export { Select };
