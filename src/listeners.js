@@ -5,11 +5,11 @@
  * (plus optional helpers) so tear-down is always a single call.
  *
  * Public utilities (also exported for direct use):
- *   addListener(target)(event)(handler)(opts?) → teardownFn
- *   debounce(fn)(ms) → debouncedFn
+ *   addListener(target)(event)(handler)(opts?) -> teardownFn
+ *   debounce(fn)(ms) -> debouncedFn
  */
 
-//  Shared utilities 
+// Shared utilities 
 
 //TODO: clean this up, together with clock and timer
 
@@ -45,7 +45,7 @@ const debounce = fn => ms => {
   return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), ms); };
 };
 
-//  Event bus (pub/sub) 
+// Event bus (pub/sub) 
 /**
  * Minimal pub/sub bus.
  *
@@ -95,7 +95,7 @@ const getBus = id => {
 
 const listBusIds = () => Array.from(_busRegistry.keys());
 
-//  Window resize 
+// Window resize 
 /**
  * Listen to window size changes with a configurable debounce.
  *
@@ -110,7 +110,7 @@ const onWindowResize = callback => ({ debounce: wait = 50 } = {}) => {
   return { destroy, getSize };
 };
 
-//  Media query breakpoint 
+// Media query breakpoint 
 /**
  * Fire `callback` whenever the given media query changes, and once immediately.
  *
@@ -127,7 +127,7 @@ const onBreakpoint = query => callback => {
   return { destroy, matches: () => mql.matches };
 };
 
-//  Global keyboard listeners 
+// Global keyboard listeners 
 /**
  * Factory for keydown / keyup listeners with optional key + modifier filter.
  *
@@ -161,7 +161,7 @@ const _mkKeyListener = event => callback => (opts = {}) => {
 const onKeydown = _mkKeyListener('keydown');
 const onKeyup   = _mkKeyListener('keyup');
 
-//  Scheduled alarm 
+// Scheduled alarm 
 /**
  * One-shot or repeating callback scheduler. Curried: `createAlarm(callback)(opts)`.
  *
@@ -205,7 +205,7 @@ const createAlarm = callback => (opts = {}) => {
   return { destroy: clear, reset };
 };
 
-//  Page visibility change 
+// Page visibility change 
 /**
  * @param {function} callback  Called with { visible: boolean }
  * @returns {{ destroy }}

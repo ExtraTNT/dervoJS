@@ -1,7 +1,7 @@
 import { div, span, audio, video, source, track } from '../elements.js';
 import { cn } from '../utils.js';
 
-//  Shared helpers 
+// Shared helpers 
 
 const toPx = v => (typeof v === 'number' ? `${v}px` : v);
 
@@ -27,7 +27,7 @@ const trackNodes = tracks =>
     })([])
   );
 
-//  Video 
+// Video 
 
 /**
  * Video — accessible HTML5 video player with aspect ratio, caption, and track support.
@@ -115,7 +115,7 @@ const Video = ({
   ]);
 };
 
-//  VideoStream 
+// VideoStream 
 
 /**
  * VideoStream — renders a <video> element wired to a MediaStream object
@@ -196,7 +196,7 @@ const VideoStream = ({
   ]);
 };
 
-//  Audio 
+// Audio 
 
 /**
  * Audio — accessible HTML5 audio player.

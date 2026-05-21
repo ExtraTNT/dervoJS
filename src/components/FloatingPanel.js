@@ -1,6 +1,6 @@
 import { div, span, button } from '../elements.js';
 
-//  Per-panel position/size state 
+// Per-panel position/size state 
 // Keyed by panel id so multiple independent panels can coexist.
 const _panels = new Map();
 
@@ -9,7 +9,7 @@ const getPs = id => defaults => {
   return _panels.get(id);
 };
 
-//  Active drag/resize handles 
+// Active drag/resize handles 
 // We attach document-level mousemove/mouseup listeners and manipulate the
 // DOM element directly for smooth 60fps movement, then save back to _panels.
 
@@ -44,7 +44,7 @@ const onRszUp = () => {
   _rsz = null;
 };
 
-//  Component 
+// Component 
 
 /**
  * FloatingPanel — draggable, resizable floating window.
@@ -89,7 +89,7 @@ const FloatingPanel = ({
       `height:${ps.h}px`,
     ].join(';'),
   })([
-    //  title bar (drag handle) 
+    // title bar (drag handle) 
     div({
       className:   'fp-titlebar',
       onmousedown: e => {
@@ -113,10 +113,10 @@ const FloatingPanel = ({
       ]),
     ]),
 
-    //  content area 
+    // content area 
     div({ className: 'fp-content' })([...children]),
 
-    //  resize handle (bottom-right corner) 
+    // resize handle (bottom-right corner) 
     div({
       className:   'fp-resize-handle',
       title:       'Drag to resize',

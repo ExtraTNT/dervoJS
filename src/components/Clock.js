@@ -48,7 +48,7 @@ const formatTime = secs => {
  *   ticker.stop();      // pause
  *   ticker.restart();   // stop then start
  *   ticker.toggle();    // flip state
- *   ticker.isRunning(); // → boolean
+ *   ticker.isRunning(); // -> boolean
  *
  * @example
  *   // Poll every 5 seconds, start immediately
@@ -80,7 +80,7 @@ const createInterval = fn => ({ ms = 1000, autoStart = false } = {}) => {
   return { start, stop, restart, toggle, isRunning };
 };
 
-//  Task helpers 
+// Task helpers 
 
 /** Task that resolves after `ms` milliseconds. */
 const delay = ms => new Task((_rej, res) => setTimeout(res, ms));
@@ -91,7 +91,7 @@ const effect = f => new Task((_rej, res) => { f(); res(); });
 /**
  * Creates a timer controller that drives a store slice.
  *
- * Each tick is a lazy Task chain: delay(step s) → update state → chain(tick).
+ * Each tick is a lazy Task chain: delay(step s) -> update state -> chain(tick).
  * The loop stops when `cancelled` is flipped — no interval handle, no leaks.
  *
  * @param {Object}   opts
@@ -146,7 +146,7 @@ const createTimer = ({ store, key = 'timer', step = 1 } = {}) => {
   return { start, pause, reset, toggle };
 };
 
-//  Internal button helper (curried) 
+// Internal button helper (curried) 
 const _btn = label => onClick => variant =>
   button({ className: `btn btn-${variant} btn-sm`, onclick: onClick, type: 'button' })([label]);
 

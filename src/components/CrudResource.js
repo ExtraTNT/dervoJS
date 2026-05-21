@@ -225,7 +225,7 @@ const _renderInput = (field, path, value, error, onPatch, disabled) => {
   });
 };
 
-//   flat-form validation (top-level fields only) 
+//  flat-form validation (top-level fields only) 
 
 const _validateForm = fields => values => {
   const schema = _schemaFor(fields);
@@ -233,7 +233,7 @@ const _validateForm = fields => values => {
   return { errors, ok: isFormValid(errors) };
 };
 
-//   side-effect dispatcher 
+//  side-effect dispatcher 
 // Effects must run *after* the current render — never inside it. queueMicrotask
 // runs before paint but after the synchronous render returns, which means
 // setState calls won't trigger render re-entry.
@@ -259,7 +259,7 @@ const _load = (ctx, fetcher, onData) => {
   });
 };
 
-//   view: list 
+//  view: list 
 
 const _viewList = ctx => {
   const { state, setState, listItemFields, ops, http, hideFields, listColumns, mountId, idParam } = ctx;
@@ -335,7 +335,7 @@ const _viewList = ctx => {
   ])
 };
 
-//   view: show 
+//  view: show 
 
 const _viewShow = ctx => {
   const { state, setState, showFields, ops, http, id, hideFields } = ctx;
@@ -505,7 +505,7 @@ const _titleFromResource = r =>
  * @returns {function} basePath => spec => resource => opts => vnode
  */
 const createCrud = (http = defaultHttp) => basePath => spec => {
-  const _cache = new Map();          // resource → compiled descriptors
+  const _cache = new Map();          // resource -> compiled descriptors
 
   return resource => {
     if (!_cache.has(resource))

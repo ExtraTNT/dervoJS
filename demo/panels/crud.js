@@ -171,7 +171,7 @@ const patchCrud = patch => setState(s => {
   return { crudDemo: { ...cur, ...next } };
 });
 
-//   panel render 
+//  panel render 
 
 export const crudPanel = state => {
   const cd = state.crudDemo ?? _initial;
@@ -184,13 +184,13 @@ export const crudPanel = state => {
         ' for any resource described by an OpenAPI 3.0 (or 3.1) document. ',
         'Form components and validators are picked automatically from the schema — ',
         code({})(['format: email']),
-        ' → email input + validator, ',
+        ' -> email input + validator, ',
         code({})(['enum']),
-        ' → Select, ',
+        ' -> Select, ',
         code({})(['type: integer + minimum/maximum']),
-        ' → NumberInput + range, nested objects → nested Cards, ',
+        ' -> NumberInput + range, nested objects -> nested Cards, ',
         code({})(['type: array']),
-        ' → add/remove repeater.',
+        ' -> add/remove repeater.',
       ]),
       div({ style: 'display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px' })([
         Badge({ variant: 'green'  })(['list']),
@@ -229,11 +229,11 @@ export const crudPanel = state => {
 `import { createHttp, createCrud } from './src/index.js';
 
 // One-time setup — each curry step gives a reusable handle
-const http     = createHttp(myAuthedFetch);   //  bind auth/transport
-const withApi  = createCrud(http)('/api');    //  bind base path
-const withSpec = withApi(openapiSpec);        //  bind OpenAPI spec
-const Users    = withSpec('users');           //  bind resource
-const Projects = withSpec('projects');        //  another resource, same spec
+const http     = createHttp(myAuthedFetch);   // bind auth/transport
+const withApi  = createCrud(http)('/api');    // bind base path
+const withSpec = withApi(openapiSpec);        // bind OpenAPI spec
+const Users    = withSpec('users');           // bind resource
+const Projects = withSpec('projects');        // another resource, same spec
 
 // Per call site — pass state + setState, the rest is automatic
 Users({ state: s.users, setState: patchUsers, view: 'list' });
@@ -244,19 +244,19 @@ Projects({ state: s.projects, setState: patchProjects, view: 'new' });`
     ]),
 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'Schema → component mapping' })([
+      Card({ title: 'Schema -> component mapping' })([
         pre({ style: 'background:var(--surface-2); padding:12px; border-radius:var(--radius); margin:0; font-size:12px; overflow:auto' })([
-`string                          → TextInput
-string + format: email          → TextInput type=email + email() validator
-string + format: date / date-time → DateTimePicker
-string + enum: [...]            → Select
-integer / number                → NumberInput + range() validator
-integer/number + minimum/maximum → NumberInput min/max
-boolean                         → Toggle
-array  + items: <schema>        → repeating field (+ Add / ✕ row)
-object + properties             → nested Card with recursive fields
-required: [...]                 → required() validator on each field
-readOnly: true                  → hidden from forms`
+`string                          -> TextInput
+string + format: email          -> TextInput type=email + email() validator
+string + format: date / date-time -> DateTimePicker
+string + enum: [...]            -> Select
+integer / number                -> NumberInput + range() validator
+integer/number + minimum/maximum -> NumberInput min/max
+boolean                         -> Toggle
+array  + items: <schema>        -> repeating field (+ Add / ✕ row)
+object + properties             -> nested Card with recursive fields
+required: [...]                 -> required() validator on each field
+readOnly: true                  -> hidden from forms`
         ]),
       ]),
     ]),

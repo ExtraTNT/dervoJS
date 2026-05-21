@@ -22,8 +22,8 @@ export const layoutPanel = state =>
       ]),
 
       Row({ gap: 12 })([
-        Col({ span: 12, md: 8 })([ demoBox('col-12  →  col-md-8  (main content)') ]),
-        Col({ span: 12, md: 4 })([ demoBox('col-12  →  col-md-4  (sidebar)') ]),
+        Col({ span: 12, md: 8 })([ demoBox('col-12  ->  col-md-8  (main content)') ]),
+        Col({ span: 12, md: 4 })([ demoBox('col-12  ->  col-md-4  (sidebar)') ]),
       ]),
 
       div({ style: 'margin-top:12px' })([
@@ -35,8 +35,8 @@ export const layoutPanel = state =>
         ]),
       ]),
       doc([`Row({ gap: 12 })([
-  Col({ span: 12, md: 8 })([ main   ]),  // full → 8 cols on md
-  Col({ span: 12, md: 4 })([ aside  ]),  // full → 4 cols on md
+  Col({ span: 12, md: 8 })([ main   ]),  // full -> 8 cols on md
+  Col({ span: 12, md: 4 })([ aside  ]),  // full -> 4 cols on md
 ])
 // Breakpoints: span (default) · sm (≥576px) · md (≥768px) · lg (≥1024px)
 Col({ span: 12, sm: 6, md: 3 })([ item ])`]),
@@ -45,7 +45,7 @@ Col({ span: 12, sm: 6, md: 3 })([ item ])`]),
     div({ style: 'margin-top:16px' })([
       Card({ title: 'Grid (auto equal-column)' })([
         p({ style: 'margin-top:0; font-size:13px; color:var(--text-muted)' })([
-          'cols: 1 (default) → sm:2 → md:3',
+          'cols: 1 (default) -> sm:2 -> md:3',
         ]),
         Grid({ cols: 1, sm: 2, md: 3, gap: 10 })([
           demoBox('Item 1', true),
@@ -178,7 +178,7 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
 ])`]),      ]),
     ]),
 
-    //  DragList 
+    // DragList 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'DragList — single list reorder' })([
         p({ style: 'margin-top:0; font-size:13px; color:var(--text-muted)' })([

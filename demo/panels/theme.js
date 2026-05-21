@@ -7,7 +7,7 @@ import { setState } from '../store.js';
 
 const LIGHT = tokens.light;
 
-//  Token group definitions 
+// Token group definitions 
 const HEX_GROUPS = [
   { label: 'Accent',   keys: ['accent', 'accent-hover', 'accent-ring'] },
   { label: 'Surfaces', keys: ['bg', 'surface', 'surface-2', 'border', 'border-2'] },
@@ -42,7 +42,7 @@ const isHex = val => /^#[0-9a-fA-F]{6}$/.test((val || '').trim());
 
 const isRGBA = val => /^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(,\s*(0|1|0?\.\d+)\s*)?\)$/.test((val || '').trim());
 
-//  Token row 
+// Token row 
 const tokenRow = (key, effective, overrides) => {
   const val     = effective[key] ?? LIGHT[key] ?? '';
   const changed = key in overrides;
@@ -71,21 +71,21 @@ const tokenRow = (key, effective, overrides) => {
   ]);
 };
 
-//  Group card 
+// Group card 
 const groupCard = (group, effective, overrides) =>
   div({ style: 'background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:10px 12px; display:flex; flex-direction:column; gap:0' })([
     strong({ style: 'font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--text-subtle); display:block; margin-bottom:6px' })([group.label]),
     ...group.keys.map(k => tokenRow(k, effective, overrides)),
   ]);
 
-//  Generate initStyles snippet 
+// Generate initStyles snippet 
 const makeSnippet = overrides => {
   if (!Object.keys(overrides).length) return '// No changes yet — edit a token above first.';
   const inner = Object.entries(overrides).map(([k, v]) => `    '${k}': '${v}',`).join('\n');
   return `initStyles({\n  colors: {\n${inner}\n  },\n});`;
 };
 
-//  Syntax token preview 
+// Syntax token preview 
 const syntaxPreview = () =>
   div({ style: 'font-family:ui-monospace,monospace; font-size:13px; line-height:1.9; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; white-space:pre-wrap' })([
     span({ style: 'color:var(--hl-comment)' })(['// syntax token preview\n']),
@@ -110,7 +110,7 @@ const syntaxPreview = () =>
     span({ style: 'color:var(--hl-comment)' })(['// answer']),
   ]);
 
-//  Main panel 
+// Main panel 
 export const themePanel = state => {
   const overrides  = state.themeOverrides  || {};
   const copied     = state.themeCopied     || false;
@@ -119,7 +119,7 @@ export const themePanel = state => {
 
   return div({})([
 
-    //  Token editor card 
+    // Token editor card 
     Card({ title: 'Token Editor' })([
       Stack({ gap: 16 })([
 
@@ -179,7 +179,7 @@ export const themePanel = state => {
       ]),
     ]),
 
-    //  Live preview card 
+    // Live preview card 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'Live Preview — all components react instantly' })([
         Stack({ gap: 20 })([

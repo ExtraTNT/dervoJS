@@ -23,7 +23,7 @@
  *     .cvs-bg-content  position:relative; z-index:1  — children live here
  *
  *  API 
- *   CanvasBg(opts)(children) → vnode
+ *   CanvasBg(opts)(children) -> vnode
  *
  *   opts.id          {string}   id placed on the <canvas> element so the effect can target it
  *   opts.height      {string}   CSS height of the wrapper.         Default '240px'
@@ -33,10 +33,10 @@
 
 import { div, canvas } from '../elements.js';
 
-//  Component 
+// Component 
 
 /**
- * CanvasBg :: opts → children → vnode
+ * CanvasBg :: opts -> children -> vnode
  */
 export const CanvasBg = ({
   id        = '',

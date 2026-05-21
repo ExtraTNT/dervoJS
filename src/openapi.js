@@ -27,13 +27,13 @@
  *   }
  *
  * 3.0 vs 3.1 differences handled:
- *   - `nullable: true`  (3.0)        →  3.1 `type: ['x', 'null']`
- *   - `example` vs `examples`        →  both accepted
- *   - `const`            (3.1)       →  treated as a single-value enum
- *   - `$ref` resolution              →  local refs only (`#/components/...`)
+ *   - `nullable: true`  (3.0)        ->  3.1 `type: ['x', 'null']`
+ *   - `example` vs `examples`        ->  both accepted
+ *   - `const`            (3.1)       ->  treated as a single-value enum
+ *   - `$ref` resolution              ->  local refs only (`#/components/...`)
  */
 
-//   ref resolution 
+//  ref resolution 
 
 /** Resolve a local `$ref` like `#/components/schemas/User` against the spec root. */
 const resolveRef = spec => ref => {
@@ -48,7 +48,7 @@ const _deref = spec => schema => {
   return schema;
 };
 
-//   type-system normalisation 
+//  type-system normalisation 
 
 const _isNullable = schema =>
   schema.nullable === true ||
@@ -67,7 +67,7 @@ const _titleCase = s =>
     .replace(/\s+/g, ' ')
     .replace(/^./, c => c.toUpperCase());
 
-//   field compilation 
+//  field compilation 
 
 const _compileField = spec => (name, raw, isRequired) => {
   const s        = _deref(spec)(raw) || {};
@@ -114,7 +114,7 @@ const _compileObject = spec => schema => {
     .map(([k, v]) => _compileField(spec)(k, v, req.has(k)));
 };
 
-//   path/operation discovery 
+//  path/operation discovery 
 
 const _segments = path => path.split('/').filter(Boolean);
 const _isParam  = seg  => /^\{.+\}$/.test(seg);
@@ -154,7 +154,7 @@ const _findOps = spec => resource => {
   return out;
 };
 
-//   schema extraction from operations 
+//  schema extraction from operations 
 
 const _requestSchema = spec => opEntry => {
   const c = opEntry?.op?.requestBody?.content?.['application/json'];
@@ -185,7 +185,7 @@ const _itemSchema = spec => listSchema => {
   return s;
 };
 
-//   public API 
+//  public API 
 
 /**
  * Compile a single resource out of an OpenAPI document.

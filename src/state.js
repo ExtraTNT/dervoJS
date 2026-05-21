@@ -53,7 +53,7 @@ const vnodeKey = c => (c && typeof c === 'object' ? (c.props?.key ?? null) : nul
 
 const _prevProps = new WeakMap();
 
-//  SVG-aware node creation 
+// SVG-aware node creation 
 const _SVG_NS  = 'http://www.w3.org/2000/svg';
 const _SVG_SET = new Set([
   'svg','g','path','circle','ellipse','rect','line','polyline','polygon',
@@ -82,7 +82,7 @@ const _buildNode = vnode => {
   return node;
 };
 
-//  Tracked node creation 
+// Tracked node creation 
 // _registerProps walks the just-created DOM tree and seeds _prevProps so
 // every subsequent patch has accurate "what was previously set" tracking.
 const _registerProps = (vnode, dom) => {
@@ -141,7 +141,7 @@ const _patch = parent => oldNode => newVnode => {
     return;
   }
 
-  //  Memoized subtree short-circuit (opt-in via props.memo)
+  // Memoized subtree short-circuit (opt-in via props.memo)
   // Memoized factories return the same vnode object for the same opts.
   // When the user marks a vnode `memo: true`, we stamp the DOM node with
   // the vnode reference; on the next patch, ===-equality means the entire
@@ -156,7 +156,7 @@ const _patch = parent => oldNode => newVnode => {
     oldNode._dervoVnode = newVnode;
   }
 
-  //  Text node
+  // Text node
   if (typeof newVnode === 'string') {
     if (oldNode.nodeType === Node.TEXT_NODE) {
       if (oldNode.nodeValue !== newVnode) { if (_profiling) _ops.textUpdates++; oldNode.nodeValue = newVnode; }
@@ -167,7 +167,7 @@ const _patch = parent => oldNode => newVnode => {
     return;
   }
 
-  //  Element: different tag → full replacement 
+  // Element: different tag -> full replacement 
   if (
     oldNode.nodeType !== Node.ELEMENT_NODE ||
     oldNode.tagName.toLowerCase() !== newVnode.tag
@@ -177,13 +177,13 @@ const _patch = parent => oldNode => newVnode => {
     return;
   }
 
-  //  Element: same tag → patch props then recurse 
+  // Element: same tag -> patch props then recurse 
   _patchProps(oldNode)(newVnode.props || {});
 
   const newCh = childList(newVnode);
   const oldCh = Array.from(oldNode.childNodes);   // static snapshot
 
-  //  Key-based reconciliation 
+  // Key-based reconciliation 
   if (newCh.some(c => vnodeKey(c) != null)) {
     const keyMap  = new Map(
       oldCh.filter(n => n._dervoKey != null).map(n => [n._dervoKey, n])
@@ -219,7 +219,7 @@ const _patch = parent => oldNode => newVnode => {
     return;
   }
 
-  //  Index-based reconciliation (no keys) 
+  // Index-based reconciliation (no keys) 
   const minLen = Math.min(oldCh.length, newCh.length);
   for (let i = 0; i < minLen; i++) _patch(oldNode)(oldCh[i])(newCh[i]);
   newCh.slice(minLen).forEach(child => {
@@ -232,7 +232,7 @@ const _patch = parent => oldNode => newVnode => {
   oldCh.slice(newCh.length).reverse().forEach(n => { if (_profiling) _ops.removes++; oldNode.removeChild(n); });
 };
 
-//  Renderer 
+// Renderer 
 
 /** Curried: _render(root)(newVnodes) — patch or initial-render a list of root vnodes */
 const _render = root => newVnodes => {

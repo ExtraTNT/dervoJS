@@ -22,7 +22,7 @@ import {
 import { setState, getState } from '../store.js';
 import { doc } from '../components/doc.js';
 
-//  Constants
+// Constants
 
 const BUS_ID = 'showcase';
 const TYPES  = ['click', 'login', 'error', 'metric', 'message'];
@@ -51,7 +51,7 @@ const SAMPLES = {
   message: ['hello',   'lgtm',     'shipping it', 'on it',    'ack'],
 };
 
-//  Pure helpers (curried where it pays off)
+// Pure helpers (curried where it pays off)
 
 const _id   = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const _ts   = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -63,7 +63,7 @@ const eventFor = type => () => ({ id: _id(), type, ts: _ts(), msg: _pick(SAMPLES
 // state-slice updater   (key -> updater -> setState patch)
 const updateShowcase = updater => setState(s => ({ showcase: updater(s.showcase || {}) }));
 
-//  Bus + module-level controllers (created lazily, once)
+// Bus + module-level controllers (created lazily, once)
 
 const _bus    = getBus(BUS_ID);     // named — any other module can grab it too
 const _ctrls  = {};                 // type -> interval controller
@@ -123,7 +123,7 @@ const toggleSampler = () => {
   });
 };
 
-//  Side-effecting actions (pure inputs -> bus / controller mutation)
+// Side-effecting actions (pure inputs -> bus / controller mutation)
 
 const toggleEmitter = type => () => {
   _ensureCtrl(type);
@@ -168,17 +168,17 @@ const togglePin = id => () => updateShowcase(sc => {
   return { ...sc, pinned };
 });
 
-//  Memoised badge — cached by stableKey(opts), reused across every render
+// Memoised badge — cached by stableKey(opts), reused across every render
 
 const MemoBadge = memoComponent(Badge);
 
-//  Styled templates via partial application
+// Styled templates via partial application
 //
-//  sdiv(style) returns a curried vnode factory: props -> children -> vnode.
-//  Because the style string is baked in once, every reuse skips that arg
-//  entirely — the renderer also patches a stable style attribute, so React-
-//  style "did the className change?" diffing wins big when 200+ cells share
-//  the same shell.
+// sdiv(style) returns a curried vnode factory: props -> children -> vnode.
+// Because the style string is baked in once, every reuse skips that arg
+// entirely — the renderer also patches a stable style attribute, so React-
+// style "did the className change?" diffing wins big when 200+ cells share
+// the same shell.
 
 // Outer cube wrapper — a single styled div used for every plane
 const planeBox = sdiv([
@@ -191,8 +191,8 @@ const planeBox = sdiv([
 const planeRow = sdiv('display:flex; gap:4px;');
 
 // One styled cell template, parameterised only by inline color via props.style
-//   (style strings concatenate, so the outer baked style wins for layout
-//    while the per-call style supplies the color)
+//  (style strings concatenate, so the outer baked style wins for layout
+//   while the per-call style supplies the color)
 const cellBox = sdiv([
   'flex:1; aspect-ratio:1; border-radius:4px;',
   'display:flex; align-items:center; justify-content:center;',
@@ -206,7 +206,7 @@ const planeLabel = sspan([
   'letter-spacing:.06em; color:var(--text-muted);',
 ].join(' '));
 
-//  Color palettes for the n³ grid
+// Color palettes for the n³ grid
 
 const HUES = {
   rainbow: (x, y, z, n) => `hsl(${Math.round((x + y + z) * 360 / (n * 3))}, 70%, ${30 + (z / n) * 40}%)`,
@@ -215,14 +215,14 @@ const HUES = {
   mono:    (x, y, z, n) => `hsl(220, 10%, ${15 + ((x + y + z) / (n * 3)) * 70}%)`,
 };
 
-//  Memoized matrix pipeline
+// Memoized matrix pipeline
 //
-//  Three layers, each a pure (opts -> vnode) factory wrapped in memoize().
-//  When the matrix params don't change between renders, every cell is a
-//  cache hit — vnode construction is essentially free, even for 32³ cells.
+// Three layers, each a pure (opts -> vnode) factory wrapped in memoize().
+// When the matrix params don't change between renders, every cell is a
+// cache hit — vnode construction is essentially free, even for 32³ cells.
 //
-//  At n=32 → 32³ = 32768 cells. Cap the cell cache at 50k so a full grid
-//  fits without eviction. Plane and matrix caches stay small (≤ 32 entries).
+// At n=32 -> 32³ = 32768 cells. Cap the cell cache at 50k so a full grid
+// fits without eviction. Plane and matrix caches stay small (≤ 32 entries).
 
 // Raw factories — wrapped in freeze() so the cached vnodes carry props.memo
 // and the renderer can short-circuit on ===-equality next render.
@@ -250,9 +250,9 @@ const _matrixRawWith = planeFn => ({ hue, n }) =>
   })(Array.from({ length: n }, (_, z) => planeFn({ hue, n, z }))));
 
 // Cached pipeline — chain memoized layers
-//   Cell    : memoize(50_000)  — covers n=32 (32k cells) without eviction
-//   Plane   : memoize() default — at most n entries (≤ 32)
-//   Matrix  : memoLeaf          — single (hue, n) tuple
+//  Cell    : memoize(50_000)  — covers n=32 (32k cells) without eviction
+//  Plane   : memoize() default — at most n entries (≤ 32)
+//  Matrix  : memoLeaf          — single (hue, n) tuple
 const Cell        = memoize(50_000)(_cellRaw);
 const Plane       = memoize(64)(_planeRawWith(Cell));
 const MatrixMemo  = memoLeaf(_matrixRawWith(Plane));
@@ -263,7 +263,7 @@ const MatrixRaw   = _matrixRawWith(_planeRawWith(_cellRaw));
 const buildMatrix = (hue, n, useMemo) =>
   (useMemo ? MatrixMemo : MatrixRaw)({ hue, n });
 
-//  Curried view templates — partial application builds widgets
+// Curried view templates — partial application builds widgets
 
 const tile = ({ label: lbl, color, value, sub, onClick, active }) =>
   div({
@@ -305,7 +305,7 @@ const emitterRow = type => running =>
   ]);
 
 // feed-row :: pinned -> ev -> vnode
-//   key:ev.id is what lets the keyed reconciler reorder rather than rebuild
+//  key:ev.id is what lets the keyed reconciler reorder rather than rebuild
 const feedRow = pinned => ev =>
   div({
     key: ev.id,
@@ -326,7 +326,7 @@ const feedRow = pinned => ev =>
     })([pinned[ev.id] ? '★' : '☆']),
   ]);
 
-//  Panel
+// Panel
 
 export const showcasePanel = state => {
   _wire();
@@ -359,7 +359,7 @@ export const showcasePanel = state => {
 
   return div({ style: 'display:flex; flex-direction:column; gap:16px' })([
 
-    //  Intro
+    // Intro
     Card({ title: '◆ Live Telemetry — renderer showcase' })([
       p({ style: 'margin:0 0 10px; font-size:13px; color:var(--text-muted); line-height:1.6' })([
         'A single page exercising every renderer feature at once: a named ',
@@ -390,7 +390,7 @@ export const showcasePanel = state => {
       ]),
     ]),
 
-    //  Stat tiles — derived from the SAME counters the chart reads
+    // Stat tiles — derived from the SAME counters the chart reads
     div({ style: 'display:flex; gap:12px; flex-wrap:wrap' })([
       tile({
         label: 'Total events', color: 'var(--accent)',
@@ -411,7 +411,7 @@ export const showcasePanel = state => {
       }),
     ]),
 
-    //  Charts row
+    // Charts row
     Row({ gap: 16 })([
       Col({ span: 12, md: 7 })([
         Card({ title: 'Counters by type — click a bar to filter the feed' })([
@@ -438,7 +438,7 @@ export const showcasePanel = state => {
         ]),
       ]),
       Col({ span: 12, md: 5 })([
-        Card({ title: 'Events / second (1Hz sampler → SparkLine)' })([
+        Card({ title: 'Events / second (1Hz sampler -> SparkLine)' })([
           p({ style: 'margin:0 0 10px; font-size:12px; color:var(--text-muted)' })([
             'A second ', code({})(['createInterval']), ' samples the cumulative counter once per second. ',
             strong({})(['Off by default']), ' so the profiler is not spammed — toggle it on to populate the chart.',
@@ -468,7 +468,7 @@ export const showcasePanel = state => {
       ]),
     ]),
 
-    //  Emitters + rate slider
+    // Emitters + rate slider
     Row({ gap: 16 })([
       Col({ span: 12, md: 6 })([
         Card({ title: 'Emitters (each is its own createInterval)' })([
@@ -501,7 +501,7 @@ export const showcasePanel = state => {
       ]),
     ]),
 
-    //  Feed — keyed reconciler + focus preservation
+    // Feed — keyed reconciler + focus preservation
     Card({ title: 'Live event feed (keyed list)' })([
       div({ style: 'display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap' })([
         // Live filter input — focus survives every re-render below it
@@ -534,7 +534,7 @@ export const showcasePanel = state => {
         : div({})([]),
     ]),
 
-    //  How it works
+    // How it works
     Card({ title: 'What this demo proves' })([
       div({ style: 'display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px' })([
         div({ style: 'padding:10px 12px; background:var(--surface-2); border-radius:var(--radius); border:1px solid var(--border)' })([
@@ -565,7 +565,7 @@ export const showcasePanel = state => {
       ]),
     ]),
 
-    //  n³ template grid — partial application generates thousands of cells
+    // n³ template grid — partial application generates thousands of cells
     Card({ title: `Templating with sdiv — ${matrixN}³ = ${matrixN ** 3} cells from one styled template` })([
       p({ style: 'margin:0 0 10px; font-size:13px; color:var(--text-muted); line-height:1.6' })([
         strong({})(['sdiv(style)']), ' bakes a style string into a vnode factory once. ',
@@ -638,7 +638,7 @@ const _planeRawWith = cellFn => ({ hue, n, z }) => { /* maps n*n cells via cellF
 const _matrixRawWith = planeFn => ({ hue, n }) => { /* maps n planes via planeFn */ };
 
 // 3. Wrap each layer in a memoize cache
-//    Cap the cell cache at 50k so n=32 (32768 cells) fits without eviction.
+//   Cap the cell cache at 50k so n=32 (32768 cells) fits without eviction.
 const Cell    = memoize(50_000)(_cellRaw);
 const Plane   = memoize(64)(_planeRawWith(Cell));
 const Matrix  = memoLeaf(_matrixRawWith(Plane));
@@ -647,7 +647,7 @@ const Matrix  = memoLeaf(_matrixRawWith(Plane));
 const view = state => Matrix({ hue: state.hue, n: state.n });`]),
     ]),
 
-    //  Code
+    // Code
     Card({ title: 'Bus + interval wiring' })([
       doc([`// 1. Grab a named bus — same instance everywhere
 const bus = getBus('showcase');

@@ -21,7 +21,7 @@ const withDefaults = defaults({
 });
 
 /**
- * ImageBg :: opts → children → vnode
+ * ImageBg :: opts -> children -> vnode
  *
  * Renders a wrapper with a CSS background image and optional overlay.
  * The component is purely functional (no side effects) and fully curried.

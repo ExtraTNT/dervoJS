@@ -7,7 +7,7 @@ import { setState } from '../store.js';
 
 import { doc } from '../components/doc.js';
 
-//  Sample datasets 
+// Sample datasets 
 
 const SALES = [
   { label: 'N. America', value: 42 },
@@ -49,7 +49,7 @@ const SPARK_ROWS = [
   { name: 'Revenue $k', values: [ 42,  38,  55,  61,  58,  74,  82], color: '#f28e2b' },
 ];
 
-//  Hover helpers 
+// Hover helpers 
 const _setHovered = item =>
   setState(s => ({ chartsDemo: { ...s.chartsDemo, hovered: item } }));
 
@@ -58,14 +58,14 @@ const _hoverBadge = hovered =>
     ? Badge({ variant: 'primary' })([`${hovered.label}: ${hovered.value}`])
     : span({ style: 'font-size:12px; color:var(--text-muted)' })(['hover a slice or bar']);
 
-//  Panel 
+// Panel 
 export const chartsPanel = state => {
   const cd      = state.chartsDemo ?? {};
   const hovered = cd.hovered ?? null;
 
   return div({ style: 'display:flex; flex-direction:column; gap:20px' })([
 
-    //  Pie / Donut 
+    // Pie / Donut 
     Card({ title: 'PieChart' })([
       p({ style: 'margin:0 0 12px; font-size:13px; color:var(--text-muted)' })([
         'Set ', code({ style: 'font-family:monospace; font-size:12px; background:var(--surface-2); padding:1px 4px; border-radius:3px' })(['innerRadius']),
@@ -156,7 +156,7 @@ LineChart({ width: 400, color: '#e15759', fill: true, smooth: true })(trafficDat
 LineChart({ dots: false, baseline: false })(data)`]),
     ]),
 
-    //  SparkLine 
+    // SparkLine 
     Card({ title: 'SparkLine' })([
       p({ style: 'margin:0 0 12px; font-size:13px; color:var(--text-muted)' })([
         'Inline mini chart. Accepts a plain ', code({ style: 'font-family:monospace; font-size:12px; background:var(--surface-2); padding:1px 4px; border-radius:3px' })(['number[]']), '. No axes.',
@@ -193,7 +193,7 @@ SparkLine({ width: 110, height: 28, color: '#59a14f', fill: true })([3, 6, 4, 8,
 SparkLine({ smooth: true, color: '#e15759' })([...values])`]),
     ]),
 
-    //  MultiLineChart 
+    // MultiLineChart 
     Card({ title: 'MultiLineChart' })([
       p({ style: 'margin:0 0 12px; font-size:13px; color:var(--text-muted)' })([
         'Multi-series line chart sharing one Y scale. Click a point to highlight it.',

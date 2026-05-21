@@ -7,7 +7,7 @@ import {
 import { setState, getState } from '../store.js';
 import { doc } from '../components/doc.js';
 
-//  Module-level router instance 
+// Module-level router instance 
 // Reuse the same instance across renders. Lazily created on first render.
 let _router = null;
 
@@ -70,7 +70,7 @@ export const routerPanel = state => {
         '.',
       ]),
 
-      //  NavBar demo 
+      // NavBar demo 
       div({ style: 'margin-bottom:12px' })([
         span({ style: 'font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted)' })(['NavBar (horizontal)']),
         div({ style: 'margin-top:6px; padding:8px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius)' })([
@@ -83,7 +83,7 @@ export const routerPanel = state => {
         ]),
       ]),
 
-      //  Row: NavMenu + page content 
+      // Row: NavMenu + page content 
       Row({ gap: 16 })([
         Col({ span: 12, md: 4 })([
           div({ style: 'padding:8px 0; border-right:1px solid var(--border)' })([
@@ -107,7 +107,7 @@ export const routerPanel = state => {
         ]),
       ]),
 
-      //  Programmatic navigation 
+      // Programmatic navigation 
       div({ style: 'margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center' })([
         span({ style: 'font-size:12px; color:var(--text-muted)' })(['router.push():  ']),
         ...[
@@ -123,7 +123,7 @@ export const routerPanel = state => {
         ),
       ]),
 
-      //  Current route state 
+      // Current route state 
       div({ style: 'margin-top:12px; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); font-size:12px; font-family:monospace' })([
         div({})([
           span({ style: 'color:var(--text-muted)' })(['page:     ']),

@@ -1,6 +1,6 @@
 import { createBus } from '../listeners.js';
 
-//  Key aliases 
+// Key aliases 
 const _ALIASES = {
   ' ':        'space',
   'spacebar': 'space',
@@ -13,12 +13,12 @@ const _ALIASES = {
   'right':    'arrowright',
 };
 
-//  Pretty display names for special keys 
+// Pretty display names for special keys 
 const _DISPLAY = {
   arrowup:    '↑',
   arrowdown:  '↓',
   arrowleft:  '←',
-  arrowright: '→',
+  arrowright: '->',
   escape:     'Esc',
   enter:      '↵',
   space:      'Space',
@@ -67,7 +67,7 @@ const formatCombo = combo => {
   return parts.join('+');
 };
 
-//  createKeymap 
+// createKeymap 
 /**
  * Purely functional keyboard-event manager.
  * Routing is delegated to the shared createBus pub/sub from listeners.js —
@@ -117,8 +117,8 @@ const createKeymap = (opts = {}) => {
   } = opts;
 
   // Bus event names:
-  //   "any:<comboKey>"              — global bindings
-  //   "scope:<scopeId>:<comboKey>"  — scoped bindings
+  //  "any:<comboKey>"              — global bindings
+  //  "scope:<scopeId>:<comboKey>"  — scoped bindings
   // Bus payload: { element, event }
   const bus = createBus();
 
@@ -164,7 +164,7 @@ const createKeymap = (opts = {}) => {
 
   if (target) target.addEventListener('keydown', _handleKey);
 
-  //  Registration helpers 
+  // Registration helpers 
 
   // Wrap the bus off-fn to also remove the metadata entry on unbind
   const _register = busEvent => entry => slot => {

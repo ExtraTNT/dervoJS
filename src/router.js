@@ -65,7 +65,7 @@
 import { a, nav, div, span } from './elements.js';
 import { cn } from './utils.js';
 
-//  Route parsing helpers 
+// Route parsing helpers 
 
 /** Convert a route path pattern into a RegExp and extract param names */
 const _compileRoute = path => {
@@ -93,7 +93,7 @@ const _extractPath = mode => raw => {
   }
 };
 
-/** Parse query string '?a=1&b=2' → { a: '1', b: '2' } */
+/** Parse query string '?a=1&b=2' -> { a: '1', b: '2' } */
 const _parseQuery = search => {
   const q = {};
   new URLSearchParams(search).forEach((v, k) => { q[k] = v; });
@@ -112,7 +112,7 @@ const _match = compiled => path => {
   return null;
 };
 
-//  Router factory 
+// Router factory 
 
 /**
  * Curried router factory.
@@ -131,7 +131,7 @@ const _match = compiled => path => {
  * @typedef {Object} RouteContext
  * @property {string} path     Matched pathname (after base prefix)
  * @property {Object} params   Extracted named params and wildcards
- * @property {Object} query    Parsed query string key→value
+ * @property {Object} query    Parsed query string key->value
  *
  * @typedef {Object} RouterHandlers
  * @property {(ctx: RouteContext) => void} [onChange]  Called on every navigation (after handler)
@@ -208,7 +208,7 @@ const createRouter = (routes = [], { mode = 'history', base = '' } = {}) => (han
   return { push, replace, back, forward, getPath, getHref, destroy };
 };
 
-//  Navigation components 
+// Navigation components 
 
 /**
  * Link — curried navigation anchor.

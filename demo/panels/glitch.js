@@ -7,7 +7,7 @@ import { doc } from '../components/doc.js';
 let _handles = [];
 const stopAll = () => { _handles.forEach(h => h.stop()); _handles = []; };
 
-//  Mount helper — called after the vnode tree is in the DOM 
+// Mount helper — called after the vnode tree is in the DOM 
 
 const mountAll = () => {
   // CORS-friendly images (Unsplash direct URLs are blocked for canvas pixel
@@ -27,7 +27,7 @@ const mountAll = () => {
   });
 };
 
-//  Panel 
+// Panel 
 // unload:true in NAV_ITEMS tears down the DOM on nav away; each visit
 // re-runs glitchPanel, so scheduling mountAll here fires on every visit.
 
@@ -35,7 +35,7 @@ export const glitchPanel = () => {
   setTimeout(mountAll, 0); // defer to ensure the DOM is updated before we query for elements
   return div({})([
 
-    //  Default preset 
+    // Default preset 
     Card({ title: 'GlitchImg — default preset' })([
       p({ style: 'font-size:13px; color:var(--text-muted); margin:0 0 12px' })([
         'Default: 30 fps · RGB shift · 6 shift-line passes · 3 scatter slots.',
@@ -49,7 +49,7 @@ fx.resume();  // continue animation
 fx.stop();    // cancel RAF and free resources`]),
     ]),
 
-    //  RGB off, fewer shift lines 
+    // RGB off, fewer shift lines 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'GlitchImg — no RGB, reduced shift lines' })([
         p({ style: 'font-size:13px; color:var(--text-muted); margin:0 0 12px' })([
@@ -60,7 +60,7 @@ fx.stop();    // cancel RAF and free resources`]),
       ]),
     ]),
 
-    //  High-brightness scanline + heavy scatter 
+    // High-brightness scanline + heavy scatter 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'GlitchImg — slow scan, heavy scatter' })([
         p({ style: 'font-size:13px; color:var(--text-muted); margin:0 0 12px' })([
@@ -77,7 +77,7 @@ fx.stop();    // cancel RAF and free resources`]),
       ]),
     ]),
 
-    //  CanvasBg 
+    // CanvasBg 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'CanvasBg — canvas as a background' })([
         CanvasBg({ id: 'glitch-bg', height: '300px' })([
@@ -102,37 +102,37 @@ const fx = GlitchImg({ src: '/photo.jpg' })(document.getElementById('bg1'));
 fx.stop();
 
 // opts:
-//   id        string   id on the <canvas>        default auto
-//   height    string   CSS height of the wrapper  default '240px'
-//   className string   extra class on wrapper
-//   style     string   extra inline style on wrapper`]),
+//  id        string   id on the <canvas>        default auto
+//  height    string   CSS height of the wrapper  default '240px'
+//  className string   extra class on wrapper
+//  style     string   extra inline style on wrapper`]),
       ]),
     ]),
 
-    //  API reference 
+    // API reference 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'API reference' })([
-        doc([`//  Transform pipeline (all curried) 
-//   flowLine  :: { brightness } → { w, h, t } → pixels → pixels
-//   shiftLine :: { w, h }       → pixels → pixels
-//   shiftRGB  :: { w }          → pixels → pixels
-//   extractRect :: { w, h }     → pixels → { data, rw, rh }
-//   buildPipeline :: config → state → pixels → pixels
+        doc([`// Transform pipeline (all curried) 
+//  flowLine  :: { brightness } -> { w, h, t } -> pixels -> pixels
+//  shiftLine :: { w, h }       -> pixels -> pixels
+//  shiftRGB  :: { w }          -> pixels -> pixels
+//  extractRect :: { w, h }     -> pixels -> { data, rw, rh }
+//  buildPipeline :: config -> state -> pixels -> pixels
 //
-//  Mount function 
-//   GlitchImg(opts)(el) → { stop, pause, resume }
+// Mount function 
+//  GlitchImg(opts)(el) -> { stop, pause, resume }
 //
 // opts:
-//   src             string   Image URL (must be CORS-accessible)
-//   fps             number   Target frame rate              default 30
-//   flowSpeed       number   Scanline scroll px/frame       default 8
-//   flowBrightness  number   Scanline brightness boost      default 60
-//   shiftLines      number   Shift-line passes per frame    default 6
-//   scatCount       number   Scatter-rect slots             default 3
-//   rgb             boolean  Chromatic aberration           default true
+//  src             string   Image URL (must be CORS-accessible)
+//  fps             number   Target frame rate              default 30
+//  flowSpeed       number   Scanline scroll px/frame       default 8
+//  flowBrightness  number   Scanline brightness boost      default 60
+//  shiftLines      number   Shift-line passes per frame    default 6
+//  scatCount       number   Scatter-rect slots             default 3
+//  rgb             boolean  Chromatic aberration           default true
 //
-//  Vnode helper 
-//   GlitchCanvas({ id?, className?, style?, width?, height? }) → vnode`]),
+// Vnode helper 
+//  GlitchCanvas({ id?, className?, style?, width?, height? }) -> vnode`]),
       ]),
     ]),
   ]);

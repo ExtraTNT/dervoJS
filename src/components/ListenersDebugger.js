@@ -160,7 +160,7 @@ const ListenersDebugger = ({ setState } = {}) => {
                 span({ className: 'dbg-log-ts' })([l.ts]),
                 span({ className: 'dbg-log-key' })([l.bus]),
                 span({ className: 'dbg-log-from' })([`:${l.event}`]),
-                span({ className: 'dbg-log-arrow' })(['→']),
+                span({ className: 'dbg-log-arrow' })(['->']),
                 span({ className: 'dbg-log-to' })([ JSON.stringify(l.payload) ]),
               ])) : [div({ className: 'dbg-log-empty' })(['No logs yet'])])
             ]),

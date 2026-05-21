@@ -67,7 +67,7 @@ const createHttp = (fetchImpl = globalThis.fetch, extraHeaders = {}) => {
     const init = { method, headers };
     if (body !== undefined && body !== null) init.body = JSON.stringify(body);
     const r = await fetchImpl(`${url}${_qs(opts)}`, init);
-    if (!r.ok) throw new Error(`${method} ${url} → ${r.status} ${r.statusText}`);
+    if (!r.ok) throw new Error(`${method} ${url} -> ${r.status} ${r.statusText}`);
     return _parseBody(r);
   };
 
@@ -79,7 +79,7 @@ const createHttp = (fetchImpl = globalThis.fetch, extraHeaders = {}) => {
 
   const list = url => async (opts = {}) => {
     const r = await fetchImpl(`${url}${_qs(opts)}`, { method: 'GET', headers });
-    if (!r.ok) throw new Error(`GET ${url} → ${r.status} ${r.statusText}`);
+    if (!r.ok) throw new Error(`GET ${url} -> ${r.status} ${r.statusText}`);
     const data  = await _parseBody(r);
     const hdr   = parseInt(r.headers.get('x-total-count') ?? '', 10);
     const total = Number.isFinite(hdr) ? hdr : (Array.isArray(data) ? data.length : 0);

@@ -322,7 +322,7 @@ const Float = ({ side = 'left', style = '' } = {}) => children =>
 const Clearfix = ({ style = '' } = {}) => children =>
   div({ className: 'clearfix', style })(children);
 
-//  DragList 
+// DragList 
 
 /**
  * DragList — drag-and-drop reorderable list with optional cross-list transfer.
@@ -407,7 +407,7 @@ const DragList = ({
       'data-id':   item.id,
       key:         String(item.id),
 
-      //  drag source events 
+      // drag source events 
       ondragstart: disabled ? null : e => {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData(DRAG_ID_KEY,   String(item.id));
@@ -419,7 +419,7 @@ const DragList = ({
         e.currentTarget.classList.remove('drag-item-dragging');
       },
 
-      //  drop target events (item-level) 
+      // drop target events (item-level) 
       ondragover: disabled ? null : e => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';

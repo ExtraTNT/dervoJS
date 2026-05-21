@@ -18,7 +18,7 @@
  *   SparkLine(opts)(values) — minimal inline trend line, no axes
  *
  *  Hover callbacks 
- *   All charts accept onXxxHover: (item | null, index | -1) → void
+ *   All charts accept onXxxHover: (item | null, index | -1) -> void
  *   Manage tooltip state in your store; keep charts declarative.
  *
  * @example
@@ -32,7 +32,7 @@ import { vnode } from '../../lib/odocosjs/src/render.js';
 import { div, span } from '../elements.js';
 import { cn } from '../utils.js';
 
-//  Local SVG element factories 
+// Local SVG element factories 
 const _svg    = vnode('svg');
 const _g      = vnode('g');
 const _path   = vnode('path');
@@ -42,13 +42,13 @@ const _line   = vnode('line');
 const _pline  = vnode('polyline');
 const _txt    = vnode('text');
 
-//  Default colour palette 
+// Default colour palette 
 const PALETTE = [
   '#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
   '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac',
 ];
 
-//  Pure helpers (all curried) 
+// Pure helpers (all curried) 
 const _sum   = xs => xs.reduce((a, b) => a + b, 0);
 const _max   = xs => Math.max(...xs);
 const _min   = xs => Math.min(...xs);
@@ -57,19 +57,19 @@ const _clamp = lo => hi => x => Math.max(lo, Math.min(hi, x));
 const _color = palette => i => palette[i % palette.length];
 const _toRad = deg => deg * Math.PI / 180;
 
-/** Map v from [srcLo..srcHi] → [dstLo..dstHi] */
+/** Map v from [srcLo..srcHi] -> [dstLo..dstHi] */
 const _scale = srcLo => srcHi => dstLo => dstHi => v => {
   const t = srcHi === srcLo ? 0 : (v - srcLo) / (srcHi - srcLo);
   return dstLo + t * (dstHi - dstLo);
 };
 
-/** Polar (radians, radius) → Cartesian {x,y} around centre (cx, cy) */
+/** Polar (radians, radius) -> Cartesian {x,y} around centre (cx, cy) */
 const _polar = cx => cy => r => angle => ({
   x: cx + r * Math.cos(angle),
   y: cy + r * Math.sin(angle),
 });
 
-//  Nice grid helpers 
+// Nice grid helpers 
 
 const _niceStep = max => {
   if (max <= 0) return 1;
@@ -97,7 +97,7 @@ const _niceTop = max => {
   return Math.ceil(max / step) * step;
 };
 
-//  SVG arc path for a pie/donut slice 
+// SVG arc path for a pie/donut slice 
 // cx, cy: centre; r: outer radius; ir: inner radius (0 = solid pie)
 // s, e: start/end angles in radians
 const _slicePath = cx => cy => r => ir => s => e => {
@@ -122,7 +122,7 @@ const _slicePath = cx => cy => r => ir => s => e => {
   ].join(' ');
 };
 
-//  Catmull-Rom smooth path through [{x,y}] 
+// Catmull-Rom smooth path through [{x,y}] 
 const _smoothPath = pts => {
   if (pts.length < 2) return `M ${_fmt(pts[0].x)} ${_fmt(pts[0].y)}`;
   const T    = 0.3;
@@ -138,7 +138,7 @@ const _smoothPath = pts => {
   }, `M ${_fmt(pts[0].x)} ${_fmt(pts[0].y)}`);
 };
 
-//  Colour legend (HTML) 
+// Colour legend (HTML) 
 const _legend = palette => data =>
   div({ style: 'display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:8px; font-size:12px; color:var(--text)' })(
     data.map((d, i) =>
@@ -149,7 +149,7 @@ const _legend = palette => data =>
     )
   );
 
-//  PieChart 
+// PieChart 
 /**
  * Pie or donut chart. Each item in data becomes one slice.
  *
@@ -159,7 +159,7 @@ const _legend = palette => data =>
  * @param {number}   [opts.gapDeg=1]           Gap between slices in degrees
  * @param {boolean}  [opts.legend=true]        Show colour swatch legend below chart
  * @param {string[]} [opts.palette=PALETTE]    Colour palette; overridden per-item by item.color
- * @param {Function} [opts.onSliceHover]       (item | null, index | -1) → void
+ * @param {Function} [opts.onSliceHover]       (item | null, index | -1) -> void
  * @param {string}   [opts.className]
  * @param {string}   [opts.style]
  *
@@ -238,7 +238,7 @@ const PieChart = ({
   ]);
 };
 
-//  BarChart 
+// BarChart 
 /**
  * Vertical bar chart with Y-axis grid lines.
  *
@@ -252,8 +252,8 @@ const PieChart = ({
  * @param {boolean}  [opts.gridLines=true]
  * @param {boolean}  [opts.legend=false]
  * @param {string[]} [opts.palette=PALETTE]
- * @param {Function} [opts.onBarHover]         (item | null, index | -1) → void
- * @param {Function} [opts.onBarClick]         (item, index) → void
+ * @param {Function} [opts.onBarHover]         (item | null, index | -1) -> void
+ * @param {Function} [opts.onBarClick]         (item, index) -> void
  * @param {string}   [opts.className]
  * @param {string}   [opts.style]
  *
@@ -380,7 +380,7 @@ const BarChart = ({
   ]);
 };
 
-//  LineChart 
+// LineChart 
 /**
  * Line chart. Fill, dots, and smooth Catmull-Rom curves are all optional.
  *
@@ -396,7 +396,7 @@ const BarChart = ({
  * @param {boolean}  [opts.smooth=false]        Catmull-Rom smooth curve
  * @param {boolean}  [opts.baseline=true]       Force Y axis to start at 0
  * @param {boolean}  [opts.gridLines=true]
- * @param {Function} [opts.onPointHover]        (item | null, index | -1) → void
+ * @param {Function} [opts.onPointHover]        (item | null, index | -1) -> void
  * @param {string}   [opts.className]
  * @param {string}   [opts.style]
  *
@@ -533,7 +533,7 @@ const LineChart = ({
   ]);
 };
 
-//  SparkLine 
+// SparkLine 
 /**
  * Minimal inline trend line. No axes, no labels — just shape and colour.
  * Perfect for embedding in table cells or stat cards.
@@ -603,7 +603,7 @@ const SparkLine = ({
   ]);
 };
 
-//  MultiLineChart 
+// MultiLineChart 
 /**
  * Multi-series line chart. All series share the same X/Y scales.
  * Clicking a point (or the invisible vertical strip over it) selects that

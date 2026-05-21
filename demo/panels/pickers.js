@@ -18,7 +18,7 @@ const Val = (v, muted = false) =>
 export const pickersPanel = state =>
   div({})([
 
-    //  NumberInput 
+    // NumberInput 
     Card({ title: 'NumberInput' })([
       Row({ gap: 24 })([
         Col({ span: 12 })([
@@ -62,7 +62,7 @@ export const pickersPanel = state =>
       ]),
     ]),
 
-    //  ColorPicker 
+    // ColorPicker 
     div({ style: 'margin-top: 16px' })([
       Card({ title: 'ColorPicker' })([
         Row({ gap: 32 })([
@@ -95,7 +95,7 @@ export const pickersPanel = state =>
       ]),
     ]),
 
-    //  DateTimePicker 
+    // DateTimePicker 
     div({ style: 'margin-top: 16px' })([
       Card({ title: 'DateTimePicker' })([
         Row({ gap: 32 })([

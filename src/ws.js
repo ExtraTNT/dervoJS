@@ -10,7 +10,7 @@
  *   - No implicit state — status/messages must be tracked by the caller
  *   - destroy() is always safe to call (idempotent, no-ops on closed socket)
  *   - Reconnect is opt-in, capped by maxRetries, with exponential back-off
- *   - send() is typed: plain strings AND objects (→ JSON.stringify)
+ *   - send() is typed: plain strings AND objects (-> JSON.stringify)
  *   - onMessage delivers the parsed JSON value when the frame is valid JSON,
  *     or the raw string otherwise
  *
@@ -118,7 +118,7 @@ const createWS = ({
     socket.onclose = evt => {
       if (destroyed) { onClose(evt.code); return; }
       onClose(evt.code);
-      // Clean close or explicit destroy → don't reconnect
+      // Clean close or explicit destroy -> don't reconnect
       if (!reconnect || evt.code === 1000) return;
       if (retries >= maxRetries) { onGiveUp(); return; }
       retries++;

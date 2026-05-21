@@ -2,7 +2,7 @@ import { div, input, button, label, span } from '../elements.js';
 import { toMaybe } from '../../lib/odocosjs/src/core.js';
 import { cn, fire } from '../utils.js';
 
-//  Date constants 
+// Date constants 
 
 const DAYS   = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
@@ -10,12 +10,12 @@ const MONTHS = [
   'July','August','September','October','November','December',
 ];
 
-//  Pure date helpers 
+// Pure date helpers 
 
 /** Pad a number to 2 decimal digits */
 const pad2 = n => String(n).padStart(2, '0');
 
-/** Parse an ISO date string → { year, month(0-based), day } or null */
+/** Parse an ISO date string -> { year, month(0-based), day } or null */
 const parseDate = iso => {
   const m = iso ? String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
   return m ? { year: +m[1], month: +m[2] - 1, day: +m[3] } : null;
@@ -27,7 +27,7 @@ const parseTime = iso => {
   return m ? { hour: +m[1], minute: +m[2] } : { hour: 0, minute: 0 };
 };
 
-/** Format a date (+ optional time) object → ISO string */
+/** Format a date (+ optional time) object -> ISO string */
 const formatISO = ({ year, month, day, hour = 0, minute = 0 }, showTime) =>
   showTime
     ? `${year}-${pad2(month + 1)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}`
@@ -40,7 +40,7 @@ const daysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
 const firstDayOfWeek = (year, month) => new Date(year, month, 1).getDay();
 
 /**
- * Curried: adjacentMonth(delta)(year)(month) → { year, month }
+ * Curried: adjacentMonth(delta)(year)(month) -> { year, month }
  * adjacentMonth(-1) = prevMonthOf,  adjacentMonth(+1) = nextMonthOf
  */
 const adjacentMonth = delta => year => month => ({
@@ -59,7 +59,7 @@ const cmpDate = a => b =>
   : a.month !== b.month ? a.month - b.month
   : a.day   - b.day;
 
-//  Component 
+// Component 
 
 /**
  * DateTimePicker — calendar grid with optional time selector.
@@ -115,11 +115,11 @@ const DateTimePicker = ({
 
   const { hour: selHour, minute: selMinute } = showTime ? parseTime(value) : { hour: 0, minute: 0 };
 
-  //  Navigation 
+  // Navigation 
   const prevMonth = () => fire(onViewChange)(prevMonthOf(vy)(vm));
   const nextMonth = () => fire(onViewChange)(nextMonthOf(vy)(vm));
 
-  //  Day predicates 
+  // Day predicates 
   const isDisabled = year => month => day => {
     const d = { year, month, day };
     return toMaybe(minD)(() => false)(m => cmpDate(d)(m) < 0)
@@ -132,7 +132,7 @@ const DateTimePicker = ({
   const isSelected = year => month => day =>
     sel != null && year === sel.year && month === sel.month && day === sel.day;
 
-  //  Day selection 
+  // Day selection 
   const selectDay = year => month => day => {
     if (isDisabled(year)(month)(day)) return;
     fire(onChange)(formatISO({ year, month, day, hour: selHour, minute: selMinute }, showTime));
@@ -141,7 +141,7 @@ const DateTimePicker = ({
   const onHourChange   = e => sel && fire(onChange)(formatISO({ ...sel, hour:   +e.target.value, minute: selMinute }, true));
   const onMinuteChange = e => sel && fire(onChange)(formatISO({ ...sel, minute: +e.target.value, hour:   selHour   }, true));
 
-  //  Calendar cells 
+  // Calendar cells 
   const blanks = Array.from({ length: firstDayOfWeek(vy, vm) }, () =>
     div({ className: 'date-cell date-cell-blank' })([])
   );
@@ -167,19 +167,19 @@ const DateTimePicker = ({
   return div({ className: cn('date-picker', className), style })([
     ...(labelText ? [label({ htmlFor: id, className: 'field-label' })([labelText])] : []),
 
-    //  Month navigation 
+    // Month navigation 
     div({ className: 'date-picker-header' })([
       button({ type: 'button', className: 'date-nav-btn', onclick: prevMonth, 'aria-label': 'Previous month' })(['‹']),
       span({ className: 'date-picker-title' })([`${MONTHS[vm]} ${vy}`]),
       button({ type: 'button', className: 'date-nav-btn', onclick: nextMonth, 'aria-label': 'Next month'     })(['›']),
     ]),
 
-    //  Day-of-week headers + day cells 
+    // Day-of-week headers + day cells 
     div({ className: 'date-grid' })(
       DAYS.map(d => div({ className: 'date-cell date-cell-dow' })([d])).concat(blanks, dayCells)
     ),
 
-    //  Time row 
+    // Time row 
     ...(showTime ? [
       div({ className: 'date-picker-time' })([
         span({ className: 'date-picker-time-label' })(['Time']),

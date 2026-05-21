@@ -11,7 +11,7 @@ const pic = seed => w => h => `https://picsum.photos/seed/${seed}-${w}x${h}/${w}
 export const mediaPanel = state => {
   const pic_ = pic(state.mediaSeed ?? 1);
   return div({})([  
-    //  onMount info 
+    // onMount info 
     div({ style: 'margin-bottom:16px; padding:10px 14px; background:var(--surface-2); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:var(--radius); font-size:12px; color:var(--text-muted); line-height:1.6' })([
       span({ style: 'font-weight:600; color:var(--text)' })(['\u2139\ufe0f  Images refresh on every visit\u2002']),
       'This panel is declared with ',
@@ -20,7 +20,7 @@ export const mediaPanel = state => {
       span({ style: 'font-family:ui-monospace,monospace; background:var(--surface-3,var(--surface-2)); padding:1px 5px; border-radius:3px' })(['onMount: () => setState({ mediaSeed: Date.now() })']),
       ' in NAV_ITEMS. The DOM is fully torn down on route change and a new seed is stamped into state on each visit, so picsum serves a different image every time. See the Docs tab for details.',
     ]),
-    //  Images 
+    // Images 
     Card({ title: 'Img — aspect, fit, shape' })([
       Row({ gap: 12 })([
         Col({ span: 12, sm: 6, md: 4 })([
@@ -45,7 +45,7 @@ Img({ src: '/photo.jpg', alt: 'Portrait', aspect: '4/3', fit: 'contain' })
 Img({ src: '/avatar.jpg', alt: 'Avatar', circle: true, width: 80, height: 80 })`]),
     ]),
 
-    //  Divider 
+    // Divider 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'Divider + Spacer' })([
         Stack({ gap: 0 })([
@@ -79,7 +79,7 @@ Spacer({ size: 32 })`]),
       ]),
     ]),
 
-    //  AspectBox 
+    // AspectBox 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'AspectBox — embed-safe aspect ratio' })([
         Row({ gap: 12 })([
@@ -102,7 +102,7 @@ AspectBox({ ratio: '1/1' })([ squareContent ])
       ]),
     ]),
 
-    //  Float + Clearfix 
+    // Float + Clearfix 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'Float + Clearfix' })([
         p({ style: 'margin:0 0 10px; font-size:13px; color:var(--text-muted)' })([
@@ -123,7 +123,7 @@ AspectBox({ ratio: '1/1' })([ squareContent ])
       ]),
     ]),
 
-    //  Video player 
+    // Video player 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'Video — HTML5 player (multi-source + captions)' })([
         Row({ gap: 16 })([
@@ -181,7 +181,7 @@ Video({ src: '/clip.mp4', aspect: '16/9', controls: true })`]),
       ]),
     ]),
 
-    //  Audio player 
+    // Audio player 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'Audio — HTML5 player (multi-format + caption)' })([
         Stack({ gap: 12 })([
@@ -212,7 +212,7 @@ Audio({ src: '/track.mp3', controls: true, loop: true })`]),
       ]),
     ]),
 
-    //  VideoStream (webcam) 
+    // VideoStream (webcam) 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'VideoStream — live MediaStream (getUserMedia)' })([
         div({ style: 'display:flex; gap:8px; margin-bottom:12px' })([
@@ -245,7 +245,7 @@ Audio({ src: '/track.mp3', controls: true, loop: true })`]),
       ]),
     ]),
 
-    //  Dropzone 
+    // Dropzone 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'Dropzone' })([
         Dropzone({

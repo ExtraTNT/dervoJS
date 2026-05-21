@@ -54,7 +54,7 @@ const ColorPicker = ({
   return div({ className: ['color-picker', className].filter(Boolean).join(' '), style })([
     ...(labelText ? [label({ htmlFor: id, className: 'field-label' })([labelText])] : []),
 
-    //  Swatch row 
+    // Swatch row 
     div({ className: 'color-swatches' })(
       swatches.map(sw =>
         span({
@@ -68,7 +68,7 @@ const ColorPicker = ({
       )
     ),
 
-    //  Wheel + hex row 
+    // Wheel + hex row 
     div({ className: 'color-picker-row' })([
       ...(showWheel ? [
         input({

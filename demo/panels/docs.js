@@ -132,7 +132,7 @@ const DOCS = [
     name: 'Table',
     description: 'Filterable, sortable data table with sticky headers and horizontal/vertical scroll. ' +
       'Column defs accept sort/filter flags or custom HOF comparators; data flows through a pure pipeline: ' +
-      'column filters → global filter → sort.',
+      'column filters -> global filter -> sort.',
     example:
       "// Sortable + per-column filterable columns:\n" +
       "Table({\n" +
@@ -250,11 +250,11 @@ const DOCS = [
       { name: 'fn',             type: 'function', default: '—',      desc: 'Callback on each tick' },
       { name: 'opts.ms',        type: 'number',   default: '1000',   desc: 'Milliseconds between ticks' },
       { name: 'opts.autoStart', type: 'boolean',  default: 'false',  desc: 'Start immediately on creation' },
-      { name: '→ .start()',     type: 'function', default: '—',      desc: 'Begin ticking (no-op if already running)' },
-      { name: '→ .stop()',      type: 'function', default: '—',      desc: 'Pause ticking (no-op if already stopped)' },
-      { name: '→ .restart()',   type: 'function', default: '—',      desc: 'stop() then start()' },
-      { name: '→ .toggle()',    type: 'function', default: '—',      desc: 'Flip the running state' },
-      { name: '→ .isRunning()', type: 'function', default: '—',      desc: 'Returns boolean' },
+      { name: '-> .start()',     type: 'function', default: '—',      desc: 'Begin ticking (no-op if already running)' },
+      { name: '-> .stop()',      type: 'function', default: '—',      desc: 'Pause ticking (no-op if already stopped)' },
+      { name: '-> .restart()',   type: 'function', default: '—',      desc: 'stop() then start()' },
+      { name: '-> .toggle()',    type: 'function', default: '—',      desc: 'Flip the running state' },
+      { name: '-> .isRunning()', type: 'function', default: '—',      desc: 'Returns boolean' },
     ],
   },
   {
@@ -265,10 +265,10 @@ const DOCS = [
       { name: 'opts.store',         type: 'object', default: '—',       desc: 'Store from createStore()' },
       { name: 'opts.key',           type: 'string', default: "'timer'", desc: 'State key holding { elapsed, running }' },
       { name: 'opts.step',          type: 'number', default: '1',       desc: 'Seconds added per tick' },
-      { name: '→ .start()',         type: 'fn',     default: '—',       desc: 'Begin ticking (no-op if already running)' },
-      { name: '→ .pause()',         type: 'fn',     default: '—',       desc: 'Freeze the timer' },
-      { name: '→ .reset()',         type: 'fn',     default: '—',       desc: 'Pause and set elapsed back to 0' },
-      { name: '→ .toggle()',        type: 'fn',     default: '—',       desc: 'Flip running state' },
+      { name: '-> .start()',         type: 'fn',     default: '—',       desc: 'Begin ticking (no-op if already running)' },
+      { name: '-> .pause()',         type: 'fn',     default: '—',       desc: 'Freeze the timer' },
+      { name: '-> .reset()',         type: 'fn',     default: '—',       desc: 'Pause and set elapsed back to 0' },
+      { name: '-> .toggle()',        type: 'fn',     default: '—',       desc: 'Flip running state' },
     ],
   },
   {
@@ -472,7 +472,7 @@ const DOCS = [
   },
   {
     name: 'GlitchImg',
-    description: 'Canvas-based glitch effect. Imperative mount: GlitchImg(opts)(el) → { stop, pause, resume }. Use GlitchCanvas() to declare the canvas vnode.',
+    description: 'Canvas-based glitch effect. Imperative mount: GlitchImg(opts)(el) -> { stop, pause, resume }. Use GlitchCanvas() to declare the canvas vnode.',
     example: "GlitchCanvas({ id: 'g1' })\nconst fx = GlitchImg({ src: '/photo.jpg', fps: 30 })(document.getElementById('g1'))",
     props: [
       { name: 'src',             type: 'string',  default: '—',    desc: 'Image URL (must be CORS-accessible for pixel read)' },
@@ -670,10 +670,10 @@ DragList({
 })
 
 // Two-list keep/delete pattern (oncreate on the wrapper div):
-//   el.addEventListener('draglist:transfer', useDragListGroup({
-//     keep: { getItems: () => getState().keep, setItems: keep => setState({ keep }) },
-//     del:  { getItems: () => getState().del,  setItems: del  => setState({ del  }) },
-//   }))
+//  el.addEventListener('draglist:transfer', useDragListGroup({
+//    keep: { getItems: () => getState().keep, setItems: keep => setState({ keep }) },
+//    del:  { getItems: () => getState().del,  setItems: del  => setState({ del  }) },
+//  }))
 DragList({ groupId:'keep', items: state.keep, onChange: keep => setState({keep}), renderItem: i => span({})([i.label]) })
 DragList({ groupId:'del',  items: state.del,  onChange: del  => setState({del}),  renderItem: i => span({})([i.label]) })`,
     props: [
@@ -803,7 +803,7 @@ DragList({ groupId:'review', listId:'del',  onTransfer, items: state.del,  onCha
       { name: 'tocSticky',    type: 'boolean', default: 'true',     desc: 'position:sticky on the TOC panel' },
       { name: 'className',    type: 'string',  default: "''",       desc: '' },
       { name: 'style',        type: 'string',  default: "''",       desc: '' },
-      { name: 'H1–H6',        type: 'fn',      default: '—',        desc: 'Heading helpers: H1(opts)(children) → vnode' },
+      { name: 'H1–H6',        type: 'fn',      default: '—',        desc: 'Heading helpers: H1(opts)(children) -> vnode' },
       { name: 'P',            type: 'fn',      default: '—',        desc: 'Paragraph: P({lead?})(children)' },
       { name: 'Code',         type: 'fn',      default: '—',        desc: 'Inline code span' },
       { name: 'Pre',          type: 'fn',      default: '—',        desc: 'Pre block: Pre({lang})(children)' },
@@ -831,8 +831,8 @@ DragList({ groupId:'review', listId:'del',  onTransfer, items: state.del,  onCha
     props: [
       { name: 'cb',              type: 'function', default: '—',    desc: 'Called with { width, height }' },
       { name: 'opts.debounce',   type: 'number',   default: '50',   desc: 'Debounce delay ms' },
-      { name: '→ .destroy()',    type: 'fn',       default: '—',    desc: 'Remove the resize listener' },
-      { name: '→ .getSize()',    type: 'fn',       default: '—',    desc: 'Returns current { width, height } synchronously' },
+      { name: '-> .destroy()',    type: 'fn',       default: '—',    desc: 'Remove the resize listener' },
+      { name: '-> .getSize()',    type: 'fn',       default: '—',    desc: 'Returns current { width, height } synchronously' },
     ],
   },
   {
@@ -842,8 +842,8 @@ DragList({ groupId:'review', listId:'del',  onTransfer, items: state.del,  onCha
     props: [
       { name: 'query',         type: 'string',   default: '—',   desc: 'CSS media query string' },
       { name: 'cb',            type: 'function', default: '—',   desc: 'Called with boolean (matches)' },
-      { name: '→ .destroy()',  type: 'fn',       default: '—',   desc: 'Remove the listener' },
-      { name: '→ .matches()',  type: 'fn',       default: '—',   desc: 'Return current match state' },
+      { name: '-> .destroy()',  type: 'fn',       default: '—',   desc: 'Remove the listener' },
+      { name: '-> .matches()',  type: 'fn',       default: '—',   desc: 'Return current match state' },
     ],
   },
   {
@@ -856,7 +856,7 @@ DragList({ groupId:'review', listId:'del',  onTransfer, items: state.del,  onCha
       { name: 'opts.ctrl',    type: 'boolean',         default: '—',   desc: 'Require Ctrl' },
       { name: 'opts.shift',   type: 'boolean',         default: '—',   desc: 'Require Shift' },
       { name: 'opts.alt',     type: 'boolean',         default: '—',   desc: 'Require Alt' },
-      { name: '→ .destroy()', type: 'fn',             default: '—',   desc: 'Remove the listener' },
+      { name: '-> .destroy()', type: 'fn',             default: '—',   desc: 'Remove the listener' },
     ],
   },
   {
@@ -868,8 +868,8 @@ DragList({ groupId:'review', listId:'del',  onTransfer, items: state.del,  onCha
       { name: 'opts.delay',      type: 'number',   default: '1000',  desc: 'Milliseconds before first (and each repeated) call' },
       { name: 'opts.repeat',     type: 'boolean',  default: 'false', desc: 'Keep firing until destroy()' },
       { name: 'opts.immediate',  type: 'boolean',  default: 'false', desc: 'Also call cb immediately before starting the timer' },
-      { name: '→ .destroy()',    type: 'fn',       default: '—',     desc: 'Cancel' },
-      { name: '→ .reset()',      type: 'fn',       default: '—',     desc: 'Cancel and restart with same delay' },
+      { name: '-> .destroy()',    type: 'fn',       default: '—',     desc: 'Cancel' },
+      { name: '-> .reset()',      type: 'fn',       default: '—',     desc: 'Cancel and restart with same delay' },
     ],
   },
   {
@@ -878,7 +878,7 @@ DragList({ groupId:'review', listId:'del',  onTransfer, items: state.del,  onCha
     example: "onVisibilityChange(({ visible }) => {\n  if (!visible) analytics.pause();\n  else analytics.resume();\n});",
     props: [
       { name: 'cb',            type: 'function', default: '—', desc: 'Called with { visible: boolean }' },
-      { name: '→ .destroy()',  type: 'fn',       default: '—', desc: 'Remove the listener' },
+      { name: '-> .destroy()',  type: 'fn',       default: '—', desc: 'Remove the listener' },
     ],
   },  {
     name: 'NAV_ITEMS \u2014 onMount / unload',
@@ -902,7 +902,7 @@ DragList({ groupId:'review', listId:'del',  onTransfer, items: state.del,  onCha
     ],  },
   {
     name: 'StateDebugger',
-    description: 'Live inspector panel for any dervoJS store. Shows all state keys with their current value and type, lets you edit any value as inline JSON, add new keys, remove keys, expand complex values (objects/arrays), filter the key list, and watch individual keys for changes. Watched keys append timestamped before→after diffs to a scrollable change log. Maintains its own internal UI state in a module-level variable so it never pollutes the app store.',
+    description: 'Live inspector panel for any dervoJS store. Shows all state keys with their current value and type, lets you edit any value as inline JSON, add new keys, remove keys, expand complex values (objects/arrays), filter the key list, and watch individual keys for changes. Watched keys append timestamped before->after diffs to a scrollable change log. Maintains its own internal UI state in a module-level variable so it never pollutes the app store.',
     example: `// In a debug panel (receives state from mount):
 import { StateDebugger } from 'dervoJS';
 import { setState, getState } from '../store.js';
@@ -1061,7 +1061,7 @@ export const debugPanel = state =>
       { name: 'gapDeg',       type: 'number',   default: '1',          desc: 'Gap between slices in degrees' },
       { name: 'legend',       type: 'boolean',  default: 'true',       desc: 'Show colour swatch legend below chart' },
       { name: 'palette',      type: 'string[]', default: 'PALETTE',    desc: 'Colour palette; overridden per-item by item.color' },
-      { name: 'onSliceHover', type: 'function', default: '—',          desc: '(item | null, index | -1) → void' },
+      { name: 'onSliceHover', type: 'function', default: '—',          desc: '(item | null, index | -1) -> void' },
     ],
   },
   {
@@ -1077,7 +1077,7 @@ export const debugPanel = state =>
       { name: 'color',      type: 'string',   default: '—',          desc: 'Default bar fill; overridden by item.color' },
       { name: 'gridLines',  type: 'boolean',  default: 'true',       desc: 'Show horizontal grid lines' },
       { name: 'legend',     type: 'boolean',  default: 'false',      desc: 'Show colour legend' },
-      { name: 'onBarHover', type: 'function', default: '—',          desc: '(item | null, index | -1) → void' },
+      { name: 'onBarHover', type: 'function', default: '—',          desc: '(item | null, index | -1) -> void' },
     ],
   },
   {
@@ -1094,7 +1094,7 @@ export const debugPanel = state =>
       { name: 'smooth',       type: 'boolean',  default: 'false',     desc: 'Catmull-Rom smooth curve' },
       { name: 'baseline',     type: 'boolean',  default: 'true',      desc: 'Force Y axis to start at 0' },
       { name: 'gridLines',    type: 'boolean',  default: 'true',      desc: 'Show horizontal grid lines' },
-      { name: 'onPointHover', type: 'function', default: '—',         desc: '(item | null, index | -1) → void' },
+      { name: 'onPointHover', type: 'function', default: '—',         desc: '(item | null, index | -1) -> void' },
     ],
   },
   {
@@ -1126,7 +1126,7 @@ export const debugPanel = state =>
       { name: 'xLabels',      type: 'string[]', default: 'null',    desc: 'Label for each data index; sparse (every ~10th shown)' },
       { name: 'legend',       type: 'boolean',  default: 'true',    desc: 'HTML colour legend below chart' },
       { name: 'highlightIdx', type: 'number',   default: 'null',    desc: 'Index of the highlighted point — dashed guide + larger dots' },
-      { name: 'onPointClick', type: 'function', default: '—',       desc: '(index) → void — called when a click strip is clicked' },
+      { name: 'onPointClick', type: 'function', default: '—',       desc: '(index) -> void — called when a click strip is clicked' },
       { name: 'className',    type: 'string',   default: "''",      desc: 'Extra CSS class(es)' },
       { name: 'style',        type: 'string',   default: "''",      desc: 'Extra inline CSS' },
       { name: '(series)',     type: 'Array',    default: '[]',      desc: 'Array of { label, color, data: number[] }' },
@@ -1138,9 +1138,9 @@ export const debugPanel = state =>
     example: "const Users    = createCrud(http)('/api')(spec)('users');\nconst Projects = createCrud(http)('/api')(spec)('projects');\nUsers({ state: s.users, setState: patchUsers, view: 'list' });\nUsers({ state: s.users, setState: patchUsers, view: 'edit', id: 42, onSuccess: closeModal });",
     props: [
       { name: 'http',         type: 'HttpClient', default: 'defaultHttp',    desc: 'Curry step 1. Object with { get, list, post, put, patch, remove } — see createHttp.' },
-      { name: 'basePath',     type: 'string',     default: '—',              desc: 'Curry step 2. Prefix joined with each OpenAPI path (e.g. "/api" → /api/users).' },
+      { name: 'basePath',     type: 'string',     default: '—',              desc: 'Curry step 2. Prefix joined with each OpenAPI path (e.g. "/api" -> /api/users).' },
       { name: 'spec',         type: 'object',     default: '—',              desc: 'Curry step 3. Parsed OpenAPI document. 3.0 and 3.1 both supported.' },
-      { name: 'resource',     type: 'string',     default: '—',              desc: 'Curry step 4. Path segment to match (e.g. "users" → /users, /api/users, /v1/users/{id}).' },
+      { name: 'resource',     type: 'string',     default: '—',              desc: 'Curry step 4. Path segment to match (e.g. "users" -> /users, /api/users, /v1/users/{id}).' },
       { name: 'opts.state',        type: 'object',                       default: '—',     desc: 'Required. State slice for this resource. Keys: view, id, data, total, loading, error, form, formErrors, submitting, confirmDelete, _loadedKey, filter, sort.' },
       { name: 'opts.setState',     type: '(patch | fn) => void',         default: '—',     desc: 'Required. Writes to that slice. Must accept both an object patch and an updater function.' },
       { name: 'opts.view',         type: "'list'|'show'|'edit'|'new'",   default: 'state.view ?? "list"', desc: 'Override state.view. Useful for routing.' },
@@ -1155,16 +1155,16 @@ export const debugPanel = state =>
   {
     name: 'createHttp',
     description: 'Build an HttpClient with the curried shape CrudResource expects. Pass a fetch implementation (or wrap fetch for auth/headers/base URL). Anything matching the same shape works — you can also write a fully custom client by hand.',
-    example: "//  Default — bare fetch, Content-Type: application/json\nconst http = createHttp();\n\n//  Auth — wrap fetch\nconst authed = (url, init = {}) => fetch(url, {\n  ...init,\n  headers: { ...init.headers, Authorization: `Bearer ${token}` },\n});\nconst http = createHttp(authed);\n\n//  Static headers\nconst http = createHttp(fetch, { 'X-Api-Key': KEY });",
+    example: "// Default — bare fetch, Content-Type: application/json\nconst http = createHttp();\n\n// Auth — wrap fetch\nconst authed = (url, init = {}) => fetch(url, {\n  ...init,\n  headers: { ...init.headers, Authorization: `Bearer ${token}` },\n});\nconst http = createHttp(authed);\n\n// Static headers\nconst http = createHttp(fetch, { 'X-Api-Key': KEY });",
     props: [
       { name: 'fetchImpl',     type: 'typeof fetch', default: 'globalThis.fetch', desc: 'fetch-compatible function. Wrap to inject auth, base URLs, retries, telemetry.' },
       { name: 'extraHeaders',  type: '{[k]: string}', default: '{}',              desc: 'Static headers merged on every request.' },
-      { name: '→ get',         type: 'url => opts => Promise<json>',           default: '—', desc: 'GET. Single item or arbitrary endpoint.' },
-      { name: '→ list',        type: 'url => opts => Promise<[items, total]>', default: '—', desc: 'GET. Returns [items, total] — total comes from the x-total-count header, falls back to items.length.' },
-      { name: '→ post',        type: 'url => body => opts => Promise<json>',   default: '—', desc: 'POST with JSON body.' },
-      { name: '→ put',         type: 'url => body => opts => Promise<json>',   default: '—', desc: 'PUT with JSON body.' },
-      { name: '→ patch',       type: 'url => body => opts => Promise<json>',   default: '—', desc: 'PATCH with JSON body.' },
-      { name: '→ remove',      type: 'url => body => opts => Promise<json>',   default: '—', desc: 'DELETE. Body is optional; pass null when none.' },
+      { name: '-> get',         type: 'url => opts => Promise<json>',           default: '—', desc: 'GET. Single item or arbitrary endpoint.' },
+      { name: '-> list',        type: 'url => opts => Promise<[items, total]>', default: '—', desc: 'GET. Returns [items, total] — total comes from the x-total-count header, falls back to items.length.' },
+      { name: '-> post',        type: 'url => body => opts => Promise<json>',   default: '—', desc: 'POST with JSON body.' },
+      { name: '-> put',         type: 'url => body => opts => Promise<json>',   default: '—', desc: 'PUT with JSON body.' },
+      { name: '-> patch',       type: 'url => body => opts => Promise<json>',   default: '—', desc: 'PATCH with JSON body.' },
+      { name: '-> remove',      type: 'url => body => opts => Promise<json>',   default: '—', desc: 'DELETE. Body is optional; pass null when none.' },
     ],
   },
   {
@@ -1174,11 +1174,11 @@ export const debugPanel = state =>
     props: [
       { name: 'spec',     type: 'object', default: '—', desc: 'Parsed OpenAPI 3.0 or 3.1 document.' },
       { name: 'resource', type: 'string', default: '—', desc: 'Resource path segment to compile.' },
-      { name: '→ ops',            type: 'object',   default: '—', desc: '{ basePath, itemPath, idParam, listOp, createOp, showOp, updateOp, deleteOp } — null entries when the operation is absent from the spec.' },
-      { name: '→ idParam',        type: 'string',   default: "'id'", desc: 'Name of the path parameter for the item route.' },
-      { name: '→ fields',         type: 'Field[]',  default: '—', desc: 'Form schema (from create body, falling back to update body / show response / list item).' },
-      { name: '→ showFields',     type: 'Field[]',  default: '—', desc: 'Read-only display fields (from show response, falling back to list item / form).' },
-      { name: '→ listItemFields', type: 'Field[]',  default: '—', desc: 'Per-item schema for list table columns (handles array<T> and paginated wrappers).' },
+      { name: '-> ops',            type: 'object',   default: '—', desc: '{ basePath, itemPath, idParam, listOp, createOp, showOp, updateOp, deleteOp } — null entries when the operation is absent from the spec.' },
+      { name: '-> idParam',        type: 'string',   default: "'id'", desc: 'Name of the path parameter for the item route.' },
+      { name: '-> fields',         type: 'Field[]',  default: '—', desc: 'Form schema (from create body, falling back to update body / show response / list item).' },
+      { name: '-> showFields',     type: 'Field[]',  default: '—', desc: 'Read-only display fields (from show response, falling back to list item / form).' },
+      { name: '-> listItemFields', type: 'Field[]',  default: '—', desc: 'Per-item schema for list table columns (handles array<T> and paginated wrappers).' },
       { name: 'Field shape',      type: 'descriptor', default: '—', desc: '{ name, title, description, type, format, enum, default, nullable, required, readOnly, minLength, maxLength, pattern, minimum, maximum, step, items, properties }.' },
     ],
   },

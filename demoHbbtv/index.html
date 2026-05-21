@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>dervoJS HbbTV demo</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; overflow-x: hidden; }
+    </style>
+  </head>
+  <body>
+    <!--
+      HbbTV / OIPF DOM hooks. Real STBs instantiate these by type; desktop
+      browsers ignore them. Position them off-screen so they never affect
+      the layout.
+    -->
+    <object id="appmgr"  type="application/oipfApplicationManager"
+            style="position:absolute; left:-9999px; top:-9999px; width:0; height:0"></object>
+    <object id="oipfcfg" type="application/oipfConfiguration"
+            style="position:absolute; left:-9999px; top:-9999px; width:0; height:0"></object>
+    <object id="video"   type="video/broadcast"
+            style="position:absolute; left:-9999px; top:-9999px; width:0; height:0; z-index:-1"></object>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

@@ -6,7 +6,7 @@ import { doc } from '../components/doc.js';
 
 export const controlsPanel = state =>
   div({})([
-    //  Sliders 
+    // Sliders 
     Card({ title: 'Slider' })([
       Stack({ gap: 20 })([
         Slider({
@@ -48,7 +48,7 @@ Slider({id: 'sliderDis', label: 'Disabled', value: 60, disabled: true,}),
       ]),
     ]),
 
-    //  Progress bars 
+    // Progress bars 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'ProgressBar' })([
         Stack({ gap: 20 })([
@@ -77,7 +77,7 @@ ProgressBar({ indeterminate: state.progressRunning, label: 'Indeterminate' }),`]
       ]),
     ]),
 
-    //  Stat display row 
+    // Stat display row 
     div({ style: 'margin-top:16px' })([
       Card({ title: 'Live slider values' })([
         Row({ gap: 12 })([

@@ -5,7 +5,7 @@ import { getRenderLog, getProfilerFrame, enableProfiler, disableProfiler } from 
 import { Button } from './Button.js';
 import { BarChart, MultiLineChart } from './Charts.js';
 
-//  Module-level UI state 
+// Module-level UI state 
 const _ui = {
   limit:        50,
   showTable:    false,
@@ -13,7 +13,7 @@ const _ui = {
   lastSeenFrame: -1,     // used to auto-detach when the component stops rendering
 };
 
-//  Helpers 
+// Helpers 
 const fmt = n => n < 0.1 ? '<0.1' : n.toFixed(2);
 const hot = ms => ms > 16.67;
 
@@ -95,7 +95,7 @@ const opsRow = e => {
   ]);
 };
 
-//  Component 
+// Component 
 
 /**
  * Auto-detaches (calls disableProfiler) when it stops being rendered,
@@ -152,7 +152,7 @@ const opsRow = e => {
  *                appears for the first time.
  *
  *   replaced   — existing DOM nodes swapped out (replaceChild). Happens when
- *                the tag changes (e.g. div → span), or when a text node is
+ *                the tag changes (e.g. div -> span), or when a text node is
  *                replaced by an element or vice-versa. Replacements are
  *                expensive because the old subtree is thrown away entirely.
  *                High replaces usually indicate keyed lists with mismatched
@@ -184,11 +184,11 @@ const opsRow = e => {
  *   signal that child nodes lack stable keys and are being rebuilt unnecessarily.
  *
  * QUICK DIAGNOSIS GUIDE
- *   Slow compute, normal patch → expensive view function. Profile JS directly.
- *   Normal compute, slow patch → large tree or many mutations. Check counts.
- *   High replaced, low moved   → missing or unstable keys on lists.
- *   High visited, low mutations → healthy. Tree is large but stable.
- *   changed keys = {} on every frame → setState({}) is being called too often
+ *   Slow compute, normal patch -> expensive view function. Profile JS directly.
+ *   Normal compute, slow patch -> large tree or many mutations. Check counts.
+ *   High replaced, low moved   -> missing or unstable keys on lists.
+ *   High visited, low mutations -> healthy. Tree is large but stable.
+ *   changed keys = {} on every frame -> setState({}) is being called too often
  *                                       (likely a polling or timer re-render).
  */
 let _wasActive = false;
@@ -205,18 +205,18 @@ const RenderProfiler = ({ setState = () => {}, active = true } = {}) => {
   // captures real data and the UI isn't empty.
   if (justActivated) { queueMicrotask(force); }
 
-  //  auto-detach: if the frame counter hasn't advanced since last render,
-  //    we're still alive; if it HAS advanced but we weren't called, we won't
-  //    reach here anyway. Track the frame we last ran at so that calling
-  //    disableProfiler from the FloatingPanel onClose is enough — but also
-  //    register our "I'm alive" stamp so cleanup is possible from outside.
+  // auto-detach: if the frame counter hasn't advanced since last render,
+  //   we're still alive; if it HAS advanced but we weren't called, we won't
+  //   reach here anyway. Track the frame we last ran at so that calling
+  //   disableProfiler from the FloatingPanel onClose is enough — but also
+  //   register our "I'm alive" stamp so cleanup is possible from outside.
   _ui.lastSeenFrame = getProfilerFrame();
 
   const log = getRenderLog().slice(0, _ui.limit);
   if (!log.length)
     return div({ className: 'rp-empty' })(['No renders recorded yet.']);
 
-  //  aggregate stats 
+  // aggregate stats 
   const totals  = log.map(e => e.totalMs);
   const last    = totals[0];
   const avg     = totals.reduce((a, b) => a + b, 0) / totals.length;
@@ -224,7 +224,7 @@ const RenderProfiler = ({ setState = () => {}, active = true } = {}) => {
   const sorted  = [...totals].sort((a, b) => a - b);
   const p95     = sorted[Math.floor(sorted.length * 0.95)] ?? maximum;
 
-  //  chart series (oldest → newest) 
+  // chart series (oldest -> newest) 
   const frames       = log.slice().reverse();
   const highlightIdx = _ui.expandedFrame != null
     ? frames.findIndex(f => f.frame === _ui.expandedFrame)
@@ -236,12 +236,12 @@ const RenderProfiler = ({ setState = () => {}, active = true } = {}) => {
   ];
   const xLabels      = frames.map(f => `#${f.frame}`);
 
-  //  expanded frame 
+  // expanded frame 
   const expanded = highlightIdx != null ? frames[highlightIdx] : null;
 
   return div({ className: 'rp-root' })([
 
-    //  stat chips 
+    // stat chips 
     div({ className: 'rp-stats' })([
       statChip('last')(`${fmt(last)}ms`)(hot(last)),
       statChip('avg')(`${fmt(avg)}ms`)(hot(avg)),
@@ -263,7 +263,7 @@ const RenderProfiler = ({ setState = () => {}, active = true } = {}) => {
       })(['≡']),
     ]),
 
-    //  timing / history multi-line chart 
+    // timing / history multi-line chart 
     MultiLineChart({
       width: 840, height: 130, paddingX: 36, paddingY: 14,
       gridLines: true, dots: true, dotR: 3, legend: true,
@@ -275,7 +275,7 @@ const RenderProfiler = ({ setState = () => {}, active = true } = {}) => {
       },
     })(chartSeries),
 
-    //  expanded frame detail 
+    // expanded frame detail 
     expanded
       ? div({ className: 'rp-chart-detail' })([
           span({ className: 'rp-cd-frame', style: 'font-size:11px; color:var(--text-muted); display:block; margin-bottom:6px' })([
@@ -285,7 +285,7 @@ const RenderProfiler = ({ setState = () => {}, active = true } = {}) => {
         ])
       : div({ style: 'display:none' })([]),
 
-    //  table 
+    // table 
     _ui.showTable
       ? table({ className: 'rp-table' })([
           thead({})([

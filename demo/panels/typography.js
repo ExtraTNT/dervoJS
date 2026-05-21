@@ -38,7 +38,7 @@ const sampleContent = [
   Pre({ lang: 'js' })([
     'const greeting = name => `Hello, ${name}!`;\n',
     'console.log(greeting("world"));\n',
-    '// → Hello, world!',
+    '// -> Hello, world!',
   ]),
 
   H2({})(['Blockquote']),
@@ -69,7 +69,7 @@ const sampleContent = [
   H2({})(['API reference']),
   P({})([
     Code({})(['Typography({ toc, tocPosition, tocTitle, tocSticky, className, style })']),
-    ' → ', Code({})(['children => vnode']),
+    ' -> ', Code({})(['children => vnode']),
   ]),
   P({})(['Convenience exports: ', Code({})(['H1']), ', ', Code({})(['H2']), ', ', Code({})(['H3']),
     ', ', Code({})(['H4']), ', ', Code({})(['H5']), ', ', Code({})(['H6']),

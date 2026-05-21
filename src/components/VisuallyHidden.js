@@ -1,7 +1,7 @@
 import { span } from '../elements.js';
 
 /**
- * VisuallyHidden :: opts → children → vnode
+ * VisuallyHidden :: opts -> children -> vnode
  *
  * Keeps content available to screen readers while hiding it visually.
  * Curried, single-arg form for composition.

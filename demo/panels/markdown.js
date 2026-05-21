@@ -81,13 +81,13 @@ It supports full **markdown** including \`code\`.
 ]
 `;
 
-//  Activate default registry once 
+// Activate default registry once 
 setHighlightRegistry(defaultRegistry);
 
-//  Custom plugin alias used for the lab 
+// Custom plugin alias used for the lab 
 const LAB_ALIAS = '__lab__';
 
-//  Available built-in languages for the picker 
+// Available built-in languages for the picker 
 const LANGS = [
   { value: 'js',     label: 'JavaScript' },
   { value: 'ts',     label: 'TypeScript' },
@@ -117,7 +117,7 @@ const SAMPLES = {
   [LAB_ALIAS]: "-- Write anything here; the\n-- custom plugin below\n-- will highlight it.\nlet x = 42 in x * 2",
 };
 
-//  Helpers 
+// Helpers 
 const labelStyle = 'font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-subtle); display:block; margin-bottom:6px';
 const taStyle    = 'width:100%; box-sizing:border-box; font-family:ui-monospace,monospace; font-size:12px; line-height:1.5; padding:.6rem .8rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); color:var(--text); resize:vertical; outline:none';
 const codeBlockStyle = 'font-family:ui-monospace,monospace; font-size:12.5px; line-height:1.6; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:.8rem 1rem; overflow-x:auto; white-space:pre-wrap; word-break:break-all; min-height:120px';
@@ -155,7 +155,7 @@ export const markdownPanel = state => {
   const tokens = highlight(defaultRegistry)(pluginActive && isCustom ? LAB_ALIAS : lang)(src);
 
   return div({})([
-    //  Static markdown renderer 
+    // Static markdown renderer 
     Card({ title: 'Markdown Renderer' })([
       Stack({ gap: 16 })([
         div({ style: 'font-size:13px; color:var(--text-subtle)' })([
@@ -176,7 +176,7 @@ export const markdownPanel = state => {
       ]),
     ]),
 
-    //  Interactive highlight plugin lab 
+    // Interactive highlight plugin lab 
     div({ style: 'margin-top:16px' })([
       Card({ title: '✦ Syntax Highlight Plugin Lab' })([
         Stack({ gap: 16 })([

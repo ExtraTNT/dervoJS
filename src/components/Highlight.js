@@ -1,7 +1,7 @@
 import { vnode } from '../../lib/odocosjs/src/render.js';
 import { toMaybe } from '../../lib/odocosjs/src/core.js';
 
-//  Highlight engine 
+// Highlight engine 
 // A plugin is: String -> [VNode | String]
 // A registry is: { [lang]: plugin }
 
@@ -37,7 +37,7 @@ const tokenizer = specs => source => {
 const highlight = registry => lang => source =>
   toMaybe(registry[lang])(_ => [source])(fn => fn(source));
 
-//  Language plugins 
+// Language plugins 
 const jsPlugin = tokenizer([
   [/\/\/.*$/m,                                               'comment'],
   [/\/\*[\s\S]*?\*\//,                                       'comment'],

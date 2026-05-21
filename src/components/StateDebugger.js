@@ -1,7 +1,7 @@
 import { div, span, input, button, strong } from '../elements.js';
 import { cn } from '../utils.js';
 
-//  Private UI state 
+// Private UI state 
 // Lives at module level so it survives re-renders without touching the app store.
 const _ui = {
   editKey:   null,   // key currently open for inline editing
@@ -18,7 +18,7 @@ const _ui = {
   logFilter: '',     // log filter string
 };
 
-//  Helpers 
+// Helpers 
 
 const ts = () => new Date().toTimeString().slice(0, 8);
 
@@ -55,7 +55,7 @@ const applyEdit = setState => force => key => {
   }
 };
 
-//  Sub-renders 
+// Sub-renders 
 
 const typeTag = type =>
   span({ className: `dbg-type-tag dbg-type-${type}` })([type]);
@@ -63,7 +63,7 @@ const typeTag = type =>
 const actionBtn = (extra = {}) => label => title => onClick =>
   button({ className: cn('dbg-btn', extra.cls), title, type: 'button', onclick: onClick, ...(extra.disabled && { disabled: true }) })([label]);
 
-//  Main component 
+// Main component 
 
 /**
  * StateDebugger — live inspector for any dervoJS store.
@@ -88,7 +88,7 @@ const StateDebugger = ({ state, setState, getState }) => {
   const add   = addEntry(setState)(force);
   const btn   = actionBtn({});
 
-  //  diff watched keys 
+  // diff watched keys 
   if (_ui.prevSnap !== null) {
     const newEntries = [..._ui.watched]
       .filter(k => _ui.prevSnap[k] !== state[k])
@@ -103,13 +103,13 @@ const StateDebugger = ({ state, setState, getState }) => {
   }
   _ui.prevSnap = { ...state };
 
-  //  filter + sort keys 
+  // filter + sort keys 
   const allKeys      = Object.keys(state).sort();
   const filteredKeys = _ui.filter
     ? allKeys.filter(k => k.toLowerCase().includes(_ui.filter.toLowerCase()))
     : allKeys;
 
-  //  state tree rows 
+  // state tree rows 
   const rows = filteredKeys.map(k => {
     const v         = state[k];
     const type      = typeOf(v);
@@ -179,7 +179,7 @@ const StateDebugger = ({ state, setState, getState }) => {
     ]);
   });
 
-  //  add entry form 
+  // add entry form 
   const addRow = div({ className: 'dbg-add-row' })([
     input({
       className:   'dbg-input dbg-add-key',
@@ -204,7 +204,7 @@ const StateDebugger = ({ state, setState, getState }) => {
       : div({ style: 'display:none' })([]),
   ]);
 
-  //  change log 
+  // change log 
   const visibleLog = _ui.logFilter
     ? _ui.log.filter(e => e.key.toLowerCase().includes(_ui.logFilter.toLowerCase()))
     : _ui.log;
@@ -225,7 +225,7 @@ const StateDebugger = ({ state, setState, getState }) => {
           : 'Click 👁 next to a key to watch it.',
       ])];
 
-  //  render 
+  // render 
   return div({ className: 'state-debugger' })([
 
     // toolbar
@@ -251,7 +251,7 @@ const StateDebugger = ({ state, setState, getState }) => {
     // body: tree (left) + log (right)
     div({ className: 'dbg-body' })([
 
-      //  left: state tree 
+      // left: state tree 
       div({ className: 'dbg-tree' })([
         // header
         div({ className: 'dbg-row dbg-header' })([
@@ -264,7 +264,7 @@ const StateDebugger = ({ state, setState, getState }) => {
         addRow,
       ]),
 
-      //  right: change log 
+      // right: change log 
       div({ className: 'dbg-log-panel' })([
         div({ className: 'dbg-log-header' })([
           strong({})(['Change log']),

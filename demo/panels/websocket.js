@@ -6,7 +6,7 @@ import { createWS } from '../../src/index.js';
 import { setState, getState } from '../store.js';
 import { doc } from '../components/doc.js';
 
-//  Module-level WS instances 
+// Module-level WS instances 
 // One demo per WS scenario — lazily created, stored outside the view.
 let _echoWs  = null;
 let _chatLog = null;  // alias — displayed messages live in state
@@ -80,7 +80,7 @@ export const websocketPanel = state => {
         ' API.',
       ]),
 
-      //  Status bar 
+      // Status bar 
       div({ style: 'display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap' })([
         span({ style: 'font-size:12px; color:var(--text-muted)' })(['Status:']),
         Badge({ variant: STATUS_VARIANT[status] ?? 'gray' })([status]),
@@ -91,7 +91,7 @@ export const websocketPanel = state => {
           : [button({ type: 'button', className: 'btn btn-secondary btn-sm', onclick: _disconnect })(['Disconnect'])]),
       ]),
 
-      //  Message log 
+      // Message log 
       div({
         style: 'height:220px; overflow-y:auto; font-family:monospace; font-size:12px; ' +
                'background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); ' +
@@ -105,7 +105,7 @@ export const websocketPanel = state => {
                              : m.type === 'recv'  ? 'color:var(--success, #28a745)'
                              : m.type === 'error' ? 'color:var(--danger)'
                              :                      'color:var(--text-muted)' })([
-                  m.type === 'sent' ? '→ ' : m.type === 'recv' ? '← ' : '  ',
+                  m.type === 'sent' ? '-> ' : m.type === 'recv' ? '← ' : '  ',
                   m.text,
                 ]),
               ])
@@ -113,7 +113,7 @@ export const websocketPanel = state => {
           : [span({ style: 'color:var(--text-muted); font-style:italic; text-align:center; margin:auto' })(['Not connected. Click Connect.'])]
       ),
 
-      //  Send input 
+      // Send input 
       div({ style: 'display:flex; gap:8px; margin-top:10px' })([
         input({
           id:          'ws-draft',
@@ -139,7 +139,7 @@ export const websocketPanel = state => {
         })(['Clear']),
       ]),
 
-      //  JSON send example 
+      // JSON send example 
       div({ style: 'margin-top:10px; display:flex; gap:8px; flex-wrap:wrap' })([
         span({ style: 'font-size:12px; color:var(--text-muted); align-self:center' })(['Send JSON:']),
         ...[
@@ -162,7 +162,7 @@ const ws = createWS({
   url:        'wss://api.example.com/live',
   reconnect:  true,
   maxRetries: 5,
-  baseDelay:  1000,  // doubles each attempt: 1s, 2s, 4s, 8s, 16s → capped at 30s
+  baseDelay:  1000,  // doubles each attempt: 1s, 2s, 4s, 8s, 16s -> capped at 30s
 })({
   onOpen:      ()    => setState({ wsStatus: 'open' }),
   onClose:     code  => setState({ wsStatus: 'closed' }),

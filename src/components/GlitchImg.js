@@ -5,7 +5,7 @@
  * shit looks nice
  *
  * All pixel-processing transforms are purely functional and curried:
- *   transform :: config → state → pixels → pixels
+ *   transform :: config -> state -> pixels -> pixels
  *
  * The imperative shell (RAF loop, canvas I/O) is kept as a thin wrapper
  * around the pure pipeline.  The component does NOT return a vnode — it mounts
@@ -18,7 +18,7 @@
  *   scatter   — random rectangles extracted and re-drawn at offset positions
  *
  *  API 
- *   GlitchImg(opts)(el) → { stop, pause, resume }
+ *   GlitchImg(opts)(el) -> { stop, pause, resume }
  *
  *   opts.src             {string}  Image URL.  Must be CORS-accessible for pixel read.
  *   opts.fps             {number}  Target frame rate.  Default 30.
@@ -31,7 +31,7 @@
  *   el  — <canvas> element OR any container element (a canvas is created inside).
  *
  *  CSS helper 
- *   GlitchCanvas(opts) → vnode   — declare a canvas placeholder in your vnode tree.
+ *   GlitchCanvas(opts) -> vnode   — declare a canvas placeholder in your vnode tree.
  *
  * @example
  *   // 1. Put a canvas in your vnode tree:
@@ -46,27 +46,27 @@
 
 import { canvas } from '../elements.js';
 
-//  Constants 
+// Constants 
 const CH = 4; // RGBA channels per pixel
 
-//  Pure helpers 
+// Pure helpers 
 
-// copyPixels :: TypedArray → Uint8ClampedArray
+// copyPixels :: TypedArray -> Uint8ClampedArray
 const copyPixels = data => new Uint8ClampedArray(data);
 
-// rand :: number → number → number   (lo inclusive, hi exclusive, integers)
+// rand :: number -> number -> number   (lo inclusive, hi exclusive, integers)
 const rand = lo => hi => Math.floor(Math.random() * (hi - lo) + lo);
 
-// clamp255 :: number → number
+// clamp255 :: number -> number
 const clamp255 = x => x < 0 ? 0 : x > 255 ? 255 : x;
 
-// wrapIdx :: number → number → number   (positive modulo)
+// wrapIdx :: number -> number -> number   (positive modulo)
 const wrapIdx = len => i => ((i % len) + len) % len;
 
-//  Pixel transforms (config → state → pixels → pixels) 
+// Pixel transforms (config -> state -> pixels -> pixels) 
 
 /**
- * flowLine :: { speed, brightness } → { w, h, t } → Uint8ClampedArray → Uint8ClampedArray
+ * flowLine :: { speed, brightness } -> { w, h, t } -> Uint8ClampedArray -> Uint8ClampedArray
  *
  * Brightens the scanline at row `t % h`, producing a glowing horizontal streak.
  */
@@ -84,7 +84,7 @@ const flowLine = ({ brightness = 60 }) => ({ w, h, t }) => src => {
 };
 
 /**
- * shiftLine :: { w, h } → Uint8ClampedArray → Uint8ClampedArray
+ * shiftLine :: { w, h } -> Uint8ClampedArray -> Uint8ClampedArray
  *
  * Shifts a random horizontal band of rows left or right by a random offset.
  * Out-of-bounds reads fall back to the original pixel value.
@@ -109,7 +109,7 @@ const shiftLine = ({ w, h }) => src => {
 };
 
 /**
- * shiftRGB :: { w, h } → Uint8ClampedArray → Uint8ClampedArray
+ * shiftRGB :: { w, h } -> Uint8ClampedArray -> Uint8ClampedArray
  *
  * Independently offsets the R, G, and B channels, creating chromatic aberration.
  * Wraps around the pixel buffer so no reads go out of bounds.
@@ -130,7 +130,7 @@ const shiftRGB = ({ w }) => src => {
 };
 
 /**
- * extractRect :: { w, h } → Uint8ClampedArray → { data, rw, rh }
+ * extractRect :: { w, h } -> Uint8ClampedArray -> { data, rw, rh }
  *
  * Extracts a random rectangular slice of pixels to use as a scatter overlay.
  */
@@ -153,12 +153,12 @@ const extractRect = ({ w, h }) => src => {
   return { data, rw, rh };
 };
 
-//  Pipeline 
+// Pipeline 
 
 /**
- * buildPipeline :: config → state → pixels → pixels
+ * buildPipeline :: config -> state -> pixels -> pixels
  *
- * Composes flowLine → shiftLine×N → shiftRGB into a single transform.
+ * Composes flowLine -> shiftLine×N -> shiftRGB into a single transform.
  * Each shift-line pass fires with 50% probability; shiftRGB fires at ~35%.
  */
 const buildPipeline = ({ numShiftLines, flowCfg, enableRGB }) => state => src => {
@@ -170,10 +170,10 @@ const buildPipeline = ({ numShiftLines, flowCfg, enableRGB }) => state => src =>
   return p;
 };
 
-//  Mount function — imperative shell, functional API 
+// Mount function — imperative shell, functional API 
 
 /**
- * GlitchImg :: opts → (HTMLElement | HTMLCanvasElement) → { stop, pause, resume }
+ * GlitchImg :: opts -> (HTMLElement | HTMLCanvasElement) -> { stop, pause, resume }
  */
 export const GlitchImg = ({
   src,
@@ -212,7 +212,7 @@ export const GlitchImg = ({
     enableRGB:     rgb,
   });
 
-  //  Load image 
+  // Load image 
 
   const imgEl        = new Image();
   imgEl.crossOrigin  = 'anonymous';
@@ -226,7 +226,7 @@ export const GlitchImg = ({
   };
   imgEl.src = src;
 
-  //  Frame loop 
+  // Frame loop 
 
   const loop = now => {
     rafId = requestAnimationFrame(loop);
@@ -266,7 +266,7 @@ export const GlitchImg = ({
     });
   };
 
-  //  Controls 
+  // Controls 
   const stop   = () => { cancelAnimationFrame(rafId); rafId = null; clearTimeout(throughTimer); };
   const pause  = () => { paused = true; };
   const resume = () => { paused = false; };
@@ -274,10 +274,10 @@ export const GlitchImg = ({
   return { stop, pause, resume };
 };
 
-//  Vnode helper 
+// Vnode helper 
 
 /**
- * GlitchCanvas :: { id?, className?, style?, width?, height? } → vnode
+ * GlitchCanvas :: { id?, className?, style?, width?, height? } -> vnode
  *
  * Declares a <canvas> placeholder in your vnode tree.
  * Pass the rendered element to GlitchImg(opts) to start the effect.

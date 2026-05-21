@@ -1,7 +1,7 @@
 import { div, input, p, span, button, table, tbody, td, th, thead, tr } from '../elements.js';
 import { cn } from '../utils.js';
 
-//  Built-in filter HOFs 
+// Built-in filter HOFs 
 
 /**
  * filterAll — searches every column value for the query string (case-insensitive).
@@ -37,7 +37,7 @@ const filterBy = key => (row, q) => {
 const filterExact = key => (row, q) =>
   (q === null || q === undefined || q === '') ? true : row[key] === q;
 
-//  Built-in sort HOF 
+// Built-in sort HOF 
 
 /**
  * sortBy(key) — HOF: returns a (rowA, rowB) => number comparator for a column.
@@ -59,7 +59,7 @@ const sortBy = key => (a, b) => {
   return String(av ?? '').localeCompare(String(bv ?? ''));
 };
 
-//  Data pipeline helpers (pure) 
+// Data pipeline helpers (pure) 
 
 /**
  * Apply per-column filters to a row list.
@@ -85,7 +85,7 @@ const applySort = (rows, columns, sort) => {
   return [...rows].sort(sort.dir === 'desc' ? (a, b) => cmp(b, a) : cmp);
 };
 
-//  Table component 
+// Table component 
 
 /**
  * Table — filterable, sortable data table.
@@ -136,7 +136,7 @@ const Table = ({
   empty     = p({ className: 'table-empty' })(['No data.']),
   noResults = p({ className: 'table-no-results' })(['No results match your filter.']),
 } = {}) => {
-  //  Data pipeline: column filters → global filter → sort 
+  // Data pipeline: column filters -> global filter -> sort 
   const afterColFilter    = applyColumnFilters(rows)(columns)(columnFilters);
   const hasGlobal         = filter !== '' && filter != null;
   const afterGlobalFilter = hasGlobal
@@ -144,7 +144,7 @@ const Table = ({
     : afterColFilter;
   const processed = applySort(afterGlobalFilter, columns, sort);
 
-  //  Sort helpers 
+  // Sort helpers 
   const handleSort = key => {
     if (!onSort) return;
     onSort(key, sort?.key === key && sort.dir === 'asc' ? 'desc' : 'asc');
@@ -157,7 +157,7 @@ const Table = ({
     return span({ className: 'table-sort-icon table-sort-icon-idle' })(['⇅']);
   };
 
-  //  Header cell 
+  // Header cell 
   const headerCell = col => {
     const sortable  = col.sort || col.sortFn;
     const indicator = sortIndicator(col);
@@ -171,7 +171,7 @@ const Table = ({
     return th({ className: cn('table-th', sortable && 'table-th-sortable'), scope: 'col' })([inner]);
   };
 
-  //  Per-column filter inputs row 
+  // Per-column filter inputs row 
   const hasColFilterInputs = showColumnFilters && columns.some(c => c.filter || c.filterFn);
   const colFilterRow = hasColFilterInputs
     ? tr({ className: 'table-col-filter-row' })(
@@ -193,7 +193,7 @@ const Table = ({
       )
     : null;
 
-  //  Layout 
+  // Layout 
   const wrapperStyle = [
     scroll    ? 'overflow-x:auto;' : '',
     maxHeight ? `max-height:${maxHeight}; overflow-y:auto;` : '',

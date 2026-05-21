@@ -12,7 +12,7 @@ import {
   isFormValid,
 } from '../src/index.js';
 
-//  Validation schemas 
+// Validation schemas 
 export const formSchema = {
   name:  validate(required(), minLength(2), maxLength(50)),
   email: validate(
@@ -26,7 +26,7 @@ export const formSchema = {
   ),
 };
 
-//  Store 
+// Store 
 // Initial state
 export const store = createStore({
   activeTab: 'philosophy',
@@ -136,7 +136,7 @@ export const store = createStore({
 
 export const { getState, setState } = store;
 
-//  Clock / Interval controllers 
+// Clock / Interval controllers 
 export let countdownCtrl;
 countdownCtrl = createInterval(
   () => setState(s => {
@@ -166,7 +166,7 @@ export const feedCtrl = createInterval(
   }))
 )({ ms: 2000 });
 
-//  Parse clock input 
+// Parse clock input 
 export const parseClockInput = raw => {
   const s = String(raw).trim();
   if (/^\d+:\d{1,2}$/.test(s)) {
@@ -176,7 +176,7 @@ export const parseClockInput = raw => {
   return Math.max(0, Math.round(Number(s) || 0));
 };
 
-//  Clock actions 
+// Clock actions 
 export const startCountdown = () => { countdownCtrl.start(); setState({ countdownRunning: true });  };
 export const pauseCountdown = () => { countdownCtrl.stop();  setState({ countdownRunning: false }); };
 export const resetCountdown = () => {
@@ -196,10 +196,10 @@ export const startFeed = () => { feedCtrl.start(); setState({ feedRunning: true 
 export const stopFeed  = () => { feedCtrl.stop();  setState({ feedRunning: false }); };
 export const clearFeed = () => { feedCtrl.stop();  setState({ feedItems: [], feedRunning: false }); };
 
-//  Task-based timer (createTimer) 
+// Task-based timer (createTimer) 
 export const timerCtrl = createTimer({ store, key: 'timer' });
 
-//  Progress controller 
+// Progress controller 
 export let progressCtrl;
 progressCtrl = createInterval(
   () => setState(s => {
@@ -221,10 +221,10 @@ export const submitForm = () => {
   }
 };
 
-//  Memoised Badge 
+// Memoised Badge 
 export const MemoBadge = memoComponent(Badge);
 
-//  Table data 
+// Table data 
 export const TABLE_ROWS = [
   { lang: 'JavaScript', paradigm: 'Multi',      typed: 'Dynamic', year: 1995 },
   { lang: 'TypeScript', paradigm: 'Multi',      typed: 'Static',  year: 2012 },

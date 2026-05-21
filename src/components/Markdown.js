@@ -3,7 +3,7 @@ import { pipe, Just, Nothing, toMaybe, bind, guard } from '../../lib/odocosjs/sr
 import { eq, gt } from '../../lib/odocosjs/src/math.js';
 import { highlight, defaultRegistry } from './Highlight.js';
 
-//  Element constructors 
+// Element constructors 
 const el = tag => children => vnode(tag)({})(children);
 
 const div       = el('div');
@@ -21,7 +21,7 @@ const h         = level => children => el(`h${level}`)(children);
 const hr        = () => vnode('hr')({})([]);
 const code      = children => vnode('code')({})(children);
 
-//  Utility combinators 
+// Utility combinators 
 const map = f => xs => xs.map(f);
 const test = re => s => re.test(s);
 const match = re => s => toMaybe(s.match(re));
@@ -56,7 +56,7 @@ const consText = ch => tokens =>
 
 const liftIndex = i => eq(i)(-1) ? Nothing : Just(i);
 
-//  Inline parser 
+// Inline parser 
 const findClose = marker => from => text =>
     liftIndex(text.indexOf(marker, from));
 
@@ -130,7 +130,7 @@ const parseInline = text =>
             (_ => consText(text[0])(parseInline(text.slice(1))))
             (({ nodes, rest }) => [...nodes, ...parseInline(rest)]);
 
-//  Block parser 
+// Block parser 
 let hlRegistry = defaultRegistry;
 
 const blockBlank = lines =>

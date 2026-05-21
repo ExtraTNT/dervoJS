@@ -1,6 +1,6 @@
 import { vnode, vsnode } from '../lib/odocosjs/src/render.js';
 
-//  Plain element factories 
+// Plain element factories 
 // Usage:  el(props)(children)
 export const a          = vnode('a');
 export const abbr       = vnode('abbr');
@@ -96,7 +96,7 @@ export const ul         = vnode('ul');
 export const video      = vnode('video');
 export const wbr        = vnode('wbr');
 
-//  Styled element factories (vsnode) 
+// Styled element factories (vsnode) 
 // Usage:  vel(baseStyle)(props)(children)
 // Apply a base inline style, then merge extra props as usual.
 export const sa          = vsnode('a');
@@ -181,7 +181,7 @@ export const su          = vsnode('u');
 export const sul         = vsnode('ul');
 export const svideo      = vsnode('video');
 
-//  Pre-styled helpers 
+// Pre-styled helpers 
 export const flexRow    = sdiv('display:flex; flex-direction:row; align-items:center');
 export const flexCol    = sdiv('display:flex; flex-direction:column');
 export const inlineFlex = sspan('display:inline-flex; align-items:center');

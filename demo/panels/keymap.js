@@ -3,10 +3,10 @@ import { Card, Stack, Badge }                         from '../../src/index.js';
 import { setState, getState }                         from '../store.js';
 import { createKeymap }                               from '../../src/components/KeyMap.js';
 import { doc } from '../components/doc.js';
-//  Module-level keymap instance (created once at module load) 
+// Module-level keymap instance (created once at module load) 
 const _km = createKeymap({ debug: true });
 
-//  Log helpers 
+// Log helpers 
 const _ts    = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const _entry = scope => key => action => ({ id: String(Date.now()) + String(Math.random()), ts: _ts(), scope, key, action });
 
@@ -20,9 +20,9 @@ const _log = scope => key => action => s => ({
 // Guard: only act when the keymap demo tab is visible
 const _active = () => getState().activeTab === 'keymap';
 
-//  Global bindings 
-//   ?         — toggle help overlay
-//   Ctrl+L    — clear event log
+// Global bindings 
+//  ?         — toggle help overlay
+//  Ctrl+L    — clear event log
 
 _km.addGlobal('?')(_el => e => {
   if (!_active()) return;
@@ -44,16 +44,16 @@ _km.addGlobal('ctrl+l')(_el => e => {
   }));
 });
 
-//  Zone A scoped bindings 
-//   ↑        — increment counter
-//   ↓        — decrement counter
-//   R        — reset counter to 0
+// Zone A scoped bindings 
+//  ↑        — increment counter
+//  ↓        — decrement counter
+//  R        — reset counter to 0
 
 _km.addScoped('zone-a')('arrowup')(_el => e => {
   e.preventDefault();
   setState(s => {
     const next = s.keymapDemo.zoneACount + 1;
-    return { keymapDemo: { ..._log('Zone A')('↑')(`count → ${next}`)(s).keymapDemo, zoneACount: next } };
+    return { keymapDemo: { ..._log('Zone A')('↑')(`count -> ${next}`)(s).keymapDemo, zoneACount: next } };
   });
 });
 
@@ -61,7 +61,7 @@ _km.addScoped('zone-a')('arrowdown')(_el => e => {
   e.preventDefault();
   setState(s => {
     const next = s.keymapDemo.zoneACount - 1;
-    return { keymapDemo: { ..._log('Zone A')('↓')(`count → ${next}`)(s).keymapDemo, zoneACount: next } };
+    return { keymapDemo: { ..._log('Zone A')('↓')(`count -> ${next}`)(s).keymapDemo, zoneACount: next } };
   });
 });
 
@@ -70,10 +70,10 @@ _km.addScoped('zone-a')('r')(_el => e => {
   setState(s => ({ keymapDemo: { ..._log('Zone A')('R')('counter reset')(s).keymapDemo, zoneACount: 0 } }));
 });
 
-//  Zone B scoped bindings 
-//   Enter    — ping (uses the focused element's tag name)
-//   Ctrl+↑   — bulk +5 pings
-//   Ctrl+↓   — bulk −5 pings (floor 0)
+// Zone B scoped bindings 
+//  Enter    — ping (uses the focused element's tag name)
+//  Ctrl+↑   — bulk +5 pings
+//  Ctrl+↓   — bulk −5 pings (floor 0)
 
 _km.addScoped('zone-b')('enter')(el => e => {
   e.preventDefault();
@@ -88,7 +88,7 @@ _km.addScoped('zone-b')('ctrl+arrowup')(_el => e => {
   e.preventDefault();
   setState(s => {
     const next = s.keymapDemo.zoneBPings + 5;
-    return { keymapDemo: { ..._log('Zone B')('Ctrl+↑')(`pings → ${next}`)(s).keymapDemo, zoneBPings: next } };
+    return { keymapDemo: { ..._log('Zone B')('Ctrl+↑')(`pings -> ${next}`)(s).keymapDemo, zoneBPings: next } };
   });
 });
 
@@ -96,11 +96,11 @@ _km.addScoped('zone-b')('ctrl+arrowdown')(_el => e => {
   e.preventDefault();
   setState(s => {
     const next = Math.max(0, s.keymapDemo.zoneBPings - 5);
-    return { keymapDemo: { ..._log('Zone B')('Ctrl+↓')(`pings → ${next}`)(s).keymapDemo, zoneBPings: next } };
+    return { keymapDemo: { ..._log('Zone B')('Ctrl+↓')(`pings -> ${next}`)(s).keymapDemo, zoneBPings: next } };
   });
 });
 
-//  Sub-components 
+// Sub-components 
 
 const _scopeColor = scope =>
   scope === 'zone-a' ? 'var(--accent)'     :
@@ -178,7 +178,7 @@ const HelpOverlay = () =>
     ]),
   ]);
 
-//  Panel 
+// Panel 
 export const keymapPanel = state => {
   const km          = state.keymapDemo ?? {};
   const log         = km.log ?? [];
@@ -192,7 +192,7 @@ export const keymapPanel = state => {
 
   return div({ style: 'display:flex; flex-direction:column; gap:20px' })([
 
-    //  Header 
+    // Header 
     Card({ title: '⌘ KeyMap' })([
       p({ style: 'margin:0 0 10px; font-size:13px; color:var(--text-muted)' })([
         'Purely functional global keyboard-event system. Bindings fire everywhere; scoped bindings only fire when the matching element has logical focus. Handlers receive the focused element as their first argument.',
@@ -211,10 +211,10 @@ export const keymapPanel = state => {
       ]),
     ]),
 
-    //  Help overlay 
+    // Help overlay 
     ...(showHelp ? [HelpOverlay()] : []),
 
-    //  Focus zones 
+    // Focus zones 
     div({ style: 'display:grid; grid-template-columns:1fr 1fr; gap:16px' })([
 
       FocusZone(isZoneA)
@@ -276,7 +276,7 @@ export const keymapPanel = state => {
 
     ]),
 
-    //  Event log 
+    // Event log 
     Card({ title: 'Event log' })([
       div({ style: 'display:flex; align-items:center; gap:8px; margin-bottom:10px' })([
         span({ style: 'font-size:12px; color:var(--text-muted)' })([
@@ -295,7 +295,7 @@ export const keymapPanel = state => {
       ]),
     ]),
 
-    //  Code snippet 
+    // Code snippet 
     Card({ title: 'Usage' })([
       p({ style: 'margin:0 0 10px; font-size:13px; color:var(--text-muted)' })([
         'Create one instance, register bindings, wire focus events on your elements.',

@@ -1,7 +1,7 @@
 import { a } from '../elements.js';
 
 /**
- * SkipLink :: opts → children → vnode
+ * SkipLink :: opts -> children -> vnode
  *
  * Renders a skip-to-content link that becomes visible on keyboard focus.
  * Default target is `.page-layout-main`. The click handler will focus the

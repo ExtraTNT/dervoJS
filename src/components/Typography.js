@@ -1,7 +1,7 @@
 import { div, nav, a, span, h1, h2, h3, h4, h5, h6 } from '../elements.js';
 import { cn } from '../utils.js';
 
-//  Utilities 
+// Utilities 
 
 /** Convert text to a URL-safe id slug */
 const slugify = text =>
@@ -12,7 +12,7 @@ const slugify = text =>
     .replace(/[\s_]+/g, '-')
     .replace(/-+/g, '-');
 
-/** Heading tag → numeric level */
+/** Heading tag -> numeric level */
 const HEADING_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
 const tagLevel = tag => parseInt(tag[1], 10);
 
@@ -50,7 +50,7 @@ const injectIds = node => {
   return node;
 };
 
-//  TOC vnode 
+// TOC vnode 
 
 /**
  * Curried: renderTOC(tocTitle)(headings)
@@ -69,7 +69,7 @@ const renderTOC = tocTitle => headings => {
   ]);
 };
 
-//  Main component 
+// Main component 
 
 /**
  * Typography — prose wrapper with optional auto-generated Table of Contents.
@@ -115,7 +115,7 @@ const Typography = ({
   );
 };
 
-//  Convenience heading / prose wrappers 
+// Convenience heading / prose wrappers 
 
 const H1 = ({ className = '', style = '', id } = {}) => children =>
   h1({ className: cn('typo-h1', className), style, ...(id && { id }) })(children);
