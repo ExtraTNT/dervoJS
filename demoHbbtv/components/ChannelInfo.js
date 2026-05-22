@@ -5,7 +5,7 @@
 
 import { div, p, span } from '../../src/index.js';
 
-const _row = (k, v) => [
+const row = k => v => [
   span({ style: 'color:var(--text-muted)' })([k]),
   span({ style: 'font-family:ui-monospace,monospace; word-break:break-all' })([String(v)]),
 ];
@@ -16,8 +16,8 @@ export const ChannelInfo = channel =>
         'No broadcast channel — running outside a TV.',
       ])
     : div({ style: 'display:grid; grid-template-columns:max-content 1fr; gap:6px 16px; font-size:13px' })([
-        ..._row('Name',      channel.name ?? '—'),
-        ..._row('Network',   channel.onid),
-        ..._row('Transport', channel.tsid),
-        ..._row('Service',   channel.sid),
+        row('Name')      (channel.name ?? '—'),
+        row('Network')   (channel.onid),
+        row('Transport') (channel.tsid),
+        row('Service')   (channel.sid),
       ]);

@@ -7,12 +7,12 @@ import { div } from '../../src/index.js';
 
 // shared building blocks
 
-const _pill = ({ label, active, bg = 'var(--surface)', fg = 'var(--text)' }) =>
+const pill = ({ label, active, bg = 'var(--surface)', fg = 'var(--text)' }) =>
   div({
     style: `border:1px solid var(--border); border-radius:8px; padding:14px 0; text-align:center; font-weight:700; background:${bg}; color:${fg}; opacity:${active ? 1 : 0.45}; transform:scale(${active ? 1.05 : 1}); transition:opacity 200ms, transform 120ms`,
   })([label]);
 
-const _chip = (label, active) =>
+const chip = (label, active) =>
   div({
     style: `padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-family:ui-monospace,monospace; font-size:12px; background:${active ? 'var(--accent)' : 'transparent'}; color:${active ? '#fff' : 'var(--text)'}; text-align:center`,
   })([label]);
@@ -28,7 +28,7 @@ const COLOURS = [
 
 export const ColourPad = lastKey =>
   div({ style: 'display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px' })(
-    COLOURS.map(c => _pill({ label: c.label, active: lastKey === c.id, bg: c.bg, fg: c.fg }))
+    COLOURS.map(c => pill({ label: c.label, active: lastKey === c.id, bg: c.bg, fg: c.fg }))
   );
 
 // navigation D-pad
@@ -44,7 +44,7 @@ export const NavPad = lastKey =>
     NAV_GRID.flat().map(k =>
       k === ''
         ? div({})([])
-        : _pill({
+        : pill({
             label:  k.toUpperCase(),
             active: lastKey === k,
             bg:     lastKey === k ? 'var(--accent)' : 'var(--surface)',
@@ -59,7 +59,7 @@ const VCR = ['rewind', 'play_pause', 'play', 'pause', 'stop', 'fast_fwd', 'back'
 
 export const VcrPad = lastKey =>
   div({ style: 'display:flex; flex-wrap:wrap; gap:6px' })(
-    VCR.map(k => _chip(k, lastKey === k))
+    VCR.map(k => chip(k, lastKey === k))
   );
 
 // numeric keypad
@@ -68,5 +68,5 @@ const NUMS = ['1','2','3','4','5','6','7','8','9','*','0','#'];
 
 export const NumPad = lastKey =>
   div({ style: 'display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:4px; max-width:200px; margin:0 auto' })(
-    NUMS.map(k => _chip(k, lastKey === k))
+    NUMS.map(k => chip(k, lastKey === k))
   );

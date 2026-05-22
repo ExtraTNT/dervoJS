@@ -71,8 +71,9 @@ const _buildNode = vnode => {
   for (const k in props) {
     if (k === 'key' || k === 'memo') continue;
     if (k.startsWith('on')) { node[k] = props[k]; continue; }
-    if (isSvg)               node.setAttribute(k, props[k]);
-    else                     node[k] = props[k];
+    if (isSvg)                        node.setAttribute(k, props[k]);
+    else if (k.startsWith('data-'))   node.setAttribute(k, props[k]);     // data-* must reflect to DOM
+    else                              node[k] = props[k];
   }
   const ch = vnode.children || [];
   if (typeof ch.map !== 'function')
@@ -110,6 +111,7 @@ const _patchProps = el => newProps => {
       if (k === 'key' || k === 'memo')           return;
       if (typeof prev[k] === 'function')       { el[k] = null; return; }
       if (isSvg)                               { el.removeAttribute(k); return; }
+      if (k.startsWith('data-'))               { el.removeAttribute(k); return; }
       if (typeof prev[k] === 'boolean')          el[k] = false;
       else                                       el[k] = '';
     });
@@ -117,6 +119,8 @@ const _patchProps = el => newProps => {
     if (k === 'key' || k === 'memo') return;
     if (k.startsWith('on')) { if (el[k] !== newProps[k]) el[k] = newProps[k]; return; }
     if (isSvg) {
+      if (el.getAttribute(k) !== String(newProps[k])) el.setAttribute(k, newProps[k]);
+    } else if (k.startsWith('data-')) {
       if (el.getAttribute(k) !== String(newProps[k])) el.setAttribute(k, newProps[k]);
     } else {
       if (k === 'style' || el[k] !== newProps[k]) el[k] = newProps[k];

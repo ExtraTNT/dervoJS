@@ -82,6 +82,7 @@ export {
   onRemoteKey, onStreamEvent,
   isHbbtvCapable, decodeKey,
   bootHbbtv,
+  createFocusManager,
 } from './hbbtv.js';
 
 // Router / Navigation 

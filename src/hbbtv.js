@@ -310,6 +310,144 @@ const bootHbbtv = ({
   return bus;
 };
 
+// focus manager — central spatial nav for TV apps
+
+/**
+ * createFocusManager — central focus engine driven by spatial DOM layout.
+ *
+ * Model:
+ *   state.<stateKey> = { id: <focusId|null> }
+ *
+ *   id: null  ->  no focus; the router owns the arrow keys.
+ *   id: <x>   ->  the focusable with `data-focus="<x>"` is highlighted;
+ *                 arrows + OK + BACK are consumed by the focus manager.
+ *
+ * No groups, no registration of layouts — every focusable element marks
+ * itself with `data-focus="<id>"` (use the Focusable helper component, or
+ * add it by hand). On each arrow press the manager:
+ *
+ *   1. If the focused element is scrollable in that direction
+ *      (data-focus-scroll contains 'x' / 'y') AND it still has scroll
+ *      distance left -> scroll the container, do not move focus.
+ *   2. Otherwise -> find the nearest neighbour `[data-focus]` in that
+ *      direction by getBoundingClientRect and move focus to it.
+ *
+ * Activation is decoupled via the bus: pressing OK on the focused element
+ * emits `bus.emit('activated', { id })`. Subscribe and dispatch however
+ * you like — no per-focusable callback registration required.
+ *
+ *   bus.on('activated', ({ id }) => {
+ *     if (id.startsWith('row-')) pushPick({ from: 'list', item: id });
+ *   });
+ *
+ * Markup contract (rendered by Focusable):
+ *   <div id="focus-<id>" data-focus="<id>" [data-focus-scroll="x|y|xy"]>...</div>
+ *
+ * @param {object} opts
+ * @param {Bus}    opts.bus              pub/sub bus emitting 'key' events
+ * @param {Store}  opts.store
+ * @param {string} [opts.stateKey='focus']
+ * @param {number} [opts.scrollStep=80]  pixels per arrow press inside a scroll container
+ * @returns {{ focus, exit, isFocused, get }}
+ */
+const createFocusManager = ({ bus, store, stateKey = 'focus', scrollStep = 80, home } = {}) => {
+
+  const _get = () => store.getState()[stateKey] || { id: null };
+  const _set = id => {
+    store.setState({ [stateKey]: { id } });
+    if (id) requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-focus="${id}"]`);
+      el?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    });
+  };
+
+  const focus = id => _set(id ?? null);
+  const exit  = () => _set(null);
+  const isFocused = () => Boolean(_get().id);
+
+  // BACK destination — by default just releases focus; when a `home` callback
+  // is supplied, BACK focuses whatever it returns (e.g. the current page's
+  // tab). No-op when we're already there, so BACK from home doesn't escape.
+  const _back = curId => {
+    if (typeof home !== 'function') return exit();
+    const h = home();
+    if (h && h !== curId) return focus(h);
+    /* already on home -> no-op */
+  };
+
+  // True iff the element can still scroll further in `dir`.
+  const _canScroll = (el, dir) => {
+    const axis = el.getAttribute('data-focus-scroll') || '';
+    if ((dir === 'up'   || dir === 'down')  && !axis.includes('y')) return false;
+    if ((dir === 'left' || dir === 'right') && !axis.includes('x')) return false;
+    if (dir === 'up')    return el.scrollTop  > 0;
+    if (dir === 'down')  return el.scrollTop  + el.clientHeight < el.scrollHeight - 1;
+    if (dir === 'left')  return el.scrollLeft > 0;
+    if (dir === 'right') return el.scrollLeft + el.clientWidth  < el.scrollWidth  - 1;
+    return false;
+  };
+
+  const _scroll = (el, dir) => {
+    if (dir === 'up')    el.scrollTop  -= scrollStep;
+    if (dir === 'down')  el.scrollTop  += scrollStep;
+    if (dir === 'left')  el.scrollLeft -= scrollStep;
+    if (dir === 'right') el.scrollLeft += scrollStep;
+  };
+
+  // Pick the nearest focusable in a direction by centre + edge geometry.
+  // Score = primary-axis distance + perpendicular penalty (×2) so a slightly
+  // off-axis neighbour still wins over a far on-axis one.
+  const _nearest = (el, dir) => {
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const all = Array.from(document.querySelectorAll('[data-focus]'));
+
+    let best = null, bestScore = Infinity;
+    for (const o of all) {
+      if (o === el || el.contains(o) || o.contains(el)) continue;
+      const ro = o.getBoundingClientRect();
+      const ocx = ro.left + ro.width / 2, ocy = ro.top + ro.height / 2;
+
+      // Must be on the correct side. Tolerate slight overlap (1px).
+      if (dir === 'left'  && ro.right  > r.left  + 1) continue;
+      if (dir === 'right' && ro.left   < r.right - 1) continue;
+      if (dir === 'up'    && ro.bottom > r.top   + 1) continue;
+      if (dir === 'down'  && ro.top    < r.bottom - 1) continue;
+
+      const dist = dir === 'left'  ? cx - ocx
+                 : dir === 'right' ? ocx - cx
+                 : dir === 'up'    ? cy - ocy
+                                   : ocy - cy;
+      const perp = (dir === 'left' || dir === 'right')
+        ? Math.abs(cy - ocy)
+        : Math.abs(cx - ocx);
+      const score = dist + perp * 2;
+      if (score < bestScore) { bestScore = score; best = o; }
+    }
+    return best;
+  };
+
+  bus.on('key', ({ key }) => {
+    const cur = _get();
+    if (!cur.id) return;
+    const el = document.querySelector(`[data-focus="${cur.id}"]`);
+    if (!el) { _set(null); return; }     // focused element is gone — release
+
+    if (key === 'left' || key === 'right' || key === 'up' || key === 'down') {
+      // 1) scroll the container if it can take more in this direction
+      if (_canScroll(el, key)) { _scroll(el, key); return; }
+      // 2) otherwise hop to the nearest neighbour
+      const next = _nearest(el, key);
+      if (next) _set(next.getAttribute('data-focus'));
+      return;
+    }
+    if (key === 'ok')   { bus.emit('activated', { id: cur.id }); return; }
+    if (key === 'back') { _back(cur.id);                          return; }
+  });
+
+  return { focus, exit, isFocused, get: _get };
+};
+
 export {
   KEYSET,
   initApp, initKeys,
@@ -318,4 +456,5 @@ export {
   isHbbtvCapable,
   decodeKey,
   bootHbbtv,
+  createFocusManager,
 };
