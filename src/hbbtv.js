@@ -397,14 +397,27 @@ const createFocusManager = ({ bus, store, stateKey = 'focus', scrollStep = 80, h
   // Pick the nearest focusable in a direction by centre + edge geometry.
   // Score = primary-axis distance + perpendicular penalty (×2) so a slightly
   // off-axis neighbour still wins over a far on-axis one.
+  //
+  // Row isolation: LEFT/RIGHT cannot cross `data-focus-row` boundaries —
+  // a focusable tagged with a row only navigates left/right to other
+  // focusables in the same row. UP/DOWN ignore rows so the user can still
+  // move between strips (nav → subnav → content) with vertical arrows.
   const _nearest = (el, dir) => {
     const r = el.getBoundingClientRect();
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     const all = Array.from(document.querySelectorAll('[data-focus]'));
 
+    const horiz  = dir === 'left' || dir === 'right';
+    const myRow  = el.getAttribute('data-focus-row');
+    const rowGuard = horiz && myRow != null;
+
     let best = null, bestScore = Infinity;
     for (const o of all) {
       if (o === el || el.contains(o) || o.contains(el)) continue;
+
+      // Stay inside the row strip when going sideways.
+      if (rowGuard && o.getAttribute('data-focus-row') !== myRow) continue;
+
       const ro = o.getBoundingClientRect();
       const ocx = ro.left + ro.width / 2, ocy = ro.top + ro.height / 2;
 
@@ -448,6 +461,51 @@ const createFocusManager = ({ bus, store, stateKey = 'focus', scrollStep = 80, h
   return { focus, exit, isFocused, get: _get };
 };
 
+//  key combo detector
+
+/**
+ * onKeyCombo — fire a handler when a sequence of remote-key names is
+ * pressed within `window` ms. Reads `key` events off the bus, keeps a
+ * tiny rolling buffer keyed by timestamp, and triggers when the buffer's
+ * tail matches the target sequence.
+ *
+ * @example
+ *   // Toggle a debug panel with 9-9-1 within one second
+ *   onKeyCombo(bus, '991', () => setState(s => ({ debug: !s.debug })));
+ *
+ * @example
+ *   // Multi-character semantic combo
+ *   onKeyCombo(bus, ['red','green','blue'], unlockEasterEgg, { window: 2000 });
+ *
+ * @param {Bus}           bus
+ * @param {string|string[]} combo       Sequence of semantic key names. A bare
+ *                                       string is treated character-by-character
+ *                                       (e.g. '991' = ['9','9','1']).
+ * @param {function}      handler
+ * @param {Object}        [opts]
+ * @param {number}        [opts.window=1000]
+ * @param {string}        [opts.busEvent='key']
+ * @returns {function}    unsubscribe
+ */
+const onKeyCombo = (bus, combo, handler, { window: win = 1000, busEvent = 'key' } = {}) => {
+  const target = Array.isArray(combo) ? combo : String(combo).split('');
+  const tLen   = target.length;
+  const buf    = [];   // [{ key, t }]
+  return bus.on(busEvent, ({ key }) => {
+    const now = Date.now();
+    buf.push({ key, t: now });
+    // drop entries that fall out of the window
+    while (buf.length && now - buf[0].t > win) buf.shift();
+    if (buf.length < tLen) return;
+    // compare the last tLen entries against the target
+    for (let i = 0; i < tLen; i++) {
+      if (buf[buf.length - tLen + i].key !== target[i]) return;
+    }
+    buf.length = 0;     // consume the combo so it doesn't immediately re-fire
+    handler();
+  });
+};
+
 export {
   KEYSET,
   initApp, initKeys,
@@ -457,4 +515,5 @@ export {
   decodeKey,
   bootHbbtv,
   createFocusManager,
+  onKeyCombo,
 };

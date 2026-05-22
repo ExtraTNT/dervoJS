@@ -9,7 +9,7 @@ import { div } from '../../src/index.js';
 
 const pill = ({ label, active, bg = 'var(--surface)', fg = 'var(--text)' }) =>
   div({
-    style: `border:1px solid var(--border); border-radius:8px; padding:14px 0; text-align:center; font-weight:700; background:${bg}; color:${fg}; opacity:${active ? 1 : 0.45}; transform:scale(${active ? 1.05 : 1}); transition:opacity 200ms, transform 120ms`,
+    style: `border:1px solid var(--border); border-radius:8px; padding:4px 4px; text-align:center; font-weight:700; background:${bg}; color:${fg}; opacity:${active ? 1 : 0.45}; transform:scale(${active ? 1.05 : 1}); transition:opacity 200ms, transform 120ms`,
   })([label]);
 
 const chip = (label, active) =>
@@ -64,7 +64,7 @@ export const VcrPad = lastKey =>
 
 // numeric keypad
 
-const NUMS = ['1','2','3','4','5','6','7','8','9','*','0','#'];
+const NUMS = ['1','2','3','4','5','6','7','8','9','','0',''];
 
 export const NumPad = lastKey =>
   div({ style: 'display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:4px; max-width:200px; margin:0 auto' })(

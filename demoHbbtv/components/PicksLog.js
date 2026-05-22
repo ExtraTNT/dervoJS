@@ -1,39 +1,30 @@
 /**
- * PicksLog — recently activated items. Wrapped in a single Focusable
- * scroll container so it can take focus from a neighbour; when focused
- * and overflowing, UP/DOWN scroll the log instead of moving focus. Once
- * the log is scrolled to its edge in that direction, the focus manager
- * jumps to the next neighbouring focusable.
+ * PicksLog — formatting of the demo's "what was activated" trail.
+ *
+ * The scroll-container behaviour lives in the library (FocusScroll); this
+ * component is just the row formatting.
  */
 
-import { div, span, p, Badge } from '../../src/index.js';
-import { Focusable } from './Focusable.js';
+import { div, span, p, Badge, FocusScroll } from '../../src/index.js';
 
 /**
- * @param {object} opts
- * @param {string} opts.id            focus id (e.g. 'list-picks', 'grid-picks')
+ * @param {Object} opts
+ * @param {string} opts.id            focus id for the scroll container
  * @param {Array}  opts.picks         [{ from, item, ts }]
- * @param {object} opts.focus         state.focus
+ * @param {Object} opts.focus         state.focus
  * @param {string} [opts.maxHeight='300px']
  */
-export const PicksLog = ({ id, picks = [], focus, maxHeight = '300px' } = {}) => {
-  const body = picks.length === 0
-    ? p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
-        'Nothing picked yet. Focus an item with the arrows, then press OK.',
-      ])
-    : div({ style: 'display:flex; flex-direction:column; gap:4px; font-size:12px; font-family:ui-monospace, monospace' })(
-        picks.map(p => div({ style: 'display:flex; gap:8px; align-items:baseline' })([
-          span({ style: 'color:var(--text-muted)' })([new Date(p.ts).toLocaleTimeString()]),
-          Badge({ variant: 'blue' })([p.from]),
-          span({})([p.item]),
-        ]))
-      );
-
-  return Focusable({
-    id,
-    focus,
-    scroll: 'y',
-    maxHeight,
-    style: 'padding:8px; border:1px solid var(--border); border-radius:8px; background:var(--surface)',
-  })([body]);
-};
+export const PicksLog = ({ id, picks = [], focus, maxHeight = '300px' } = {}) =>
+  FocusScroll({ id, focus, axis: 'y', maxHeight })([
+    picks.length === 0
+      ? p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
+          'Nothing picked yet. Focus an item with the arrows, then press OK.',
+        ])
+      : div({ style: 'display:flex; flex-direction:column; gap:4px; font-size:12px; font-family:ui-monospace, monospace;margin:2px' })(
+          picks.map(p => div({ style: 'display:flex; gap:8px; align-items:baseline' })([
+            span({ style: 'color:var(--text-muted)' })([new Date(p.ts).toLocaleTimeString()]),
+            Badge({ variant: 'blue' })([p.from]),
+            span({})([p.item]),
+          ]))
+        ),
+  ]);

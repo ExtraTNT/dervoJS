@@ -83,7 +83,11 @@ export {
   isHbbtvCapable, decodeKey,
   bootHbbtv,
   createFocusManager,
+  onKeyCombo,
 } from './hbbtv.js';
+export {
+  Focusable, FocusList, FocusGrid, FocusScroll, TabBar,
+} from './components/HbbtvWidgets.js';
 
 // Router / Navigation 
 export { createRouter, Link, NavLink, NavBar, NavMenu, Breadcrumbs } from './router.js';

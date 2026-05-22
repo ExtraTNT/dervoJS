@@ -29,8 +29,8 @@ const _jumpTo = (fm, pageId) => {
 export const wireRouter = (bus, fm) => {
   bus.on('key', ({ key }) => {
     // numeric direct jump
-    const n = parseInt(key, 10);
-    if (!Number.isNaN(n) && n >= 1 && n <= PAGES.length) return _jumpTo(fm, PAGES[n - 1]);
+    //const n = parseInt(key, 10);
+    //if (!Number.isNaN(n) && n >= 1 && n <= PAGES.length) return _jumpTo(fm, PAGES[n - 1]);
 
     // colour-button direct jump
     const cIdx = _COLOUR_TO_PAGE.indexOf(key);
