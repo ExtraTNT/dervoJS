@@ -33,21 +33,21 @@ initStyles();
 document.body.style.cssText = 'margin:0; padding:0; background:var(--bg); color:var(--text); font-family:system-ui, sans-serif';
 document.documentElement.style.boxSizing = 'border-box';
 
-//   boot HbbTV → pub/sub bus 
+// boot HbbTV → pub/sub bus 
 const bus = bootHbbtv();
 
-//   bus → store wiring 
+// bus → store wiring 
 bus.on('boot',   setBoot);
 bus.on('key',    ({ key, raw }) => pushKey(key, raw));
 bus.on('stream', pushEvent);
 
-//   focus manager 
+// focus manager 
 const fm = createFocusManager({
   bus, store,
   home: () => `tab-${getState().page}`,
 });
 
-//   activation dispatcher 
+// activation dispatcher 
 bus.on('activated', ({ id }) => {
   if (id.startsWith('tab-'))    return setPage(id.slice(4));
   if (id.startsWith('subtab-')) return setSubPage(getState().page, id.slice(7));

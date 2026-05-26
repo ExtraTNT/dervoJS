@@ -64,7 +64,7 @@ const tokenRow = (key, effective, overrides) => {
       oninput: e => {
         const v = e.target.value;
         if (!v) return;
-        setTokens({ [key]: v });
+        setTokens({ [key]: v })();
         setState(s => ({ themeOverrides: { ...s.themeOverrides, [key]: v } }));
       },
     })([]),
