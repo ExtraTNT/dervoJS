@@ -191,7 +191,7 @@ mount(store)(document.body)(state => div({})([`Count: ${state.count}`]));
 
 ### Layout
 
-`Container`, `Row`/`Col` (12-col responsive grid), `Stack`, `Grid`, `Divider`, `Spacer`, `AspectBox`, `Float`, `Clearfix`, `PageLayout`, `AppShell`, `TwoPane`, `BlogLayout`, `DragList` + `useDragListGroup`.
+`Container`, `Row`/`Col` (12-col responsive grid), `Stack`, `Grid`, `Divider`, `Spacer`, `AspectBox`, `Float`, `Clearfix`, `PageLayout`, `AppShell`, `TwoPane`, `BlogLayout`, `DragList` + `useDragListGroup`, `FloatingPanel`.
 
 ### Typography & Markdown
 
@@ -217,7 +217,6 @@ Syntax highlighting via `tokenizer` / `highlight` / `defaultRegistry` (ships wit
 - `StateDebugger` — live inspector, inline JSON editing, key watchers.
 - `RenderProfiler` — per-frame timings, DOM op counters, sparkline. Off by default; activates when rendered.
 - `ListenersDebugger` — inspect all named pub/sub buses.
-- `FloatingPanel` — draggable/resizable container, position persisted by id.
 
 ---
 
@@ -345,6 +344,8 @@ Hash or history mode; named params; query parsing; nav helpers.
 
 ### Curried HTTP client
 
+(pls note, this is kind of overkill for most usecases, there is also a http client in odocosJS that is better for simple applications)
+
 ```js
 import { createHttp, defaultHttp } from './src/index.js';
 
@@ -442,7 +443,7 @@ const game = createGame({
     mara: {
       name: 'Mara the Hermit',
       locations: ['hermitHut'],
-      greeting: 'Mara sits cross-legged by the fire.',
+      greeting: 'Mara sits by the fire.',
       dialogue: ctx => Scene({ /* ... */ })(ctx),
     },
   },
