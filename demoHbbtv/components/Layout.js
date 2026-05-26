@@ -33,11 +33,12 @@ export const Header = state => {
     span({ style: 'flex:1; min-width:0' })([]),
     // row:'nav' confines LEFT/RIGHT to top tabs only — it can never drift down to a sub-tab or content.
     TabBar({ tabs: _tabDefs, current: state.page, focus: state.focus, row: 'nav', tabStyle: 'margin:0 4px' }),
-    ...(previewing
+    /*...(previewing
       ? [span({ style: 'font-size:11px; color:var(--accent)' })([
           'press ', kbd({})(['OK']), ' to switch',
         ])]
-      : []),
+      : []),*/
+      ([]),
   ]);
 };
 
@@ -48,7 +49,6 @@ export const Footer = () =>
       ' scroll / jump · ',
       kbd({})(['OK']), ' switch / pick · ',
       kbd({})(['BACK']), ' back to tab · ',
-      kbd({})(['1']), '-', kbd({})(['4']), ' direct · ',
       kbd({})(['RED']), '/', kbd({})(['GREEN']), '/', kbd({})(['YELLOW']), '/', kbd({})(['BLUE']),
     ]),
     span({})([

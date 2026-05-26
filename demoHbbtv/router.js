@@ -33,7 +33,7 @@ export const wireRouter = (bus, fm) => {
     //if (!Number.isNaN(n) && n >= 1 && n <= PAGES.length) return _jumpTo(fm, PAGES[n - 1]);
 
     // colour-button direct jump
-    const cIdx = _COLOUR_TO_PAGE.indexOf(key);
+    //const cIdx = _COLOUR_TO_PAGE.indexOf(key);
     if (cIdx >= 0 && cIdx < PAGES.length) return _jumpTo(fm, PAGES[cIdx]);
   });
 };
