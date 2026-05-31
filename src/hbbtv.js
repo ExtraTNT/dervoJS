@@ -469,25 +469,32 @@ const createFocusManager = ({ bus, store, stateKey = 'focus', scrollStep = 80, h
  * tiny rolling buffer keyed by timestamp, and triggers when the buffer's
  * tail matches the target sequence.
  *
+ * Curried for partial application — matches the rest of the HbbTV module:
+ *
+ *   onKeyCombo(bus)('991')(handler)              // shortest
+ *   onKeyCombo(bus)(['red','green','blue'])(fn)({ window: 2000 })
+ *
+ * Legacy positional shape is still supported for now:
+ *
+ *   onKeyCombo(bus, '991', handler, { window: 1000 })
+ *
  * @example
  *   // Toggle a debug panel with 9-9-1 within one second
- *   onKeyCombo(bus, '991', () => setState(s => ({ debug: !s.debug })));
+ *   onKeyCombo(bus)('991')(() => setState(s => ({ debug: !s.debug })));
  *
  * @example
- *   // Multi-character semantic combo
- *   onKeyCombo(bus, ['red','green','blue'], unlockEasterEgg, { window: 2000 });
+ *   // Two seconds, semantic combo
+ *   onKeyCombo(bus)(['red','green','blue'])(unlockEasterEgg)({ window: 2000 });
  *
  * @param {Bus}           bus
- * @param {string|string[]} combo       Sequence of semantic key names. A bare
- *                                       string is treated character-by-character
- *                                       (e.g. '991' = ['9','9','1']).
- * @param {function}      handler
+ * @param {string|string[]} [combo]     omit when using the curried shape
+ * @param {function}      [handler]     omit when using the curried shape
  * @param {Object}        [opts]
  * @param {number}        [opts.window=1000]
  * @param {string}        [opts.busEvent='key']
- * @returns {function}    unsubscribe
+ * @returns {function}    unsubscribe (when fully applied) or next-stage curry
  */
-const onKeyCombo = (bus, combo, handler, { window: win = 1000, busEvent = 'key' } = {}) => {
+const _installCombo = (bus, combo, handler, { window: win = 1000, busEvent = 'key' } = {}) => {
   const target = Array.isArray(combo) ? combo : String(combo).split('');
   const tLen   = target.length;
   const buf    = [];   // [{ key, t }]
@@ -504,6 +511,16 @@ const onKeyCombo = (bus, combo, handler, { window: win = 1000, busEvent = 'key' 
     buf.length = 0;     // consume the combo so it doesn't immediately re-fire
     handler();
   });
+};
+
+// onKeyCombo — accepts both the curried shape and the legacy positional one.
+// Dispatch happens on the type of the second argument so existing callers
+// (demoHbbtv/main.js uses `onKeyCombo(bus, '991', toggleProfiler)`) keep working.
+const onKeyCombo = (bus, combo, handler, opts) => {
+  // legacy positional: all args provided
+  if (combo !== undefined && handler !== undefined) return _installCombo(bus, combo, handler, opts);
+  // curried: onKeyCombo(bus)(combo)(handler)(opts?)
+  return combo2 => handler2 => (opts2 = {}) => _installCombo(bus, combo2, handler2, opts2);
 };
 
 export {

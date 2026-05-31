@@ -60,7 +60,7 @@ export { PieChart, BarChart, LineChart, MultiLineChart, SparkLine, PALETTE } fro
 
 // Listeners / Event system 
 export { addListener, debounce, createBus, onWindowResize, onBreakpoint, onKeydown, onKeyup, createAlarm, onVisibilityChange } from './listeners.js';
-export { listBusIds, getBus } from './listeners.js';
+export { listBusIds, getBus, destroyBus } from './listeners.js';
 
 // WebSocket
 export { createWS } from './ws.js';

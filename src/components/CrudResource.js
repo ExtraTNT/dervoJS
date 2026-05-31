@@ -129,100 +129,143 @@ const _withError = error => input =>
     span({ className: 'field-error', style: 'display:block; margin-top:-4px' })([error]),
   ]);
 
-const _renderInput = (field, path, value, error, onPatch, disabled) => {
-  const id = `crud-${path.join('-')}`;
-  const set = v => onPatch(path, v);
+// Per-type leaf renderers. Each takes the same { field, id, value, error,
+// disabled, set } bag and returns a vnode. Splitting them out makes the
+// 90-LOC switch readable and individually testable.
 
-  // Enums always become a Select regardless of underlying type.
-  // Always show a placeholder option — without one, the browser displays the
-  // first real option while state stays '', and the UI lies about what's saved.
-  if (field.enum?.length) {
-    return Select({
-      id, label: field.title,
-      options: field.enum.map(v => ({ value: String(v), label: String(v) })),
-      value: value == null ? '' : String(value),
-      placeholder: field.required ? 'Choose…' : '— none —',
-      disabled,
-      error,
-      onChange: e => set(e.target.value),
-    });
-  }
+const _renderEnum   = ({ field, id, value, error, disabled, set }) =>
+  Select({
+    id, label: field.title,
+    options: field.enum.map(v => ({ value: String(v), label: String(v) })),
+    value:    value == null ? '' : String(value),
+    placeholder: field.required ? 'Choose…' : '— none —',
+    disabled, error,
+    onChange: e => set(e.target.value),
+  });
 
-  if (field.type === 'boolean') {
-    return div({ className: 'field', style: 'display:flex; align-items:center; gap:12px; padding:6px 0' })([
-      Toggle({ on: !!value, onChange: set, disabled })([field.title]),
-      ...(error ? [span({ className: 'field-error' })([error])] : []),
-    ]);
-  }
+const _renderBool   = ({ field, value, error, disabled, set }) =>
+  div({ className: 'field', style: 'display:flex; align-items:center; gap:12px; padding:6px 0' })([
+    Toggle({ on: !!value, onChange: set, disabled })([field.title]),
+    ...(error ? [span({ className: 'field-error' })([error])] : []),
+  ]);
 
-  if (field.type === 'integer' || field.type === 'number') {
-    return _withError(error)(NumberInput({
-      id, label: field.title,
-      value: Number(value ?? 0),
-      min: field.minimum, max: field.maximum, step: field.step,
-      disabled,
-      onChange: set,
-    }));
-  }
+const _renderNumber = ({ field, id, value, error, disabled, set }) =>
+  _withError(error)(NumberInput({
+    id, label: field.title,
+    value: Number(value ?? 0),
+    min: field.minimum, max: field.maximum, step: field.step,
+    disabled,
+    onChange: set,
+  }));
 
-  if (field.type === 'string' && (field.format === 'date' || field.format === 'date-time')) {
-    return _withError(error)(DateTimePicker({
-      id, label: field.title,
-      value: value ?? '',
-      showTime: field.format === 'date-time',
-      onChange: set,
-    }));
-  }
+const _renderDate   = ({ field, id, value, error, disabled, set }) =>
+  _withError(error)(DateTimePicker({
+    id, label: field.title,
+    value: value ?? '',
+    showTime: field.format === 'date-time',
+    onChange: set,
+    disabled,
+  }));
 
-  if (field.type === 'array' && field.items) {
-    const items = Array.isArray(value) ? value : [];
-    return div({ className: 'field', style: 'padding:6px 0' })([
-      div({ className: 'field-label' })([field.title]),
-      div({ style: 'display:flex; flex-direction:column; gap:8px; padding:8px 0 0 12px; border-left:2px solid var(--border)' })(
-        items.length
-          ? items.map((item, i) =>
-              div({ key: `item-${i}`, style: 'display:flex; gap:8px; align-items:flex-start' })([
-                div({ style: 'flex:1' })([
-                  _renderInput(
-                    { ...field.items, title: `#${i + 1}` },
-                    [...path, i], item, null, onPatch, disabled,
-                  ),
-                ]),
-                Button({
-                  variant: 'ghost', size: 'sm',
-                  onClick: () => set(items.filter((_, j) => j !== i)),
-                })(['✕']),
-              ])
-            )
-          : [span({ style: 'color:var(--text-muted); font-size:12px' })(['(empty)'])]
-      ),
-      div({ style: 'margin-top:8px' })([
-        Button({
-          variant: 'secondary', size: 'sm',
-          onClick: () => set([...items, _defaultValue(field.items)]),
-        })(['+ Add']),
-      ]),
-    ]);
-  }
+const _renderArray  = (opts, recurse) => {
+  const { field, value, disabled, set, path, onPatch } = opts;
+  const items = Array.isArray(value) ? value : [];
+  return div({ className: 'field', style: 'padding:6px 0' })([
+    div({ className: 'field-label' })([field.title]),
+    div({ style: 'display:flex; flex-direction:column; gap:8px; padding:8px 0 0 12px; border-left:2px solid var(--border)' })(
+      items.length
+        ? items.map((item, i) =>
+            div({ key: `item-${i}`, style: 'display:flex; gap:8px; align-items:flex-start' })([
+              div({ className: 'dv-grow' })([
+                recurse({
+                  field:    { ...field.items, title: `#${i + 1}` },
+                  path:     [...path, i],
+                  value:    item,
+                  error:    null,
+                  disabled,
+                  onPatch,
+                }),
+              ]),
+              Button({
+                variant: 'ghost', size: 'sm',
+                onClick: () => set(items.filter((_, j) => j !== i)),
+              })(['✕']),
+            ])
+          )
+        : [span({ className: 'dv-muted dv-fs-12' })(['(empty)'])]
+    ),
+    div({ className: 'dv-mt-8' })([
+      Button({
+        variant: 'secondary', size: 'sm',
+        onClick: () => set([...items, _defaultValue(field.items)]),
+      })(['+ Add']),
+    ]),
+  ]);
+};
 
-  if (field.type === 'object' && field.properties) {
-    return Card({ title: field.title, className: 'crud-nested', style: 'margin:8px 0' })(
-      field.properties.map(p =>
-        _renderInput(p, [...path, p.name], value?.[p.name], null, onPatch, disabled || p.readOnly)
-      )
-    );
-  }
+const _renderObject = (opts, recurse) => {
+  const { field, value, disabled, path, onPatch } = opts;
+  return Card({ title: field.title, className: 'crud-nested', style: 'margin:8px 0' })(
+    field.properties.map(p =>
+      recurse({
+        field:    p,
+        path:     [...path, p.name],
+        value:    value?.[p.name],
+        error:    null,
+        disabled: disabled || p.readOnly,
+        onPatch,
+      })
+    )
+  );
+};
 
-  // Default: text input (covers string, unknown, and string formats not above)
-  return TextInput({
+const _renderText   = ({ field, id, value, error, disabled, set }) =>
+  TextInput({
     id, label: field.title,
     type: field.format === 'email' ? 'email' : (field.format === 'password' ? 'password' : 'text'),
     value: value ?? '',
-    hint: field.description,
-    error,
-    disabled,
+    hint:  field.description,
+    error, disabled,
     onInput: e => set(e.target.value),
   });
+
+/**
+ * _renderInput — dispatches to a per-type renderer.
+ *
+ * Single options bag instead of six positional args; recursive calls (arrays
+ * + nested objects) re-invoke with another bag, so the readability win
+ * compounds at every level of nesting.
+ *
+ * @param {Object}   opts
+ * @param {Object}   opts.field         compiled field descriptor
+ * @param {string[]} opts.path          path of keys from the form root
+ * @param {*}        opts.value         current value at that path
+ * @param {string?}  opts.error         per-field error (null when valid)
+ * @param {boolean}  opts.disabled
+ * @param {function} opts.onPatch       (path, value) => void
+ */
+const _renderInput = opts => {
+  const { field, path, onPatch } = opts;
+  // derive the per-call helpers once, then pass the enriched bag to whichever
+  // leaf renderer matches
+  const ctx = {
+    ...opts,
+    id:  `crud-${path.join('-')}`,
+    set: v => onPatch(path, v),
+  };
+
+  if (field.enum?.length)            return _renderEnum(ctx);
+  if (field.type === 'boolean')      return _renderBool(ctx);
+  if (field.type === 'integer'
+   || field.type === 'number')       return _renderNumber(ctx);
+  if (field.type === 'string'
+   && (field.format === 'date'
+    || field.format === 'date-time'))return _renderDate(ctx);
+  if (field.type === 'array'
+   && field.items)                   return _renderArray(ctx, _renderInput);
+  if (field.type === 'object'
+   && field.properties)              return _renderObject(ctx, _renderInput);
+  return _renderText(ctx);
 };
 
 //  flat-form validation (top-level fields only) 
@@ -436,7 +479,14 @@ const _viewForm = mode => ctx => {
       : Card({})([
           formEl({ onsubmit: e => { e.preventDefault(); submit(); } })([
             ...visible.map(f =>
-              _renderInput(f, [f.name], values[f.name], state.formErrors?.[f.name], patchPath, false)
+              _renderInput({
+                field:    f,
+                path:     [f.name],
+                value:    values[f.name],
+                error:    state.formErrors?.[f.name],
+                disabled: false,
+                onPatch:  patchPath,
+              })
             ),
             div({ style: 'display:flex; gap:10px; margin-top:16px' })([
               // type='submit' alone — the form's onsubmit handler runs submit().

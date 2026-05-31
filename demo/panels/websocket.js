@@ -105,7 +105,7 @@ export const websocketPanel = state => {
                              : m.type === 'recv'  ? 'color:var(--success, #28a745)'
                              : m.type === 'error' ? 'color:var(--danger)'
                              :                      'color:var(--text-muted)' })([
-                  m.type === 'sent' ? '-> ' : m.type === 'recv' ? '← ' : '  ',
+                  m.type === 'sent' ? '→ ' : m.type === 'recv' ? '← ' : '  ',
                   m.text,
                 ]),
               ])

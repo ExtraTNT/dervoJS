@@ -76,8 +76,9 @@ const applyColumnFilters = rows => columns => columnFilters =>
 /**
  * Apply a sort directive { key, dir } to a row list (non-mutating).
  * Flips the comparator for 'desc'.
+ * Curried — `applySort(columns)(sort)` is a reusable row transformer.
  */
-const applySort = (rows, columns, sort) => {
+const applySort = columns => sort => rows => {
   if (!sort?.key) return rows;
   const col = columns.find(c => c.key === sort.key);
   if (!col) return rows;
@@ -142,7 +143,7 @@ const Table = ({
   const afterGlobalFilter = hasGlobal
     ? afterColFilter.filter(row => filterFn(row, filter))
     : afterColFilter;
-  const processed = applySort(afterGlobalFilter, columns, sort);
+  const processed = applySort(columns)(sort)(afterGlobalFilter);
 
   // Sort helpers 
   const handleSort = key => {

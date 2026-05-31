@@ -60,19 +60,25 @@ const pattern = (re, msg = 'Invalid format') =>
   v => (!v || re.test(String(v))) ? null : msg;
 
 /**
- * Numeric range check (inclusive).
- * @param {number} min
- * @param {number} max
- * @param {string} [msg]
+ * Numeric range check (inclusive). Accepts two shapes:
+ *
+ *   range(0, 100)           // legacy positional
+ *   range(0, 100, 'oops')
+ *   range({ min: 0, max: 100, msg: 'oops' })   // options object
+ *
  * @returns {function} rule
  */
-const range = (min, max, msg) =>
-  v => {
+const range = (minOrOpts, max, msg) => {
+  const { min: lo, max: hi, msg: m } = typeof minOrOpts === 'object' && minOrOpts !== null
+    ? minOrOpts
+    : { min: minOrOpts, max, msg };
+  return v => {
     const n = Number(v);
-    return (v === '' || v === null || v === undefined || (n >= min && n <= max))
+    return (v === '' || v === null || v === undefined || (n >= lo && n <= hi))
       ? null
-      : (msg ?? `Must be between ${min} and ${max}`);
+      : (m ?? `Must be between ${lo} and ${hi}`);
   };
+};
 
 /**
  * Compose multiple rules into one, returning the first error or null.

@@ -9,7 +9,10 @@
  *   Inventory — slot-based equip widget; pre-built scene shape
  *   Shop      — buy-from-stock grid; pre-built scene shape
  *
- * All four work with whatever item catalogue you pass — no global state.
+ * Visual treatment uses the `dv-*` utility classes from dervo.css so the
+ * reconciler isn't re-writing long inline-style strings every frame. Only
+ * truly dynamic bits (bar width, bonus colour) stay inline — and bar width
+ * goes through a CSS custom property so the style attr stays short.
  */
 
 import { div, p, span, h2 } from '../elements.js';
@@ -19,7 +22,7 @@ import { Button }  from './Button.js';
 import { Alert }   from './Alert.js';
 import { Stack }   from './Layout.js';
 
-//  shared formatters 
+//  shared formatters
 
 const _formatBonuses = bonuses =>
   Object.entries(bonuses || {})
@@ -29,7 +32,17 @@ const _formatBonuses = bonuses =>
 
 const _capitalise = s => s ? s[0].toUpperCase() + s.slice(1) : '';
 
-//  Stats 
+// Bar gauge — width as a CSS custom property keeps the style string short
+// even when pct re-computes every frame.
+const _bar = (pct, color) =>
+  div({ className: 'dv-bar-track' })([
+    div({
+      className: 'dv-bar-fill',
+      style: color ? `--dv-pct:${pct}%; --dv-bar:${color}` : `--dv-pct:${pct}%`,
+    })([]),
+  ]);
+
+//  Stats
 
 /**
  * Stats — render a vertical list of stat rows. Each row shows label,
@@ -46,24 +59,24 @@ const Stats = ({ values = {}, bonuses = {}, max = 25 } = {}) =>
       const bonus = bonuses[label] || 0;
       const total = base + bonus;
       const pct   = Math.min(100, Math.max(0, (total / max) * 100));
-      return div({ style: 'margin-bottom:8px' })([
-        div({ style: 'display:flex; justify-content:space-between; align-items:baseline; font-size:12px; margin-bottom:3px' })([
+      const bonusClr = bonus > 0 ? '#2ecc71' : '#e74c3c';
+      return div({ className: 'dv-mb-8' })([
+        div({ className: 'dv-flex-between dv-fs-12 dv-mb-4', style: 'align-items:baseline' })([
           span({ style: 'font-weight:600; letter-spacing:.04em' })([label]),
-          span({ style: 'font-family:ui-monospace,monospace; font-size:13px' })([
+          span({ className: 'dv-mono dv-fs-13' })([
             String(total),
-            ...(bonus ? [span({ style: `margin-left:6px; font-size:11px; color:${bonus > 0 ? '#2ecc71' : '#e74c3c'}` })([
-              `(${base}${bonus > 0 ? '+' : ''}${bonus})`,
-            ])] : []),
+            ...(bonus ? [span({
+              className: 'dv-fs-11',
+              style: `margin-left:6px; color:${bonusClr}`,
+            })([`(${base}${bonus > 0 ? '+' : ''}${bonus})`])] : []),
           ]),
         ]),
-        div({ style: 'height:5px; background:var(--surface-2); border-radius:3px; overflow:hidden' })([
-          div({ style: `width:${pct}%; height:100%; background:var(--accent); transition:width 200ms ease` })([]),
-        ]),
+        _bar(pct),
       ]);
     }),
   );
 
-//  Resources 
+//  Resources
 
 /**
  * Resources — list of resource rows. Items with `max` get a bar (HP, energy);
@@ -73,30 +86,28 @@ const Stats = ({ values = {}, bonuses = {}, max = 25 } = {}) =>
  *   { label, value, max?, suffix?, color? }
  */
 const Resources = (items = []) =>
-  div({ className: 'game-resources', style: 'display:flex; flex-direction:column; gap:8px' })(
+  div({ className: 'game-resources dv-flex-col dv-gap-8' })(
     items.map(item => item.max != null ? _resBar(item) : _resLine(item))
   );
 
 const _resLine = ({ label, value, suffix = '' }) =>
-  div({ style: 'display:flex; justify-content:space-between; font-size:12px' })([
-    span({ style: 'color:var(--text-muted)' })([label]),
-    span({ style: 'font-family:ui-monospace,monospace' })([`${value}${suffix}`]),
+  div({ className: 'dv-flex-between dv-fs-12' })([
+    span({ className: 'dv-muted' })([label]),
+    span({ className: 'dv-mono' })([`${value}${suffix}`]),
   ]);
 
-const _resBar = ({ label, value, max, color = 'var(--accent)' }) => {
+const _resBar = ({ label, value, max, color }) => {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   return div({})([
-    div({ style: 'display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px' })([
-      span({ style: 'color:var(--text-muted)' })([label]),
-      span({ style: 'font-family:ui-monospace,monospace' })([`${value}/${max}`]),
+    div({ className: 'dv-flex-between dv-fs-12', style: 'margin-bottom:2px' })([
+      span({ className: 'dv-muted' })([label]),
+      span({ className: 'dv-mono' })([`${value}/${max}`]),
     ]),
-    div({ style: 'height:6px; background:var(--surface-2); border-radius:3px; overflow:hidden' })([
-      div({ style: `width:${pct}%; height:100%; background:${color}; transition:width 200ms ease` })([]),
-    ]),
+    _bar(pct, color),
   ]);
 };
 
-//  Inventory (wardrobe) 
+//  Inventory (wardrobe)
 
 /**
  * Inventory — slot-based equip scene. One Card per slot; lists currently
@@ -125,9 +136,9 @@ const Inventory = ({
   const unequip = slot => setState(s => ({ [equippedKey]: { ...s[equippedKey], [slot]: null } }));
 
   return div({})([
-    h2({ style: 'margin:0 0 12px' })([title]),
+    h2({ className: 'dv-mb-12', style: 'margin-top:0' })([title]),
     Stack({ gap: 12 })(allSlots.map(slot => _slotCard(slot, state, items, equip, unequip, equippedKey, inventoryKey))),
-    ...(returnTo ? [div({ style: 'margin-top:14px' })([
+    ...(returnTo ? [div({ className: 'dv-mt-12' })([
       Button({ variant: 'ghost', onClick: () => goto(returnTo) })(['← Back']),
     ])] : []),
   ]);
@@ -144,29 +155,29 @@ const _slotCard = (slot, state, items, equip, unequip, equippedKey, inventoryKey
   const equippedId = state[equippedKey]?.[slot];
   const owned      = (state[inventoryKey] || []).map(id => items[id]).filter(it => it && it.slot === slot);
   return Card({ title: _capitalise(slot) })([
-    div({ style: 'font-size:13px; color:var(--text-muted); margin-bottom:8px' })([
+    div({ className: 'dv-fs-13 dv-muted dv-mb-8' })([
       'Equipped: ',
       span({ style: 'color:var(--text)' })([equippedId ? items[equippedId].name : '(nothing)']),
-      ...(equippedId ? [span({ style: 'margin-left:8px; font-size:11px' })([`(${_itemMeta(items[equippedId])})`])] : []),
+      ...(equippedId ? [span({ className: 'dv-fs-11', style: 'margin-left:8px' })([`(${_itemMeta(items[equippedId])})`])] : []),
     ]),
-    div({ style: 'display:flex; flex-wrap:wrap; gap:6px' })([
+    div({ className: 'dv-flex-row dv-gap-6', style: 'flex-wrap:wrap' })([
       ...(equippedId
         ? [Button({ variant: 'ghost', size: 'sm', onClick: () => unequip(slot) })(['Unequip'])]
         : []),
       ...owned.filter(it => it.id !== equippedId).map(it =>
         Button({ variant: 'secondary', size: 'sm', onClick: () => equip(it.id) })([
           it.name,
-          span({ style: 'margin-left:6px; opacity:.65; font-size:11px' })([`(${_itemMeta(it)})`]),
+          span({ className: 'dv-fs-11', style: 'margin-left:6px; opacity:.65' })([`(${_itemMeta(it)})`]),
         ])
       ),
       ...(owned.length === 0
-        ? [span({ style: 'font-size:12px; color:var(--text-muted)' })(['No items in this slot.'])]
+        ? [span({ className: 'dv-fs-12 dv-muted' })(['No items in this slot.'])]
         : []),
     ]),
   ]);
 };
 
-//  Shop 
+//  Shop
 
 /**
  * Shop — buy-from-stock scene. Items grouped by slot; each card shows
@@ -207,32 +218,32 @@ const Shop = ({
 
   return div({})([
     h2({ style: 'margin:0 0 4px' })([title]),
-    p({ style: 'margin:0 0 14px; color:var(--text-muted); font-family:ui-monospace,monospace; font-size:13px' })([
+    p({ className: 'dv-muted dv-mono dv-fs-13', style: 'margin:0 0 14px' })([
       `Gold: ${state[goldKey]}${currencySuffix}`,
     ]),
     ...(grouped.length === 0
       ? [Alert({ variant: 'info' })(["Nothing left in stock."])]
       : grouped.map(group => div({ style: 'margin-bottom:18px' })([
-          div({ style: 'font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-subtle); margin:0 0 8px' })([group.slot]),
+          div({ className: 'dv-fs-11', style: 'font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-subtle); margin:0 0 8px' })([group.slot]),
           div({ style: 'display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px' })(
             group.rows.map(item => _shopCard(item, state[goldKey], buy, currencySuffix))
           ),
         ]))),
-    ...(returnTo ? [div({ style: 'margin-top:8px' })([
+    ...(returnTo ? [div({ className: 'dv-mt-8' })([
       Button({ variant: 'ghost', onClick: () => goto(returnTo) })(['← Back']),
     ])] : []),
   ]);
 };
 
 const _shopCard = (item, gold, buy, suffix) => Card({})([
-  div({ style: 'display:flex; justify-content:space-between; align-items:flex-start; gap:8px' })([
+  div({ className: 'dv-flex-row dv-gap-8', style: 'justify-content:space-between; align-items:flex-start' })([
     div({ style: 'min-width:0' })([
       div({ style: 'font-weight:600' })([item.name]),
-      div({ style: 'font-size:11px; color:var(--text-muted); margin-top:2px' })([_itemMeta(item)]),
+      div({ className: 'dv-fs-11 dv-muted dv-mt-4' })([_itemMeta(item)]),
     ]),
     Badge({ variant: 'yellow' })([`${item.price}${suffix}`]),
   ]),
-  div({ style: 'margin-top:8px' })([
+  div({ className: 'dv-mt-8' })([
     Button({
       size: 'sm',
       disabled: gold < item.price,

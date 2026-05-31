@@ -325,15 +325,34 @@ const mount = store => root => view => {
 
   // Mutable reference so enableProfiler / disableProfiler can swap it live.
   let _run = _runFast;
-  _runners.push({ enable: () => { _run = _runProfiled; }, disable: () => { _run = _runFast; } });
+
+  // The runner registers itself in the module-level list so the profiler
+  // can toggle every mounted store live. Removing it on destroy() avoids
+  // a slow leak for apps that mount/unmount dynamically. The store subscriber
+  // can't be undone (Observable's onChange returns nothing), so we gate
+  // schedule() on _active too — the orphan callback becomes a no-op.
+  let _active = true;
+  const runner = {
+    enable:  () => { if (_active) _run = _runProfiled; },
+    disable: () => { if (_active) _run = _runFast;     },
+  };
+  _runners.push(runner);
 
   const schedule = () => {
-    if (pending) return;
+    if (!_active || pending) return;
     pending = true;
-    requestAnimationFrame(() => { pending = false; _run(); });
+    requestAnimationFrame(() => { pending = false; if (_active) _run(); });
   };
   store.subscribe(schedule);
   _run();   // initial render
+
+  return {
+    destroy: () => {
+      _active = false;
+      const i = _runners.indexOf(runner);
+      if (i >= 0) _runners.splice(i, 1);
+    },
+  };
 };
 
 // Render performance log 

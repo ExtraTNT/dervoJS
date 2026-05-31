@@ -815,3 +815,38 @@ body {
   content-visibility: auto;
   contain-intrinsic-size: auto 600px;
 }
+
+/*  Utilities  */
+/* Tiny, opinion-free classes that replace the most-repeated inline `style:`
+   strings found in the audit. The reconciler re-assigns the entire `style`
+   attribute on every patch (state.js:122 short-circuits the equality check
+   on `style`) so moving these into the cascade saves a per-frame write per
+   site. Use sparingly — composing classes for one-off layouts beats inline
+   styles, but a 12-token utility class for a unique component is worse. */
+.dv-muted       { color:var(--text-muted); }
+.dv-subtle      { color:var(--text-subtle); }
+.dv-mono        { font-family:ui-monospace,monospace; }
+.dv-flex-row    { display:flex; flex-direction:row;   align-items:center; }
+.dv-flex-col    { display:flex; flex-direction:column; }
+.dv-flex-between{ display:flex; align-items:center; justify-content:space-between; }
+.dv-gap-4       { gap:4px; }
+.dv-gap-6       { gap:6px; }
+.dv-gap-8       { gap:8px; }
+.dv-gap-10      { gap:10px; }
+.dv-gap-12      { gap:12px; }
+.dv-grow        { flex:1; min-width:0; }
+.dv-hidden      { display:none; }
+.dv-fs-11       { font-size:11px; }
+.dv-fs-12       { font-size:12px; }
+.dv-fs-13       { font-size:13px; }
+.dv-mt-4        { margin-top:4px; }
+.dv-mt-8        { margin-top:8px; }
+.dv-mt-12       { margin-top:12px; }
+.dv-mt-16       { margin-top:16px; }
+.dv-mb-8        { margin-bottom:8px; }
+.dv-mb-12       { margin-bottom:12px; }
+/* Bar gauge — width comes from --dv-pct, colour from --dv-bar (defaults to accent).
+   The bar background is the row background so the reconciler never writes the
+   long inline-style string. Used by GameWidgets (Stats/Resources) and elsewhere. */
+.dv-bar-track   { height:5px; background:var(--surface-2); border-radius:3px; overflow:hidden; }
+.dv-bar-fill    { width:var(--dv-pct, 0%); height:100%; background:var(--dv-bar, var(--accent)); transition:width 200ms ease; }

@@ -95,6 +95,22 @@ const getBus = id => {
 
 const listBusIds = () => Array.from(_busRegistry.keys());
 
+/**
+ * Destroy a named bus: clears all subscribers and removes the registry
+ * entry so it can be garbage-collected. Subsequent `getBus(id)` returns a
+ * fresh, empty bus.
+ *
+ * @param {string} id
+ * @returns {boolean}  true when the id existed and was removed
+ */
+const destroyBus = id => {
+  const bus = _busRegistry.get(id);
+  if (!bus) return false;
+  bus.destroy();
+  _busRegistry.delete(id);
+  return true;
+};
+
 // Window resize 
 /**
  * Listen to window size changes with a configurable debounce.
@@ -223,6 +239,7 @@ export {
   createBus,
   getBus,
   listBusIds,
+  destroyBus,
   onWindowResize,
   onBreakpoint,
   onKeydown,

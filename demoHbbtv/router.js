@@ -3,11 +3,14 @@
  * focus manager now that the page tabs are real focusables — the router
  * only handles the always-on shortcuts that bypass spatial nav.
  *
- *   1 … N             -> direct jump to page N
- *   RED / GREEN / …   -> colour-button shortcut to specific pages
+ *   RED / GREEN / YELLOW / BLUE  -> colour-button shortcut to specific pages
  *
- * Both shortcuts also move focus to the matching tab so the user lands in
- * a consistent state.
+ * Numeric direct jumps (`1`–`N`) were intentionally removed: the colour
+ * buttons cover the same use case and don't clash with the 9-9-1 profiler
+ * combo or other potential numeric combos.
+ *
+ * The shortcut also moves focus to the matching tab so the user lands in a
+ * consistent state.
  */
 
 import { setPage } from './store.js';
@@ -28,12 +31,8 @@ const _jumpTo = (fm, pageId) => {
  */
 export const wireRouter = (bus, fm) => {
   bus.on('key', ({ key }) => {
-    // numeric direct jump
-    //const n = parseInt(key, 10);
-    //if (!Number.isNaN(n) && n >= 1 && n <= PAGES.length) return _jumpTo(fm, PAGES[n - 1]);
-
-    // colour-button direct jump
-    //const cIdx = _COLOUR_TO_PAGE.indexOf(key);
+    return; // comment out for color shortcuts
+    const cIdx = _COLOUR_TO_PAGE.indexOf(key);
     if (cIdx >= 0 && cIdx < PAGES.length) return _jumpTo(fm, PAGES[cIdx]);
   });
 };
