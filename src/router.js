@@ -64,6 +64,7 @@
 
 import { a, nav, div, span } from './elements.js';
 import { cn } from './utils.js';
+import { toMaybe, fromMaybe, bind, orElse, Just, Nothing } from '../lib/odocosjs/src/core.js';
 
 // Route parsing helpers 
 
@@ -100,17 +101,18 @@ const _parseQuery = search => {
   return q;
 };
 
-/** Match a path against compiled routes; return { route, params } or null */
-const _match = compiled => path => {
-  for (const { route, re, keys } of compiled) {
-    const m = path.match(re);
-    if (!m) continue;
-    const params = {};
-    keys.forEach((k, i) => { params[k] = m[i + 1]; });
-    return { route, params };
-  }
-  return null;
-};
+/** Match a path against compiled routes. Returns Maybe<{ route, params }>.
+ *  The Maybe is propagated to the caller; never flatten to null here — that
+ *  forces a separate truthy check downstream, which is what Maybe exists to
+ *  remove. Consumers chain with bind/either and decide their own default. */
+const _match = compiled => path =>
+  compiled.reduce(
+    (acc, { route, re, keys }) =>
+      orElse(acc)(
+        bind(toMaybe(path.match(re)))(m =>
+          Just({ route, params: Object.fromEntries(keys.map((k, i) => [k, m[i + 1]])) }))),
+    Nothing,
+  );
 
 // Router factory 
 
@@ -153,16 +155,23 @@ const createRouter = (routes = [], { mode = 'history', base = '' } = {}) => (han
   }));
 
   const _dispatch = () => {
-    const raw  = mode === 'hash' ? location.hash.slice(1) || '/' : location.pathname;
-    const path = _extractPath(mode)(raw);
+    const raw     = mode === 'hash' ? location.hash.slice(1) || '/' : location.pathname;
+    const path    = _extractPath(mode)(raw);
     const trimmed = base && path.startsWith(base) ? path.slice(base.length) || '/' : path;
-    const query = _parseQuery(location.search);
-    const ctx = { path: trimmed, params: {}, query };
-    const found = _match(compiled)(trimmed);
-    if (found) {
-      ctx.params = found.params;
-      found.route.handler(ctx);
-    }
+    const query   = _parseQuery(location.search);
+    const baseCtx = { path: trimmed, params: {}, query };
+
+    // _match returns Maybe<{ route, params }>; bind threads the match through
+    // without ever materialising null. On Just we build the populated ctx
+    // and fire the handler inside the bind; on Nothing the bind is a no-op
+    // and fromMaybe hands the baseCtx back. No mutation, no truthy check.
+    const ctx = fromMaybe(baseCtx)(
+      bind(_match(compiled)(trimmed))(found => {
+        const c = { ...baseCtx, params: found.params };
+        found.route.handler(c);
+        return Just(c);
+      }),
+    );
     onChange(ctx);
   };
 

@@ -6,7 +6,12 @@
  * Combine with `validate` to compose multiple rules into one:
  *   validate(required(), minLength(3), email())
  *   // returns the first error string, or null when all pass
+ *
+ * Internally `validate` folds with Either<errMsg, value>; the public surface
+ * stays `string | null` to keep callers (validateForm, CrudResource) untouched.
  */
+
+import { Left, Right, either } from '../lib/odocosjs/src/core.js';
 
 /**
  * Requires a non-empty, non-whitespace value.
@@ -103,20 +108,30 @@ const range = (minOrOpts, max, msg) => {
  *   );
  *   emailRule('bad') // 'Enter a valid email'
  */
+// Normalise any rule shape into value -> Either<errMsg, value>.
+// - tuple [predFn, msg?]      → pred(value) ? Right(value) : Left(msg ?? 'Invalid')
+// - bool-returning predicate   → r === true ? Right(value) : Left('Invalid')
+// - classic string|null rule   → r === null ? Right(value) : Left(r)
+const _ruleToEither = rule => value => {
+  if (Array.isArray(rule)) {
+    const [pred, msg = 'Invalid'] = rule;
+    return pred(value) ? Right(value) : Left(msg);
+  }
+  const r = rule(value);
+  if (typeof r === 'boolean') return r ? Right(value) : Left('Invalid');
+  return r === null ? Right(value) : Left(r);
+};
+
+// Public surface is unchanged: `validate(...)` still returns `value => string | null`.
+// Internally the fold uses Either: Right carries the value forward, Left short-circuits.
+// Adding a "collect-all-errors" variant later is a one-line change to the Left-handler.
 const validate = (...rules) => value =>
-  rules.reduce((err, rule) => {
-    if (err !== null) return err;
-    // Tuple style: [predicateFn, errorMessage?]
-    if (Array.isArray(rule)) {
-      const [pred, msg = 'Invalid'] = rule;
-      return pred(value) ? null : msg;
-    }
-    const result = rule(value);
-    // Plain boolean predicate
-    if (typeof result === 'boolean') return result ? null : 'Invalid';
-    // Classic rule returning string | null
-    return result;
-  }, null);
+  either(
+    rules.reduce(
+      (acc, rule) => either(acc)(Left)(v => _ruleToEither(rule)(v)),
+      Right(value),
+    ),
+  )(msg => msg)(_ => null);
 
 /**
  * Validate an entire form's values against a schema of composed rules.

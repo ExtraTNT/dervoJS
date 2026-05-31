@@ -154,8 +154,13 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
 })`]),      ]),
     ]),
 
+    //  Tabs — three example shapes
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'Nested Tabs' })([
+      Card({ title: 'Tabs — minimal' })([
+        p({ style: 'margin-top:0; font-size:13px; color:var(--text-muted)' })([
+          'The simplest shape: an array of ', span({ style: 'font-family:ui-monospace,monospace' })(['{ id, label }']),
+          ' descriptors and one panel per tab. The matching panel is the only one rendered.',
+        ]),
         Tabs({
           tabs: [
             { id: 'one',   label: 'Tab 1' },
@@ -165,17 +170,168 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
           activeTab: state.innerTab,
           onTabChange: id => setState({ innerTab: id }),
         })([
-          p({})(['Content for tab 1 — nested tabs work the same way.']),
+          p({})(['Content for tab 1 — switch tabs to see only the matching panel render.']),
           p({})(['Content for tab 2.']),
           p({})(['Content for tab 3.']),
-        ]),        doc([`Tabs({
+        ]),
+        doc([`Tabs({
   tabs: [{ id: 'one', label: 'Tab 1' }, { id: 'two', label: 'Tab 2' }],
-  activeTab: state.innerTab,
+  activeTab:   state.innerTab,
   onTabChange: id => setState({ innerTab: id }),
 })([
   p({})(['Content for Tab 1']),
   p({})(['Content for Tab 2']),
-])`]),      ]),
+])`]),
+      ]),
+    ]),
+
+    div({ style: 'margin-top:16px' })([
+      Card({ title: 'Tabs — richer content + nested layout' })([
+        p({ style: 'margin-top:0; font-size:13px; color:var(--text-muted)' })([
+          'Each panel can be any vnode. Below: each panel composes ',
+          span({ style: 'font-family:ui-monospace,monospace' })(['Stack']),
+          ' / ', span({ style: 'font-family:ui-monospace,monospace' })(['Grid']),
+          ' / ', span({ style: 'font-family:ui-monospace,monospace' })(['Badge']),
+          ' so you see what hides behind the tab strip when it switches.',
+        ]),
+        Tabs({
+          tabs: [
+            { id: 'overview', label: 'Overview' },
+            { id: 'metrics',  label: 'Metrics'  },
+            { id: 'logs',     label: 'Logs'     },
+            { id: 'settings', label: 'Settings' },
+          ],
+          activeTab: state.tabsDocsTab,
+          onTabChange: id => setState({ tabsDocsTab: id }),
+        })([
+          Stack({ gap: 8 })([
+            p({ style: 'margin:0' })([
+              strong({})(['What you\'re looking at: ']),
+              'Tabs only renders one panel at a time — the others aren\'t in the DOM. ',
+              'That means each panel can have its own focus, scroll position, and form state without ',
+              'fighting the others.',
+            ]),
+            div({ style: 'display:flex; gap:6px; flex-wrap:wrap' })([
+              MemoBadge({ variant: 'green' })(['only one panel mounted']),
+              MemoBadge({ variant: 'blue'  })(['unmount-on-switch']),
+              MemoBadge({ variant: 'gray'  })(['matching panel by index']),
+            ]),
+          ]),
+
+          Grid({ cols: 1, sm: 2, md: 4, gap: 8 })([
+            div({ style: 'padding:10px; background:var(--surface-2); border-radius:var(--radius)' })([
+              p({ style: 'margin:0; font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em' })(['Active tab']),
+              p({ style: 'margin:4px 0 0; font-family:ui-monospace,monospace; font-size:18px' })([state.tabsDocsTab]),
+            ]),
+            div({ style: 'padding:10px; background:var(--surface-2); border-radius:var(--radius)' })([
+              p({ style: 'margin:0; font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em' })(['Other tabs']),
+              p({ style: 'margin:4px 0 0; font-family:ui-monospace,monospace; font-size:18px' })(['3 / 4']),
+            ]),
+            div({ style: 'padding:10px; background:var(--surface-2); border-radius:var(--radius)' })([
+              p({ style: 'margin:0; font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em' })(['Panels in DOM']),
+              p({ style: 'margin:4px 0 0; font-family:ui-monospace,monospace; font-size:18px' })(['1']),
+            ]),
+            div({ style: 'padding:10px; background:var(--surface-2); border-radius:var(--radius)' })([
+              p({ style: 'margin:0; font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em' })(['Re-renders']),
+              p({ style: 'margin:4px 0 0; font-family:ui-monospace,monospace; font-size:18px' })(['1 per state change']),
+            ]),
+          ]),
+
+          List({
+            items: [
+              { time: '10:42:01', level: 'info',  msg: 'Tab strip mounted' },
+              { time: '10:42:03', level: 'info',  msg: 'User switched to Logs panel' },
+              { time: '10:42:05', level: 'warn',  msg: 'Logs panel content is the same vnode tree, just rendered on demand' },
+              { time: '10:42:08', level: 'info',  msg: 'Overview panel was un-rendered (DOM gone)' },
+              { time: '10:42:11', level: 'error', msg: 'Other panels can hold heavy widgets without paying their render cost' },
+            ],
+            renderItem: row =>
+              li({ className: 'list-item', style: 'font-family:ui-monospace,monospace; font-size:12px' })([
+                span({ style: 'color:var(--text-muted); margin-right:8px' })([row.time]),
+                MemoBadge({ variant: row.level === 'error' ? 'red' : row.level === 'warn' ? 'yellow' : 'gray' })([row.level]),
+                span({ style: 'margin-left:8px' })([row.msg]),
+              ]),
+          }),
+
+          Stack({ gap: 10 })([
+            p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
+              'Settings panel — a regular form, mounted only while this tab is active. ',
+              'Tab switches discard its DOM (and any uncommitted state).',
+            ]),
+            div({ style: 'display:flex; gap:8px; align-items:center' })([
+              span({ style: 'font-size:13px' })(['Theme accent: ']),
+              MemoBadge({ variant: 'blue' })(['#4f46e5']),
+            ]),
+            div({ style: 'display:flex; gap:8px; align-items:center' })([
+              span({ style: 'font-size:13px' })(['State key: ']),
+              span({ style: 'font-family:ui-monospace,monospace; font-size:13px' })(['state.tabsDocsTab']),
+            ]),
+          ]),
+        ]),
+      ]),
+    ]),
+
+    div({ style: 'margin-top:16px' })([
+      Card({ title: 'Tabs — independent strips on one page' })([
+        p({ style: 'margin-top:0; font-size:13px; color:var(--text-muted)' })([
+          'Two ', span({ style: 'font-family:ui-monospace,monospace' })(['Tabs']),
+          ' on one page — each reads + writes its own slice of state, so switching one doesn\'t affect the other. ',
+          'The active selection above and below are independent.',
+        ]),
+        Row({ gap: 12 })([
+          Col({ span: 12, md: 6 })([
+            p({ style: 'margin:0 0 6px; font-size:12px; font-weight:600' })(['Documentation']),
+            Tabs({
+              tabs: [
+                { id: 'navigation', label: 'Navigation' },
+                { id: 'shortcuts',  label: 'Shortcuts'  },
+                { id: 'theming',    label: 'Theming'    },
+              ],
+              activeTab:   state.tabsKbdTab,
+              onTabChange: id => setState({ tabsKbdTab: id }),
+            })([
+              p({ style: 'font-size:13px; margin:0' })([
+                'Use ', span({ style: 'font-family:ui-monospace,monospace' })(['Tab']),
+                ' / ', span({ style: 'font-family:ui-monospace,monospace' })(['Shift+Tab']),
+                ' to walk the focus order. Each tab is a real button so keyboard activation lands naturally.',
+              ]),
+              p({ style: 'font-size:13px; margin:0' })([
+                'Sample shortcuts: ',
+                span({ style: 'font-family:ui-monospace,monospace' })(['⌘K']), ' command palette · ',
+                span({ style: 'font-family:ui-monospace,monospace' })(['/']),   ' focus search · ',
+                span({ style: 'font-family:ui-monospace,monospace' })(['?']),   ' help.',
+              ]),
+              p({ style: 'font-size:13px; margin:0' })([
+                'Themes inherit from CSS custom properties — switching the document theme also reskins this tab strip without re-rendering.',
+              ]),
+            ]),
+          ]),
+          Col({ span: 12, md: 6 })([
+            p({ style: 'margin:0 0 6px; font-size:12px; font-weight:600' })(['Minimal (state on the left)']),
+            Tabs({
+              tabs: [
+                { id: 'one',   label: 'Tab 1' },
+                { id: 'two',   label: 'Tab 2' },
+                { id: 'three', label: 'Tab 3' },
+              ],
+              activeTab:   state.innerTab,
+              onTabChange: id => setState({ innerTab: id }),
+            })([
+              p({ style: 'margin:0; font-size:13px' })([
+                'This is the same ', span({ style: 'font-family:ui-monospace,monospace' })(['state.innerTab']),
+                ' the minimal example reads. Switch this one — the minimal one above changes too.',
+              ]),
+              p({ style: 'margin:0; font-size:13px' })(['Two views, one slice of state.']),
+              p({ style: 'margin:0; font-size:13px' })(['Or — sometimes that\'s what you want.']),
+            ]),
+          ]),
+        ]),
+        doc([`// Two strips, two state slices — independent:
+Tabs({ activeTab: state.tabsKbdTab, onTabChange: id => setState({ tabsKbdTab: id }), tabs: [...] })([panel1, panel2])
+Tabs({ activeTab: state.innerTab,   onTabChange: id => setState({ innerTab: id }),   tabs: [...] })([panel1, panel2])
+
+// Two strips, ONE state slice — they mirror each other (last example column above).`]),
+      ]),
     ]),
 
     // DragList 

@@ -69,6 +69,13 @@
  * @property {() => void}  destroy  Hard close + cancel reconnect (idempotent)
  * @property {() => 'connecting'|'open'|'closing'|'closed'} status  Current WebSocket readyState label
  */
+import { toMaybe, fromMaybe, Nothing } from '../lib/odocosjs/src/core.js';
+
+// Parse a frame as JSON; fall back to the raw string on failure.
+// The caller's onMessage still sees one value either way — kept identical to
+// the previous let-then-try shape, just without the let.
+const _safeJson = s => { try { return toMaybe(JSON.parse(s)); } catch (_) { return Nothing; } };
+
 const createWS = ({
   url,
   protocols,
@@ -108,9 +115,7 @@ const createWS = ({
 
     socket.onmessage = evt => {
       if (destroyed) return;
-      let data = evt.data;
-      try { data = JSON.parse(evt.data); } catch (_) {}
-      onMessage(data);
+      onMessage(fromMaybe(evt.data)(_safeJson(evt.data)));
     };
 
     socket.onerror = err => { if (!destroyed) onError(err); };

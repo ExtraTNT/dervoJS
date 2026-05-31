@@ -32,6 +32,12 @@
  */
 
 import { addListener, getBus } from './listeners.js';
+import { toMaybe, fromMaybe, bind, orElse, Just, Nothing } from '../lib/odocosjs/src/core.js';
+
+// Run a side-effecting thunk; Just(result) on success, Nothing on throw.
+// Used for HbbTV/OIPF API calls — the same DOM hooks throw on desktop and
+// raise NS_ERROR on STB boxes that miss a given path.
+const _attempt = fn => { try { return toMaybe(fn()); } catch (_) { return Nothing; } };
 
 // keyset bit-masks (per HbbTV spec)
 
@@ -106,6 +112,17 @@ const _videoBc = () => document.getElementById('video');
 
 let _activated = false;
 
+// Side effects split out so the bind chain in initApp stays expression-shaped.
+const _activateApp = app => {
+  app.show?.();
+  if (!_activated) {
+    app.activate?.();
+    app.activateInput?.();
+    _activated = true;
+  }
+};
+const _hideApp = app => { app.hide?.(); };
+
 /**
  * Show or hide the HbbTV broadcast-related application.
  * No-op outside an STB (returns false).
@@ -114,23 +131,13 @@ let _activated = false;
  * @param {boolean} [opts.show=true]
  * @returns {boolean}  true if the call reached an OIPF application object.
  */
-const initApp = ({ show = true } = {}) => {
-  const mgr = _appMgr();
-  if (!mgr?.getOwnerApplication) return false;
-  const app = mgr.getOwnerApplication(document);
-  if (!app) return false;
-  if (show) {
-    app.show?.();
-    if (!_activated) {
-      app.activate?.();
-      app.activateInput?.();
-      _activated = true;
-    }
-  } else {
-    app.hide?.();
-  }
-  return true;
-};
+const initApp = ({ show = true } = {}) =>
+  fromMaybe(false)(
+    bind(_attempt(() => _appMgr().getOwnerApplication(document)))(app => {
+      (show ? _activateApp : _hideApp)(app);
+      return Just(true);
+    })
+  );
 
 /**
  * Request which TV-remote keys the running app will receive.
@@ -139,16 +146,30 @@ const initApp = ({ show = true } = {}) => {
  * succeed on any compliant device.
  *
  * @param {number} mask  bitwise-OR of KEYSET.* constants. Defaults to ALL.
+ * @returns {boolean}    true when at least one keyset path accepted the mask
+ *                       (returns false on desktop browsers where all three throw).
  */
-const initKeys = (mask = KEYSET.ALL) => {
-  const cfg = _oipfCfg();
-  const mgr = _appMgr();
-  try { cfg.keyset.value = mask; }      catch (_) {}     // HbbTV 0.5
-  try { cfg.keyset.setValue(mask); }    catch (_) {}     // HbbTV 0.5 (newer)
-  try { mgr.getOwnerApplication(document).privateData.keyset.setValue(mask); } catch (_) {}   // HbbTV 1.0+
-};
+const initKeys = (mask = KEYSET.ALL) =>
+  fromMaybe(false)(
+    orElse(
+      orElse(_attempt(() => { _oipfCfg().keyset.value    = mask; return true; }))     // HbbTV 0.5
+            (_attempt(() => { _oipfCfg().keyset.setValue(mask);  return true; })))    // HbbTV 0.5 (newer)
+          (_attempt(() => {
+            _appMgr().getOwnerApplication(document).privateData.keyset.setValue(mask); // HbbTV 1.0+
+            return true;
+          })),
+  );
 
 // DVB channel info
+
+// Two independent channel sources. Each returns Maybe<channel>; if the OIPF
+// app or broadcast video isn't present, the chain bubbles a Nothing rather
+// than a thrown exception.
+const _ownerChannel = () =>
+  bind(_attempt(() => _appMgr().getOwnerApplication(document)))(app =>
+    bind(toMaybe(app.privateData))(pd => toMaybe(pd.currentChannel)));
+
+const _videoChannel = () => _attempt(() => _videoBc().currentChannel);
 
 /**
  * Read the currently tuned DVB channel from the broadcast video object or
@@ -156,20 +177,15 @@ const initKeys = (mask = KEYSET.ALL) => {
  *
  * @returns {{ name, onid, tsid, sid } | null}
  */
-const getChannelInfo = () => {
-  const mgr   = _appMgr();
-  const video = _videoBc();
-  let channel = null;
-  try { channel = mgr?.getOwnerApplication?.(document)?.privateData?.currentChannel; } catch (_) {}
-  if (!channel) { try { channel = video?.currentChannel; } catch (_) {} }
-  if (!channel) return null;
-  return {
-    name: channel.name ?? null,
-    onid: parseInt(channel.onid, 10) || 0,
-    tsid: parseInt(channel.tsid, 10) || 0,
-    sid:  parseInt(channel.sid,  10) || 0,
-  };
-};
+const getChannelInfo = () =>
+  fromMaybe(null)(
+    bind(orElse(_ownerChannel())(_videoChannel()))(ch => Just({
+      name: ch.name ?? null,
+      onid: parseInt(ch.onid, 10) || 0,
+      tsid: parseInt(ch.tsid, 10) || 0,
+      sid:  parseInt(ch.sid,  10) || 0,
+    })),
+  );
 
 // remote-key listener
 
