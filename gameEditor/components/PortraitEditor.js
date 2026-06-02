@@ -14,8 +14,14 @@
  * cap.png when player has cap, helm.png when player has helm).
  */
 
-import { div, p, span, img } from '../../src/index.js';
-import { TextInput, NumberInput, Select, Button, Card, Stack, Grid, DragList, Badge } from '../../src/index.js';
+import { div, p, span, img } from '../../src/elements.js';
+import { TextInput } from '../../src/components/TextInput.js';
+import { NumberInput } from '../../src/components/NumberInput.js';
+import { Select } from '../../src/components/Select.js';
+import { Button } from '../../src/components/Button.js';
+import { Card } from '../../src/components/Card.js';
+import { Stack, Grid, DragList } from '../../src/components/Layout.js';
+import { Badge } from '../../src/components/Badge.js';
 import { emptyPortraitLayer } from '../schema.js';
 import { onText } from '../helpers.js';
 import { AssetInput } from './AssetInput.js';

@@ -5,11 +5,15 @@
  * Curried wrappers (Card, Stack, Grid, Toggle, Button, Badge) take children: `Card({...})([…])`.
  */
 
-import {
-  div, p, h2, span,
-  Card, Stack, Grid,
-  TextInput, NumberInput, Toggle, Select, Button, Badge,
-} from '../../src/index.js';
+import { div, p, h2, span } from '../../src/elements.js';
+import { Card } from '../../src/components/Card.js';
+import { Stack, Grid } from '../../src/components/Layout.js';
+import { TextInput } from '../../src/components/TextInput.js';
+import { NumberInput } from '../../src/components/NumberInput.js';
+import { Toggle } from '../../src/components/Toggle.js';
+import { Select } from '../../src/components/Select.js';
+import { Button } from '../../src/components/Button.js';
+import { Badge } from '../../src/components/Badge.js';
 import { setProject } from '../store.js';
 import { onText } from '../helpers.js';
 import { AssetInput } from '../components/AssetInput.js';

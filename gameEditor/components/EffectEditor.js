@@ -8,8 +8,10 @@
  * AND xp += 10). The simple-mode UI lets you append/remove ops.
  */
 
-import { div, span, textarea } from '../../src/index.js';
-import { Select, TextInput, Button } from '../../src/index.js';
+import { div, span, textarea } from '../../src/elements.js';
+import { Select } from '../../src/components/Select.js';
+import { TextInput } from '../../src/components/TextInput.js';
+import { Button } from '../../src/components/Button.js';
 import { onText } from '../helpers.js';
 import { effectToFn } from '../codegen.js';
 

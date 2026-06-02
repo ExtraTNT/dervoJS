@@ -10,10 +10,15 @@
  * don't keep the lossless original around to save localStorage space.
  */
 
-import { div, span, h2, p, button, img, audio, video } from '../../src/index.js';
-import {
-  TextInput, NumberInput, Select, Slider, Button, Card, Stack, Grid, Badge,
-} from '../../src/index.js';
+import { div, span, h2, p, button, img, audio, video } from '../../src/elements.js';
+import { TextInput } from '../../src/components/TextInput.js';
+import { NumberInput } from '../../src/components/NumberInput.js';
+import { Select } from '../../src/components/Select.js';
+import { Slider } from '../../src/components/Slider.js';
+import { Button } from '../../src/components/Button.js';
+import { Card } from '../../src/components/Card.js';
+import { Stack, Grid } from '../../src/components/Layout.js';
+import { Badge } from '../../src/components/Badge.js';
 import { setProject, setState, toast } from '../store.js';
 import { emptyAsset } from '../schema.js';
 import { onText } from '../helpers.js';

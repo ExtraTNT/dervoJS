@@ -11,8 +11,15 @@
  * goes back to where you were).
  */
 
-import { div, span, h2, p, button } from '../../src/index.js';
-import { TextInput, NumberInput, Select, Toggle, Button, Card, Stack, Grid, Badge } from '../../src/index.js';
+import { div, span, h2, p, button } from '../../src/elements.js';
+import { TextInput } from '../../src/components/TextInput.js';
+import { NumberInput } from '../../src/components/NumberInput.js';
+import { Select } from '../../src/components/Select.js';
+import { Toggle } from '../../src/components/Toggle.js';
+import { Button } from '../../src/components/Button.js';
+import { Card } from '../../src/components/Card.js';
+import { Stack, Grid } from '../../src/components/Layout.js';
+import { Badge } from '../../src/components/Badge.js';
 import { setProject, setState } from '../store.js';
 import { emptyNpc, emptyPage, emptyChoice, emptyShopEntry } from '../schema.js';
 import { onText } from '../helpers.js';

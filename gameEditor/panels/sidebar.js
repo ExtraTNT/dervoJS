@@ -14,10 +14,14 @@
  * the sidebar (top-to-bottom). Each widget keeps its own config inline.
  */
 
-import { div, span, h2, p, button, textarea } from '../../src/index.js';
-import {
-  TextInput, Select, Toggle, Button, Card, Stack, Badge, DragList,
-} from '../../src/index.js';
+import { div, span, h2, p, button, textarea } from '../../src/elements.js';
+import { TextInput } from '../../src/components/TextInput.js';
+import { Select } from '../../src/components/Select.js';
+import { Toggle } from '../../src/components/Toggle.js';
+import { Button } from '../../src/components/Button.js';
+import { Card } from '../../src/components/Card.js';
+import { Stack, DragList } from '../../src/components/Layout.js';
+import { Badge } from '../../src/components/Badge.js';
 import { setProject, setState } from '../store.js';
 import { emptyWidget } from '../schema.js';
 import { onText, onCheck } from '../helpers.js';

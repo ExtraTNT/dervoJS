@@ -4,7 +4,7 @@
  * that bumps a `dirty` flag the topbar listens to.
  */
 
-import { createStore } from '../src/index.js';
+import { createStore } from '../src/state.js';
 import { fromMaybe } from '../lib/odocosjs/src/core.js';
 import { set as lsSet, get as lsGet, remove as lsRemove, getKeys as lsKeys } from '../lib/odocosjs/src/localObjectStorage.js';
 import { emptyProject, normaliseProject } from './schema.js';

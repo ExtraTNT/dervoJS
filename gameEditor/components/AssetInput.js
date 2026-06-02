@@ -15,8 +15,9 @@
  * Assets catalogue and the field then references it), or paste a URL.
  */
 
-import { div, span, label as lbl, input, img, audio, video } from '../../src/index.js';
-import { Select, Button } from '../../src/index.js';
+import { div, span, input, img, audio, video, label as lbl} from '../../src/elements.js';
+import { Select } from '../../src/components/Select.js';
+import { Button } from '../../src/components/Button.js';
 
 import { onText } from '../helpers.js';
 import { getState, setProject, toast } from '../store.js';

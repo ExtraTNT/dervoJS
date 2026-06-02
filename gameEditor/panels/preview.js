@@ -6,8 +6,13 @@
  * singleton; "Play" rebuilds from the current project, "Stop" destroys it.
  */
 
-import { div, p, h2, span } from '../../src/index.js';
-import { Card, Stack, Button, Alert, Badge, createGame } from '../../src/index.js';
+import { div, p, h2, span } from '../../src/elements.js';
+import { Card } from '../../src/components/Card.js';
+import { Stack } from '../../src/components/Layout.js';
+import { Button } from '../../src/components/Button.js';
+import { Alert } from '../../src/components/Alert.js';
+import { Badge } from '../../src/components/Badge.js';
+import { createGame } from '../../src/game.js';
 import { buildGameConfig } from '../preview.js';
 import { getState, toast } from '../store.js';
 

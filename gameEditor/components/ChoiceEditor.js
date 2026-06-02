@@ -10,8 +10,10 @@
  *   - action: state mutation that runs before navigation (see EffectEditor)
  */
 
-import { div, span } from '../../src/index.js';
-import { TextInput, Select, Button } from '../../src/index.js';
+import { div, span } from '../../src/elements.js';
+import { TextInput } from '../../src/components/TextInput.js';
+import { Select } from '../../src/components/Select.js';
+import { Button } from '../../src/components/Button.js';
 import { ConditionEditor } from './ConditionEditor.js';
 import { EffectEditor }    from './EffectEditor.js';
 import { onText } from '../helpers.js';

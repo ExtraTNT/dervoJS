@@ -6,8 +6,9 @@
  * until the last page, which shows the real choices.
  */
 
-import { div, span, p, textarea } from '../../src/index.js';
-import { TextInput, Button } from '../../src/index.js';
+import { div, span, p, textarea } from '../../src/elements.js';
+import { TextInput } from '../../src/components/TextInput.js';
+import { Button } from '../../src/components/Button.js';
 import { onText } from '../helpers.js';
 import { AssetInput } from './AssetInput.js';
 

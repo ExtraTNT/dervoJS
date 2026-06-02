@@ -6,11 +6,13 @@
  * whatever is selected in the left list.
  */
 
-import {
-  div, span, h1, h2, p, button,
-  AppShell, Stack, Tabs, Button, Badge,
-  initStyles, mount,
-} from '../src/index.js';
+import { div, span, h1, h2, p, button } from '../src/elements.js';
+import { AppShell, Stack } from '../src/components/Layout.js';
+import { Tabs } from '../src/components/Tabs.js';
+import { Button } from '../src/components/Button.js';
+import { Badge } from '../src/components/Badge.js';
+import { initStyles } from '../src/styles.js';
+import { mount } from '../src/state.js';
 import { initEditorStyles } from './styles.js';
 import { store, getState, setState, persist, listSlots, useSlot, newSlot, removeSlot } from './store.js';
 import { MetaPanel }    from './panels/meta.js';

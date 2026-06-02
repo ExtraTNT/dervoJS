@@ -6,8 +6,14 @@
  * in sync.
  */
 
-import { div, span, h2, p, button } from '../../src/index.js';
-import { TextInput, Button, Card, Stack, Grid, Badge, Checkbox, Select } from '../../src/index.js';
+import { div, span, h2, p, button } from '../../src/elements.js';
+import { TextInput } from '../../src/components/TextInput.js';
+import { Button } from '../../src/components/Button.js';
+import { Card } from '../../src/components/Card.js';
+import { Stack, Grid } from '../../src/components/Layout.js';
+import { Badge } from '../../src/components/Badge.js';
+import { Checkbox } from '../../src/components/Checkbox.js';
+import { Select } from '../../src/components/Select.js';
 import { setProject, setState } from '../store.js';
 import { emptyRoom, emptyWardrobeRoom, emptyInventoryRoom, emptyPage, emptyChoice } from '../schema.js';
 import { onText, onCheck } from '../helpers.js';

@@ -6,8 +6,12 @@
  * we don't need a dep. Files unpack normally with any zip tool.
  */
 
-import { div, p, h2, span, button, textarea, pre } from '../../src/index.js';
-import { Card, Stack, Button, Badge, Alert } from '../../src/index.js';
+import { div, p, h2, span, button, textarea, pre } from '../../src/elements.js';
+import { Card } from '../../src/components/Card.js';
+import { Stack } from '../../src/components/Layout.js';
+import { Button } from '../../src/components/Button.js';
+import { Badge } from '../../src/components/Badge.js';
+import { Alert } from '../../src/components/Alert.js';
 import { setState, getState, setProject, toast, persist } from '../store.js';
 import { normaliseProject } from '../schema.js';
 import { emitAll } from '../codegen.js';

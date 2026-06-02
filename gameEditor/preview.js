@@ -10,10 +10,8 @@
  * The same semantics drive codegen.js, which emits equivalent JS source.
  */
 
-import {
-  div, p, img, video, span, h3, button,
-  Scene, NpcChoices, NpcLine,
-} from '../src/index.js';
+import { div, p, img, video, span, h3, button } from '../src/elements.js';
+import { Scene, NpcChoices, NpcLine } from '../src/game.js';
 import { resolveAssetsForPreview } from './extractAssets.js';
 
 const _safeFn = (argNames, body) => {

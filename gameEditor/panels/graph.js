@@ -15,10 +15,13 @@
  * Click a node → jumps to the matching tab with the entity selected.
  */
 
-import { div, p, h2, span } from '../../src/index.js';
-import { Card, Stack, Button, Badge } from '../../src/index.js';
+import { div, p, h2, span } from '../../src/elements.js';
+import { Card } from '../../src/components/Card.js';
+import { Stack } from '../../src/components/Layout.js';
+import { Button } from '../../src/components/Button.js';
+import { Badge } from '../../src/components/Badge.js';
 import { setState } from '../store.js';
-import { vnode } from '../../src/index.js';
+import { vnode } from '../../lib/odocosjs/src/render.js';
 
 const svg     = vnode('svg');
 const g       = vnode('g');

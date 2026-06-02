@@ -9,8 +9,9 @@
  * possible (so flipping back to "simple" doesn't lose your key/op).
  */
 
-import { div, span, textarea } from '../../src/index.js';
-import { Select, TextInput } from '../../src/index.js';
+import { div, span, textarea } from '../../src/elements.js';
+import { Select } from '../../src/components/Select.js';
+import { TextInput } from '../../src/components/TextInput.js';
 import { onText } from '../helpers.js';
 import { condToExpr } from '../codegen.js';
 

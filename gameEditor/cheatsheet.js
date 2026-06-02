@@ -12,8 +12,11 @@
  *   8. Recipes        — copy-pasteable patterns for common asks
  */
 
-import { div, h2, h3, h4, p, span, ul, li, code, pre } from '../src/index.js';
-import { FloatingPanel, Stack, Tabs, Badge } from '../src/index.js';
+import { div, h2, h3, h4, p, span, ul, li, code, pre } from '../src/elements.js';
+import { FloatingPanel } from '../src/components/FloatingPanel.js';
+import { Stack } from '../src/components/Layout.js';
+import { Tabs } from '../src/components/Tabs.js';
+import { Badge } from '../src/components/Badge.js';
 import { setState } from './store.js';
 
 const _kbd = text => span({ style: 'font-family:ui-monospace,monospace; background:var(--surface-2, rgba(0,0,0,.06)); padding:1px 5px; border-radius:3px; font-size:11.5px; color:var(--text)' })([text]);
