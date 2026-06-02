@@ -1,0 +1,482 @@
+/**
+ * Project schema for the gameEditor.
+ *
+ * Everything is plain JSON so the project round-trips through save/load and
+ * the codegen pass can read it the same way the in-place preview interpreter
+ * does. No JS in the structure itself — JS scriptlets, when the author opts
+ * into them, live as strings on Condition.expr / Effect.body, and are
+ * evaluated (in preview) or emitted verbatim (in codegen).
+ *
+ * Shape:
+ *   Project { meta, stats[], flags[], items[], rooms[], npcs[] }
+ *   Meta    { title, start, defaultMusic }
+ *   Stat    { key, initial:number }
+ *   Flag    { key, initial:boolean }
+ *   Item    { id, name, description, image, price, kind, stats:{} }
+ *   Room    { id, title, music, onEnter:Effect, pages:Page[], choices:Choice[] }
+ *   Npc     { id, name, locations, greeting, portrait, role, pages, choices,
+ *             shop:{ stock:[{itemId, price?, quantity?}] } }
+ *   Page    { id, text, image, video, advanceLabel }
+ *   Choice  { id, label, to, condition:Condition, action:Effect }
+ *
+ *   Condition.mode: 'always' | 'simple' | 'hasItem' | 'js'
+ *     simple : { key, op, value }              stat or flag check
+ *     hasItem: { itemId, op:'>=', count }      inventory check
+ *     js     : { expr }                        freeform predicate over `c`
+ *
+ *   Effect.mode: 'none' | 'simple' | 'js'
+ *     simple : { ops:[Op] }   each Op = { target, op, value }
+ *       target = stat key, 'flags.<flag>', 'inv.<itemId>', 'gold' etc.
+ *       op     = 'set' | 'add' | 'sub' | 'toggle' | 'give' | 'take'
+ *     js     : { body }       freeform body, has access to `c`
+ *
+ * Reserved player-state keys when items are used:
+ *   inventory : { [itemId]: count }
+ */
+
+const _rid = () => Math.random().toString(36).slice(2, 9);
+
+const emptyCondition = () => ({
+  mode: 'always',
+  key: '', op: '>=', value: 0,    // simple
+  itemId: '', count: 1,           // hasItem
+  expr: '',                       // js
+});
+const emptyEffect = () => ({
+  mode: 'none',
+  ops: [],         // simple
+  body: '',        // js
+});
+
+const emptyOp = (target = '') => ({ target, op: 'set', value: 0 });
+
+// Item kinds drive how the inventory room interacts with the item:
+//   consumable → "Use" button that fires useEffect, then decrements by 1
+//   readable   → "Read" button that opens the text inline
+//   equipment  → "Equip" / "Unequip" that toggles state.equipped[equipSlot]
+//   key / misc → no action button (display-only)
+const emptyItem = (id = `item_${_rid()}`) => ({
+  id,
+  name:        'New Item',
+  description: '',
+  image:       '',
+  price:       0,
+  kind:        'misc',          // 'consumable' | 'equipment' | 'readable' | 'key' | 'misc'
+  // Per-kind behaviour (each is ignored when the kind doesn't apply):
+  useEffect:   emptyEffect(),   // consumable — fires on Use
+  text:        '',              // readable   — rendered in the reading overlay
+  equipSlot:   '',              // equipment  — slot key (e.g. 'weapon', 'armor', 'head')
+});
+
+const emptyShopEntry = (itemId = '') => ({
+  itemId,
+  price:    null,        // null → use item.price
+  quantity: null,        // null → infinite
+});
+
+// Sidebar widgets shown in the in-game left column. Each widget has a `type`
+// that the preview interpreter / codegen knows how to render.
+const emptyPortraitLayer = (name = 'layer') => ({
+  id:           _rid(),
+  name,
+  defaultImage: '',
+  bindings:     [],   // [{ itemId, image }]  first matching binding wins
+});
+
+const emptyWidget = (type = 'stats') => {
+  switch (type) {
+    case 'title':     return { id: _rid(), type, label: '' };
+    case 'portrait':  return { id: _rid(), type, width: 220, height: 280, layers: [emptyPortraitLayer('body')] };
+    case 'stats':     return { id: _rid(), type, keys: [] };           // empty → show all stats
+    case 'inventory': return { id: _rid(), type, layout: 'list' };     // 'list' | 'grid'
+    case 'roomLink':  return { id: _rid(), type, label: 'Open', roomId: '', icon: '' };
+    case 'js':        return { id: _rid(), type, label: 'JS widget', body: '// receives `ctx`; bound: state, ctx, div, span, p, h3, img, video, button\nreturn div({ style: \'padding:6px 8px; border:1px solid var(--border); border-radius:var(--radius); font-size:12px\' })(["HP: " + state.hp]);' };
+    default:          return { id: _rid(), type };
+  }
+};
+
+// Skills — a top-level catalogue. The player learns skills (stored in
+// state.skills as an array of ids) and uses them during combat. Effects can
+// give/take skills via the `simple` op family (target `skills.<id>` op
+// `learn`/`forget`) or via JS bodies.
+//
+// Damage formula at runtime:
+//   final = base + (state[damageStat] * damageStatMul) + randInt(0, damageRandom)
+// Same shape applies to heal (selfHeal + selfHealStat + selfHealRandom).
+//
+// To-hit:
+//   'always'   — always lands (default)
+//   'percent'  — flat hitPercent% chance
+//   'statRoll' — d20 + state[hitStat] + hitBonus vs enemy.defense + hitDc
+const emptySkill = (id = `skill_${_rid()}`) => ({
+  id,
+  name:        'New Skill',
+  kind:        'attack',           // 'attack' | 'spell' | 'heal' | 'item'
+  // damage to enemy
+  damage:          1,              // base
+  damageStat:      '',             // optional stat that scales damage
+  damageStatMul:   1,              // multiplier on that stat
+  damageRandom:    0,              // adds randInt(0, N) — set to 6 for "+1d6"-ish feel
+  // heal self
+  selfHeal:        0,
+  selfHealStat:    '',
+  selfHealStatMul: 1,
+  selfHealRandom:  0,
+  // costs
+  costStat:    '',                 // e.g. 'mana'
+  costValue:   0,
+  costItem:    '',                 // itemId consumed
+  requireItem: '',                 // itemId required (not consumed)
+  // to-hit
+  hitMode:     'always',           // 'always' | 'percent' | 'statRoll'
+  hitPercent:  100,                // for 'percent'
+  hitStat:     '',                 // for 'statRoll' — stat added to d20
+  hitBonus:    0,                  // for 'statRoll' — flat bonus
+  hitDc:       10,                 // for 'statRoll' — vs (enemy.defense + this)
+  // presentation — image + flavour shown briefly after use
+  image:        '',
+  flavourText:  '',
+  description:  '',
+});
+
+// Per-combat "extra moves" remain available — useful for one-off boss-only
+// attacks. Same shape as skills.
+const emptyCombatMove = (label = 'Attack') => ({
+  id:           _rid(),
+  label,
+  kind:         'attack',
+  damage:       1,
+  selfHeal:     0,
+  costStat:     '',
+  costValue:    0,
+  costItem:     '',
+  image:        '',
+  flavourText:  '',
+  requireItem:  '',
+  condition:    emptyCondition(),
+});
+
+// Enemy AI action — every turn, the engine filters actions by their `useWhen`
+// rule, then picks weighted-random among the survivors.
+//
+// useWhen options:
+//   'always'       — always available
+//   'belowHp'      — enemy HP <= hpThreshold% of max
+//   'aboveHp'      — enemy HP >  hpThreshold% of max
+//   'onPlayerMiss' — last player skill missed
+//   'js'           — author writes their own predicate over `{ enemy, state }`
+const emptyEnemyAction = (label = 'Strike') => ({
+  id:     _rid(),
+  label,
+  kind:   'attack',                // 'attack' | 'heal'  (heal restores enemy HP)
+  // damage / heal magnitude (with optional randomness)
+  damage:       3,
+  damageRandom: 0,
+  healAmount:   0,
+  healRandom:   0,
+  // to-hit (always for heal)
+  hitPercent:   100,
+  // selection rule
+  weight:       1,                 // base weight in the weighted-random pick
+  useWhen:      'always',          // see header
+  hpThreshold:  50,                // for belowHp / aboveHp — percent of enemy max HP
+  jsCondition:  '',                // for useWhen='js'
+  // presentation — image + flavour shown when this action fires
+  image:        '',
+  flavourText:  '',
+});
+
+const emptyCombat = (id = `combat_${_rid()}`) => ({
+  id,
+  name:    'New Encounter',
+  enemy: {
+    name:    'Goblin',
+    hp:      8,
+    defense: 0,                       // subtracted from each player skill's damage (min 0)
+    image:   '',
+    actions: [emptyEnemyAction()],    // AI picks weighted-random each turn
+    loot:    {},                      // { itemId: count } — added to player.inventory on win
+  },
+  playerStat:  'hp',          // which player stat takes damage
+  intro:       '',            // flavour shown above the move list at combat start
+  // Per-combat extra moves available IN ADDITION to player's learned skills.
+  // Leave empty to use only state.skills.
+  extraMoves:  [],
+  winRoom:     '',            // '' → fall through to caller via state._combatReturnTo
+  loseRoom:    '',
+  winText:     'You won!',
+  loseText:    'You were defeated.',
+  winImage:    '',            // shown on the win outcome screen instead of greyed enemy
+  loseImage:   '',
+  // Effect applied on outcome — same schema as Choice action. Use simple-mode
+  // ops to grant gold/items/skills, or JS for richer logic.
+  onWin:       emptyEffect(),
+  onLose:      emptyEffect(),
+  linkedNpcId: '',            // if set: NPC is removed from world on win
+});
+
+const emptySidebar = () => ({
+  enabled: false,
+  widgets: [],
+});
+
+const emptyPage = () => ({
+  id:            _rid(),
+  text:          '',
+  image:         '',
+  video:         '',
+  advanceLabel:  'More',
+});
+
+const emptyChoice = () => ({
+  id:        _rid(),
+  label:     'New choice',
+  to:        '',
+  condition: emptyCondition(),
+  action:    emptyEffect(),
+});
+
+const emptyRoom = (id = `room_${_rid()}`) => ({
+  id,
+  kind:             'scene',     // 'scene' | 'wardrobe'
+  title:            'New Room',
+  music:            '',
+  onEnter:          emptyEffect(),
+  onEnterCondition: emptyCondition(),    // 'always' by default — gate onEnter behind a flag/stat/js check
+  pages:            [emptyPage()],
+  choices:          [],
+  // Wardrobe-only fields (ignored for kind:'scene'). Pre-seeded so flipping the
+  // kind via the editor instantly has working defaults.
+  wardrobe: {
+    portraitWidth:  240,
+    portraitHeight: 320,
+    layers:         [],     // same shape as portrait widget layers
+    kinds:          ['equipment'],
+  },
+});
+
+const emptyWardrobeRoom = (id = `wardrobe_${_rid()}`) => ({
+  ...emptyRoom(id),
+  kind:    'wardrobe',
+  title:   'Wardrobe',
+  pages:   [emptyPage()],
+  wardrobe: {
+    portraitWidth:  240,
+    portraitHeight: 320,
+    layers:         [emptyPortraitLayer('body')],
+    kinds:          ['equipment'],
+  },
+});
+
+// Inventory room — paper-doll's plain counterpart. Shows EVERY item the
+// player is carrying (optionally filtered by kind), with image + name +
+// description + count. Choices below for navigation.
+const emptyInventoryRoom = (id = `inventory_${_rid()}`) => ({
+  ...emptyRoom(id),
+  kind:    'inventory',
+  title:   'Inventory',
+  pages:   [emptyPage()],
+  inventory: {
+    kinds:           [],          // [] = show all kinds; or filter ['consumable', …]
+    layout:          'grid',      // 'grid' | 'list'
+    showDescription: true,
+    emptyMessage:    'You are not carrying anything.',
+  },
+});
+
+const emptyNpc = (id = `npc_${_rid()}`) => ({
+  id,
+  name:      'New NPC',
+  locations: [],
+  greeting:  '',
+  portrait:  '',
+  role:      'dialogue',        // 'dialogue' | 'shop'
+  pages:     [emptyPage()],
+  choices:   [],
+  shop:      { stock: [] },     // only used when role === 'shop'
+});
+
+const emptyProject = () => {
+  const room = emptyRoom('start');
+  room.title = 'Starting Room';
+  room.pages[0].text = 'Welcome. Edit this room to begin.';
+  return {
+    meta:    { title: 'Untitled RPG', start: 'start', defaultMusic: '' },
+    stats:   [
+      { key: 'hp',   initial: 100 },
+      { key: 'gold', initial: 0   },
+    ],
+    flags:             [],
+    items:             [],
+    startingInventory: {},  // { itemId: count } — seeds state.inventory at game start
+    startingEquipped:  {},  // { slot: itemId } — seeds state.equipped at game start
+    skills:            [],
+    startingSkills:    [],  // [skillId]       — seeds state.skills at game start
+    rooms:             [room],
+    npcs:              [],
+    combats:           [],
+    sidebar:           emptySidebar(),
+    // Uploaded media live in a top-level catalogue; fields hold `asset:<id>`
+    // refs. Multiple fields referencing the same asset get a single zip entry.
+    assets:            [],
+    assetDefaults:     { imageQuality: 0.8, imageMaxDim: 1080 },
+  };
+};
+
+// One asset entry. `data` is a data:URL stored as-is (post-compression for
+// images, raw for audio/video). `quality`/`maxDim` are remembered so the
+// Assets tab can show what settings were used.
+const emptyAsset = (kind = 'image') => ({
+  id:       `asset_${_rid()}`,
+  name:     '',
+  kind,                       // 'image' | 'audio' | 'video'
+  data:     '',
+  mime:     '',
+  byteSize: 0,
+  quality:  null,             // image: 0..1; null = wasn't (re-)compressed
+  maxDim:   null,
+});
+
+// Normalise an arbitrary parsed JSON to the current shape — fills missing fields
+// so the editor never has to render against undefined values. Returns the input
+// as-is for fields it already knows; this is forward-compatible with future
+// optional keys.
+const normaliseProject = raw => {
+  const base = emptyProject();
+  if (!raw || typeof raw !== 'object') return base;
+  return {
+    meta: {
+      title:        raw.meta?.title        ?? base.meta.title,
+      start:        raw.meta?.start        ?? base.meta.start,
+      defaultMusic: raw.meta?.defaultMusic ?? base.meta.defaultMusic,
+    },
+    stats: Array.isArray(raw.stats) ? raw.stats : base.stats,
+    flags: Array.isArray(raw.flags) ? raw.flags : base.flags,
+    items: Array.isArray(raw.items)
+      ? raw.items.map(it => ({
+          id:          it.id,
+          name:        it.name        ?? '',
+          description: it.description ?? '',
+          image:       it.image       ?? '',
+          price:       Number(it.price) || 0,
+          kind:        it.kind        ?? 'misc',
+          useEffect:   it.useEffect   || emptyEffect(),
+          text:        it.text        ?? '',
+          equipSlot:   it.equipSlot   ?? '',
+        }))
+      : base.items,
+    startingInventory: (raw.startingInventory && typeof raw.startingInventory === 'object')
+      ? Object.fromEntries(Object.entries(raw.startingInventory).map(([k, v]) => [k, Math.max(0, Number(v) || 0)]))
+      : base.startingInventory,
+    startingEquipped: (raw.startingEquipped && typeof raw.startingEquipped === 'object')
+      ? Object.fromEntries(Object.entries(raw.startingEquipped).filter(([k, v]) => k && v).map(([k, v]) => [String(k), String(v)]))
+      : base.startingEquipped,
+    rooms: Array.isArray(raw.rooms)
+      ? raw.rooms.map(r => ({
+          id:               r.id,
+          kind:             r.kind             ?? 'scene',
+          title:            r.title            ?? '',
+          music:            r.music            ?? '',
+          onEnter:          r.onEnter          ?? emptyEffect(),
+          onEnterCondition: r.onEnterCondition ?? emptyCondition(),
+          pages:            Array.isArray(r.pages)   && r.pages.length ? r.pages   : [emptyPage()],
+          choices:          Array.isArray(r.choices) ? r.choices : [],
+          wardrobe: r.wardrobe && typeof r.wardrobe === 'object'
+            ? {
+                portraitWidth:  Number(r.wardrobe.portraitWidth)  || 240,
+                portraitHeight: Number(r.wardrobe.portraitHeight) || 320,
+                layers:         Array.isArray(r.wardrobe.layers) ? r.wardrobe.layers : [],
+                kinds:          Array.isArray(r.wardrobe.kinds)  ? r.wardrobe.kinds  : ['equipment'],
+              }
+            : { portraitWidth: 240, portraitHeight: 320, layers: [], kinds: ['equipment'] },
+          inventory: r.inventory && typeof r.inventory === 'object'
+            ? {
+                kinds:           Array.isArray(r.inventory.kinds) ? r.inventory.kinds : [],
+                layout:          r.inventory.layout === 'list' ? 'list' : 'grid',
+                showDescription: r.inventory.showDescription !== false,
+                emptyMessage:    r.inventory.emptyMessage ?? 'You are not carrying anything.',
+              }
+            : { kinds: [], layout: 'grid', showDescription: true, emptyMessage: 'You are not carrying anything.' },
+        }))
+      : base.rooms,
+    npcs: Array.isArray(raw.npcs)
+      ? raw.npcs.map(n => ({
+          id:        n.id,
+          name:      n.name      ?? '',
+          locations: Array.isArray(n.locations) ? n.locations : [],
+          greeting:  n.greeting  ?? '',
+          portrait:  n.portrait  ?? '',
+          role:      n.role      ?? 'dialogue',
+          pages:     Array.isArray(n.pages)   && n.pages.length   ? n.pages   : [emptyPage()],
+          choices:   Array.isArray(n.choices) ? n.choices : [],
+          shop:      n.shop && Array.isArray(n.shop.stock) ? n.shop : { stock: [] },
+        }))
+      : base.npcs,
+    sidebar: raw.sidebar && typeof raw.sidebar === 'object'
+      ? {
+          enabled: !!raw.sidebar.enabled,
+          widgets: Array.isArray(raw.sidebar.widgets) ? raw.sidebar.widgets : [],
+        }
+      : base.sidebar,
+    assets: Array.isArray(raw.assets)
+      ? raw.assets.map(a => ({
+          id:       a.id || `asset_${_rid()}`,
+          name:     a.name ?? '',
+          kind:     a.kind ?? 'image',
+          data:     a.data ?? '',
+          mime:     a.mime ?? '',
+          byteSize: Number(a.byteSize || 0),
+          quality:  a.quality ?? null,
+          maxDim:   a.maxDim  ?? null,
+        }))
+      : base.assets,
+    assetDefaults: raw.assetDefaults && typeof raw.assetDefaults === 'object'
+      ? {
+          imageQuality: Number(raw.assetDefaults.imageQuality) || 0.8,
+          imageMaxDim:  Number(raw.assetDefaults.imageMaxDim)  || 1080,
+        }
+      : base.assetDefaults,
+    skills: Array.isArray(raw.skills) ? raw.skills : base.skills,
+    startingSkills: Array.isArray(raw.startingSkills) ? raw.startingSkills : base.startingSkills,
+    combats: Array.isArray(raw.combats)
+      ? raw.combats.map(c => ({
+          id:          c.id,
+          name:        c.name ?? 'Encounter',
+          enemy: {
+            name:    c.enemy?.name    ?? 'Enemy',
+            hp:      Number(c.enemy?.hp || 0),
+            defense: Number(c.enemy?.defense || 0),
+            image:   c.enemy?.image   ?? '',
+            actions: Array.isArray(c.enemy?.actions) && c.enemy.actions.length
+              ? c.enemy.actions
+              : [emptyEnemyAction()],
+            loot:    (c.enemy?.loot && typeof c.enemy.loot === 'object') ? c.enemy.loot : {},
+          },
+          playerStat:  c.playerStat ?? 'hp',
+          intro:       c.intro      ?? '',
+          extraMoves:  Array.isArray(c.extraMoves) ? c.extraMoves : [],
+          winRoom:     c.winRoom    ?? '',
+          loseRoom:    c.loseRoom   ?? '',
+          winText:     c.winText    ?? 'You won!',
+          loseText:    c.loseText   ?? 'You were defeated.',
+          winImage:    c.winImage   ?? '',
+          loseImage:   c.loseImage  ?? '',
+          onWin:       c.onWin   || emptyEffect(),
+          onLose:      c.onLose  || emptyEffect(),
+          linkedNpcId: c.linkedNpcId ?? '',
+        }))
+      : base.combats,
+  };
+};
+
+export {
+  _rid,
+  emptyProject, normaliseProject,
+  emptyRoom, emptyWardrobeRoom, emptyInventoryRoom, emptyNpc, emptyItem, emptyShopEntry,
+  emptyPage, emptyChoice,
+  emptyCondition, emptyEffect, emptyOp,
+  emptySidebar, emptyWidget, emptyPortraitLayer,
+  emptyCombat, emptyCombatMove, emptyEnemyAction,
+  emptySkill,
+  emptyAsset,
+};
