@@ -1,5 +1,5 @@
 /**
- * ChoiceEditor — a single choice row. The room/npc context decides what targets
+ * ChoiceEditor - a single choice row. The room/npc context decides what targets
  * are reachable (`roomOpts`); the vars (`stats`, `flags`) drive the condition/effect
  * editors.
  *

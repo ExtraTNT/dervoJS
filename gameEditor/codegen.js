@@ -4,7 +4,7 @@
  *
  * Files:
  *   main.js     — entry, calls createGame and mounts it
- *   scenes.js   — id → (ctx) => Scene(...)(ctx) map
+ *   scenes.js   — id -> (ctx) => Scene(...)(ctx) map
  *   world.js    — NPCS map with greetings + dialogue functions
  *   items.js    — item catalogue + initial state
  *   index.html  — boots main.js as a module
@@ -132,6 +132,7 @@ const _emitPageBody = page => {
 };
 
 const _emitWardrobeRoomFn = (room, project) => {
+  console.log(project)
   const wb = room.wardrobe || { portraitWidth: 240, portraitHeight: 320, layers: [], kinds: ['equipment'] };
   const choicesLit = room.choices.map(c => _emitChoice(c, project)).join(', ');
   return `${room.id}: ctx => {
@@ -567,7 +568,7 @@ export { scenes };
 `;
 
 // NPC dialogue function for the non-shop case
-const _emitNpcDialogue = npc => {
+const _emitNpcDialogue = (npc, project) => {
   const pagesLit = npc.pages.map(pg => `{ text: ${_q(pg.text)}, image: ${_q(pg.image)}, video: ${_q(pg.video)}, advanceLabel: ${_q(pg.advanceLabel || 'More')} }`).join(', ');
   const choicesLit = npc.choices.map(c => _emitChoice(c, project)).join(', ');
   return `ctx => {
@@ -647,7 +648,7 @@ const NPCS = {
     name:      ${_q(n.name)},
     locations: ${JSON.stringify(n.locations)},
     greeting:  ${_q(n.greeting)},
-    dialogue:  ${n.role === 'shop' ? _emitNpcShop(n, project) : _emitNpcDialogue(n)},
+    dialogue:  ${n.role === 'shop' ? _emitNpcShop(n, project) : _emitNpcDialogue(n, project)},
   }`).join(',\n  ')}
 };
 

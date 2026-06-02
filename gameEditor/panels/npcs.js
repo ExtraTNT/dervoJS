@@ -162,6 +162,7 @@ const NpcEditor = (npc, project) => {
     ...n,
     choices: n.choices.map((c, k) => k === i ? (typeof patch === 'function' ? patch(c) : { ...c, ...patch }) : c),
   }));
+  // TODO: AddChaice seems to destroy the project -> codegen flipps out
   const _addChoice = () => _updateNpc(npc.id, n => ({ ...n, choices: [...n.choices, emptyChoice()] }));
   const _deleteChoice = i => _updateNpc(npc.id, n => ({ ...n, choices: n.choices.filter((_, k) => k !== i) }));
   const _moveChoice = (i, dir) => _updateNpc(npc.id, n => {
