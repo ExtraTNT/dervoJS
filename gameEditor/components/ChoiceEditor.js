@@ -1,13 +1,23 @@
 /**
- * ChoiceEditor - a single choice row. The room/npc context decides what targets
- * are reachable (`roomOpts`); the vars (`stats`, `flags`) drive the condition/effect
- * editors.
+ * ChoiceEditor — one choice row.
  *
- * Choice = { label, to, condition, action }
- *   - label: button text shown to the player
- *   - to: target room id (or '' for "no navigation" — the action still fires)
- *   - condition: shown? predicate (see ConditionEditor)
- *   - action: state mutation that runs before navigation (see EffectEditor)
+ * Two modes, picked by the caller via the `topicCtx` prop:
+ *
+ *   topicCtx: false (default)
+ *     Simple/legacy use — rooms and non-advanced NPCs. The Choice is
+ *     { label, to, condition, action }: navigate to `to` (or stay if to:'')
+ *     after the action fires. No flow selector.
+ *
+ *   topicCtx: true
+ *     Inside an advanced NPC topic. The Choice gets a clear 4-option Flow
+ *     selector that decides what happens after the action:
+ *       change      — push current topic on the stack, switch to `topicId`
+ *       exitBack    — pop the topic stack (returns to the previous topic, or
+ *                     to the calling room if the stack is empty)
+ *       exitRoom    — leave the NPC entirely, goto `to` (or back if to:'')
+ *       exitCombat  — leave the NPC, start combat `combatId`
+ *     The picker for the relevant id (room / topic / combat) appears beneath
+ *     the Flow select; the others are hidden.
  */
 
 import { div, span } from '../../src/elements.js';
@@ -18,8 +28,26 @@ import { ConditionEditor } from './ConditionEditor.js';
 import { EffectEditor }    from './EffectEditor.js';
 import { onText } from '../helpers.js';
 
-const ChoiceEditor = ({ choice, vars, roomOpts, onChange, onDelete, onMoveUp, onMoveDown, isFirst, isLast }) => {
-  const set = patch => onChange({ ...choice, ...patch });
+const FLOW_OPTS = [
+  { value: 'stay',       label: 'stay — fire effect, no navigation (give item, NPC line, …)' },
+  { value: 'change',     label: 'change topic — push & switch to another topic' },
+  { value: 'exitBack',   label: 'exit · back to previous topic (or caller)' },
+  { value: 'exitRoom',   label: 'exit · to a room' },
+  { value: 'exitCombat', label: 'exit · enter combat' },
+];
+
+const ChoiceEditor = ({
+  choice, vars, roomOpts,
+  onChange, onDelete, onMoveUp, onMoveDown, isFirst, isLast,
+  topicCtx  = false,
+  topicOpts = [],
+  combatOpts = [],
+}) => {
+  const set  = patch => onChange({ ...choice, ...patch });
+  // Default flow in advanced topic context is exitBack (most common: "Goodbye");
+  // outside advanced context the field is ignored and `to` drives behaviour.
+  const flow = topicCtx ? (choice.flow && choice.flow !== 'navigate' ? choice.flow : 'exitBack') : 'navigate';
+
   return div({ className: 'gef-choice' })([
     div({ className: 'gef-choice-head' })([
       span({})(['Choice']),
@@ -37,13 +65,53 @@ const ChoiceEditor = ({ choice, vars, roomOpts, onChange, onDelete, onMoveUp, on
         onChange:    onText(v => set({ label: v })),
         placeholder: 'Go north',
       }),
-      Select({
-        label:    'Goes to',
-        options:  [{ value: '', label: '— stay in place —' }, ...roomOpts],
-        value:    choice.to,
-        onChange: onText(v => set({ to: v })),
-      }),
+      // Simple mode: room "Goes to" picker. Advanced topic mode: Flow selector.
+      ...(topicCtx
+        ? [Select({
+            label:    'Flow',
+            options:  FLOW_OPTS,
+            value:    flow,
+            onChange: onText(v => set({ flow: v })),
+          })]
+        : [Select({
+            label:    'Goes to',
+            options:  [{ value: '', label: '— stay in place —' }, ...roomOpts],
+            value:    choice.to,
+            onChange: onText(v => set({ to: v })),
+          })]),
     ]),
+
+    // Per-flow extras, only in topic context.
+    ...(topicCtx && flow === 'change'
+      ? [div({ style: 'margin-top:8px' })([
+          Select({
+            label:    'Change to topic',
+            options:  [{ value: '', label: '— pick a topic —' }, ...topicOpts],
+            value:    choice.topicId,
+            onChange: onText(v => set({ topicId: v })),
+          }),
+        ])]
+      : []),
+    ...(topicCtx && flow === 'exitRoom'
+      ? [div({ style: 'margin-top:8px' })([
+          Select({
+            label:    'Exit to room',
+            options:  [{ value: '', label: '— return to caller —' }, ...roomOpts],
+            value:    choice.to,
+            onChange: onText(v => set({ to: v })),
+          }),
+        ])]
+      : []),
+    ...(topicCtx && flow === 'exitCombat'
+      ? [div({ style: 'margin-top:8px' })([
+          Select({
+            label:    'Start combat',
+            options:  [{ value: '', label: '— pick a combat —' }, ...combatOpts],
+            value:    choice.combatId,
+            onChange: onText(v => set({ combatId: v })),
+          }),
+        ])]
+      : []),
 
     div({ style: 'margin-top:10px' })([
       ConditionEditor({

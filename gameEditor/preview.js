@@ -122,8 +122,12 @@ const _compileEffect = (effect, project) => {
   if (effect.mode === 'talkTo') {
     return c => {
       if (!effect.npcId) return;
+      // Fresh visit — reset greeting, drop the topic stack, drop any in-progress topic.
       c.setState(s => ({
-        _npcPageIdx: { ...(s._npcPageIdx || {}), [effect.npcId]: 0 },
+        _npcPageIdx:      { ...(s._npcPageIdx      || {}), [effect.npcId]: 0 },
+        _npcGreetingDone: { ...(s._npcGreetingDone || {}), [effect.npcId]: false },
+        _npcTopic:        { ...(s._npcTopic        || {}), [effect.npcId]: null },
+        _npcTopicStack:   { ...(s._npcTopicStack   || {}), [effect.npcId]: [] },
       }));
       c.talkTo(effect.npcId, c.scene);
     };
@@ -476,37 +480,239 @@ const _buildShopScene = (npc, project) => {
   };
 };
 
+// NPC dialogue with two systems toggled by `npc.advanced`.
+//
+//   simple (advanced: false):
+//     greeting pages → flat choices (legacy). Same as v0 behaviour.
+//
+//   advanced (advanced: true):
+//     greeting pages → entry topic → other topics via `change` flow
+//     Choices on topics decide what happens next:
+//       change      — push current topic on stack, switch to ch.topicId
+//       exitBack    — pop the stack (or leave the NPC if stack is empty)
+//       exitRoom    — leave the NPC entirely, goto ch.to (or back if ch.to:'')
+//       exitCombat  — leave the NPC, start ch.combatId
+//
+//   State keys this owns:
+//     _npcPageIdx[npcId]                 — greeting page idx
+//     _npcTopic[npcId]                   — current topic id (or null = pre-topic / entry)
+//     _npcTopicStack[npcId]              — [topicId,…] previously-visited topics
+//     _npcTopicPageIdx[npcId][topicId]   — page idx within a topic
 const _buildNpcDialogue = (npc, project) => ctx => {
-  // The engine routes dialogue through scene id `_dialogue:<npcId>:<returnTo>`;
-  // ctx.scene is patched to the return location for us. Track page index keyed
-  // off the NPC id so each "Talk to" starts at page 0 (we reset on talkTo).
+  const back = ctx.scene;
+  // Simple flat dialogue — preserves v0 behaviour exactly when advanced is off.
+  if (!npc.advanced) return _renderNpcSimple(npc, project, back, ctx);
+  return _renderNpcAdvanced(npc, project, back, ctx);
+};
+
+const _renderNpcSimple = (npc, project, back, ctx) => {
   const idx     = ctx.state._npcPageIdx?.[npc.id] || 0;
   const safeIdx = Math.min(idx, npc.pages.length - 1);
   const page    = npc.pages[safeIdx];
   const isLast  = safeIdx === npc.pages.length - 1;
-  const back    = ctx.scene;
+  const body    = _pageBody(page);
 
-  const body = _pageBody(page);
-
-  const choices = isLast
-    ? [
-        ...npc.choices.map(ch => ({
-          ..._buildChoice(ch, project, back),
-          action: c => {
-            _buildChoice(ch, project, back).action(c);
-            if (!ch.to) c.setState({ _scene: back });
-          },
-        })),
-        { label: 'Goodbye', action: c => c.setState({ _scene: back }) },
-      ]
-    : [{
+  if (!isLast) {
+    return Scene({
+      title: npc.name, body,
+      choices: [{
         label: page.advanceLabel || 'More',
         action: c => c.setState(s => ({
           _npcPageIdx: { ...(s._npcPageIdx || {}), [npc.id]: safeIdx + 1 },
         })),
-      }];
+      }],
+    })(ctx);
+  }
 
+  // Final page — render NPC's flat choices + an auto "Goodbye" when none lead out.
+  const choices = npc.choices.map(ch => _buildSimpleNpcChoice(ch, project, back));
+  const hasLeavingChoice = npc.choices.length > 0;   // any choice is good enough as an out
+  if (!hasLeavingChoice) choices.push({ label: 'Goodbye', action: c => c.setState({ _scene: back }) });
   return Scene({ title: npc.name, body, choices })(ctx);
+};
+
+// Simple-mode choice: navigate to `ch.to` (or stay/return if empty). The action
+// fires regardless. Same logic as a room choice, with the "no target → return
+// to caller" convention.
+const _buildSimpleNpcChoice = (ch, project, back) => {
+  const guard  = _compileCondition(ch.condition);
+  const effect = _compileEffect(ch.action, project);
+  return {
+    label: ch.label,
+    if:    c => guard(c),
+    action: c => {
+      effect(c);
+      if (!ch.to) { c.setState({ _scene: back }); return; }
+      const target      = (project.rooms || []).find(r => r.id === ch.to);
+      const enterGuard  = target ? _compileCondition(target.onEnterCondition) : () => true;
+      const enterEffect = target ? _compileEffect(target.onEnter, project)    : () => {};
+      c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [ch.to]: 0 } }));
+      const live = { ...c, state: c.getState() };
+      if (enterGuard(live)) enterEffect(c);
+      c.goto(ch.to);
+    },
+  };
+};
+
+// — Advanced (topic-tree) mode ————————————————————————————————
+
+const _renderNpcAdvanced = (npc, project, back, ctx) => {
+  const topics = Array.isArray(npc.topics) ? npc.topics : [];
+  // If no topics defined, fall through to simple mode so the player doesn't get stuck.
+  if (topics.length === 0) return _renderNpcSimple(npc, project, back, ctx);
+
+  // 1) Greeting pages first.
+  const idx     = ctx.state._npcPageIdx?.[npc.id] || 0;
+  const safeIdx = Math.min(idx, npc.pages.length - 1);
+  const greetingPage = npc.pages[safeIdx];
+  const greetingLast = safeIdx === npc.pages.length - 1;
+  const hasGreeting  = npc.pages.length > 0 && (greetingPage.text || greetingPage.image || greetingPage.video);
+  const inGreeting   = hasGreeting && !ctx.state._npcGreetingDone?.[npc.id];
+
+  if (inGreeting && !greetingLast) {
+    return Scene({
+      title: npc.name,
+      body:  _pageBody(greetingPage),
+      choices: [{
+        label: greetingPage.advanceLabel || 'More',
+        action: c => c.setState(s => ({
+          _npcPageIdx: { ...(s._npcPageIdx || {}), [npc.id]: safeIdx + 1 },
+        })),
+      }],
+    })(ctx);
+  }
+  if (inGreeting && greetingLast) {
+    return Scene({
+      title: npc.name,
+      body:  _pageBody(greetingPage),
+      choices: [{
+        label: greetingPage.advanceLabel || 'Continue',
+        action: c => c.setState(s => ({
+          _npcGreetingDone: { ...(s._npcGreetingDone || {}), [npc.id]: true },
+        })),
+      }],
+    })(ctx);
+  }
+
+  // 2) Topic mode. The "current" topic is _npcTopic[npc.id] or the entry topic.
+  const entryId = npc.entryTopicId || topics[0].id;
+  const cur = ctx.state._npcTopic?.[npc.id] || entryId;
+  const topic = topics.find(t => t.id === cur) || topics[0];
+  return _renderNpcTopic(npc, topic, topics, project, back, ctx);
+};
+
+const _renderNpcTopic = (npc, topic, allTopics, project, back, ctx) => {
+  const pages  = topic.pages || [];
+  const idx    = ctx.state._npcTopicPageIdx?.[npc.id]?.[topic.id] || 0;
+  const safeIdx = Math.min(idx, pages.length - 1);
+  const page   = pages[safeIdx];
+  const isLast = safeIdx === pages.length - 1;
+  const body   = _pageBody(page);
+
+  if (!isLast) {
+    return Scene({
+      title: npc.name, body,
+      choices: [{
+        label: page.advanceLabel || 'More',
+        action: c => c.setState(s => ({
+          _npcTopicPageIdx: {
+            ...(s._npcTopicPageIdx || {}),
+            [npc.id]: { ...(s._npcTopicPageIdx?.[npc.id] || {}), [topic.id]: safeIdx + 1 },
+          },
+        })),
+      }],
+    })(ctx);
+  }
+
+  // Final page — render the topic's choices. If empty, give the player an
+  // exitBack so they're never stuck.
+  const choices = (topic.choices || []).map(ch => _buildTopicChoice(ch, npc, topic, allTopics, project, back));
+  if (choices.length === 0) {
+    choices.push({
+      label: 'Back',
+      action: c => _doExitBack(c, npc, back),
+    });
+  }
+  return Scene({ title: npc.name, body, choices })(ctx);
+};
+
+// Pop the topic stack and switch to the popped topic. Empty stack → leave NPC.
+const _doExitBack = (c, npc, back) => {
+  const stack = c.state._npcTopicStack?.[npc.id] || [];
+  if (stack.length === 0) {
+    c.setState(s => ({
+      _npcTopic: { ...(s._npcTopic || {}), [npc.id]: null },
+      _scene:    back,
+    }));
+    return;
+  }
+  const previousId = stack[stack.length - 1];
+  c.setState(s => ({
+    _npcTopic:      { ...(s._npcTopic      || {}), [npc.id]: previousId },
+    _npcTopicStack: { ...(s._npcTopicStack || {}), [npc.id]: stack.slice(0, -1) },
+  }));
+};
+
+// Topic choice → engine descriptor. Each flow translates to a concrete action.
+const _buildTopicChoice = (ch, npc, topic, allTopics, project, back) => {
+  const guard  = _compileCondition(ch.condition);
+  const effect = _compileEffect(ch.action, project);
+  const flow   = ch.flow || 'exitBack';
+
+  return {
+    label: ch.label,
+    if:    c => guard(c),
+    action: c => {
+      effect(c);
+
+      // `stay` — effect ran, no navigation. The scene re-renders on next tick;
+      // current topic + page index are untouched.
+      if (flow === 'stay') return;
+
+      if (flow === 'exitBack') return _doExitBack(c, npc, back);
+
+      if (flow === 'change' && ch.topicId) {
+        const target = allTopics.find(t => t.id === ch.topicId);
+        c.setState(s => ({
+          _npcTopicStack:   { ...(s._npcTopicStack   || {}), [npc.id]: [...(s._npcTopicStack?.[npc.id] || []), topic.id] },
+          _npcTopic:        { ...(s._npcTopic        || {}), [npc.id]: ch.topicId },
+          _npcTopicPageIdx: { ...(s._npcTopicPageIdx || {}), [npc.id]: { ...(s._npcTopicPageIdx?.[npc.id] || {}), [ch.topicId]: 0 } },
+        }));
+        if (target) _compileEffect(target.onEnter, project)(c);
+        return;
+      }
+
+      if (flow === 'exitRoom') {
+        if (!ch.to) { c.setState({ _scene: back }); return; }
+        const target      = (project.rooms || []).find(r => r.id === ch.to);
+        const enterGuard  = target ? _compileCondition(target.onEnterCondition) : () => true;
+        const enterEffect = target ? _compileEffect(target.onEnter, project)    : () => {};
+        c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [ch.to]: 0 } }));
+        const live = { ...c, state: c.getState() };
+        if (enterGuard(live)) enterEffect(c);
+        c.goto(ch.to);
+        return;
+      }
+
+      if (flow === 'exitCombat' && ch.combatId) {
+        const combat = (project.combats || []).find(cb => cb.id === ch.combatId);
+        if (!combat) return;
+        c.setState({
+          _combat: {
+            id:       combat.id,
+            enemyHp:  Number(combat.enemy.hp) || 1,
+            log:      combat.intro ? [combat.intro] : [],
+            turn:     0,
+            lastMoveImage: null,
+            returnTo: back,
+            outcome:  null,
+          },
+        });
+        c.goto(`_combat:${combat.id}`);
+        return;
+      }
+    },
+  };
 };
 
 // Sidebar widget renderers — return [vnode] per widget. The createGame engine
@@ -957,6 +1163,10 @@ const buildGameConfig = rawProject => {
     skills:     startingSkills,
     _pageIdx:    {},
     _npcPageIdx: {},
+    _npcGreetingDone: {},  // { [npcId]: bool }    advanced mode: skip greeting on re-enter via change/back
+    _npcTopic:        {},  // { [npcId]: topicId|null }
+    _npcTopicStack:   {},  // { [npcId]: [topicId...] }  stack pushed by `change`, popped by `exitBack`
+    _npcTopicPageIdx: {},  // { [npcId]: { [topicId]: idx } }
     _shopStock:  {},
     _combat:     null,
     _reading:    null,

@@ -11,10 +11,10 @@ import { AppShell, Stack } from '../src/components/Layout.js';
 import { Tabs } from '../src/components/Tabs.js';
 import { Button } from '../src/components/Button.js';
 import { Badge } from '../src/components/Badge.js';
-import { initStyles } from '../src/styles.js';
+import { initStyles, setTheme, setTokens, resetTokens } from '../src/styles.js';
 import { mount } from '../src/state.js';
 import { initEditorStyles } from './styles.js';
-import { store, getState, setState, persist, listSlots, useSlot, newSlot, removeSlot } from './store.js';
+import { store, getState, setState, persist, listSlots, useSlot, newSlot, removeSlot, saveTheme } from './store.js';
 import { MetaPanel }    from './panels/meta.js';
 import { RoomsPanel }   from './panels/rooms.js';
 import { NpcsPanel }    from './panels/npcs.js';
@@ -27,10 +27,60 @@ import { CombatsPanel } from './panels/combats.js';
 import { SkillsPanel }  from './panels/skills.js';
 import { AssetsPanel }  from './panels/assets.js';
 import { CheatSheet }   from './cheatsheet.js';
+import { ThemePanel }   from './panels/theme.js';
 
-initStyles();
+// Boot with persisted editor theme; per-project token overrides are applied
+// via the subscribe hook below so they also re-apply on slot switch.
+{
+  const s0 = getState();
+  initStyles({ theme: s0.theme });
+}
 initEditorStyles();
 document.body.style.cssText = 'padding:0; margin:0; min-height:100vh; background:var(--bg)';
+
+// Per-project token overrides — these define the *game*'s palette and are
+// baked into the exported main.js by codegen. As a side-effect they also
+// recolour the editor chrome (since both share dervo's CSS custom properties).
+// On slot switch the diff against the previous overrides decides what to reset.
+let _lastOverrides = {};
+const _syncOverrides = overrides => {
+  const next = overrides || {};
+  const droppedKeys = Object.keys(_lastOverrides).filter(k => !(k in next));
+  if (droppedKeys.length) resetTokens(droppedKeys);
+  if (Object.keys(next).length) setTokens(next)();
+  _lastOverrides = next;
+};
+_syncOverrides(getState().project.meta.themeOverrides);
+store.subscribe(s => _syncOverrides(s.project.meta.themeOverrides));
+
+// Toggle helper used by the topbar 🌗 button. Writes to both DOM (live) and
+// localStorage (next boot).
+const _toggleTheme = () => {
+  const next = getState().theme === 'dark' ? 'light' : 'dark';
+  setTheme(next);
+  saveTheme(next);
+  setState({ theme: next });
+};
+
+// Live custom-CSS injection. A single <style> tag holds whatever the user
+// typed in Theme tab → Custom CSS; updates in response to setState. The same
+// content gets baked into the exported game by codegen.
+const _CSS_STYLE_ID = 'dervo-game-custom-css';
+const _ensureCustomCssTag = () => {
+  let tag = document.getElementById(_CSS_STYLE_ID);
+  if (!tag) {
+    tag = document.createElement('style');
+    tag.id = _CSS_STYLE_ID;
+    document.head.appendChild(tag);
+  }
+  return tag;
+};
+const _syncCustomCss = css => {
+  const tag = _ensureCustomCssTag();
+  if (tag.textContent !== (css || '')) tag.textContent = css || '';
+};
+_syncCustomCss(getState().project.meta.gameCss);
+store.subscribe(s => _syncCustomCss(s.project.meta.gameCss));
 
 const TABS = [
   { id: 'meta',    label: 'Project'  },
@@ -44,6 +94,7 @@ const TABS = [
   { id: 'graph',   label: 'Graph'    },
   { id: 'preview', label: 'Preview'  },
   { id: 'export',  label: 'Export'   },
+  { id: 'theme',   label: 'Theme'    },
 ];
 
 const _topBar = s =>
@@ -59,6 +110,9 @@ const _topBar = s =>
       `· ${s.project.meta.title || 'untitled'} · slot:${s.activeSlot}`,
     ]),
     div({ style: 'flex:1' })([]),
+    Button({ variant: 'ghost', size: 'sm', onClick: _toggleTheme, title: 'Toggle light / dark' })([
+      s.theme === 'dark' ? '🌞' : '🌗',
+    ]),
     Button({ variant: 'ghost', size: 'sm', onClick: () => setState({ cheatsheetOpen: !s.cheatsheetOpen }) })(['? Cheat sheet']),
     Button({ variant: 'ghost', size: 'sm', onClick: persist })(['💾 Save']),
   ]);
@@ -124,6 +178,7 @@ const _activePanel = s => {
     case 'graph':   return GraphPanel(s);
     case 'preview': return PreviewPanel(s);
     case 'export':  return ExportPanel(s);
+    case 'theme':   return ThemePanel(s);
     default:        return _placeholder('Unknown panel', String(s.activeTab));
   }
 };

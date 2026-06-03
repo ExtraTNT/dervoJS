@@ -12,6 +12,7 @@ import { emptyProject, normaliseProject } from './schema.js';
 const NS         = 'dervo-game-editor';
 const SLOT_KEY   = slot => `${NS}:project:${slot}`;
 const ACTIVE_KEY = `${NS}:active-slot`;
+const THEME_KEY  = `${NS}:theme`;
 
 const listSlots = () =>
   lsKeys()
@@ -37,9 +38,14 @@ const _initialProject = () => {
 
 const _initialTab = () => {
   const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#/, '');
-  const known = ['rooms', 'npcs', 'items', 'skills', 'combats', 'assets', 'sidebar', 'meta', 'graph', 'preview', 'export'];
+  const known = ['rooms', 'npcs', 'items', 'skills', 'combats', 'assets', 'sidebar', 'meta', 'graph', 'preview', 'export', 'theme'];
   return known.includes(h) ? h : 'rooms';
 };
+
+// Light/dark mode is editor-only. Per-project custom CSS + token overrides
+// live on project.meta and travel with the project on import/export.
+const loadTheme = () => fromMaybe('light')(lsGet(THEME_KEY));
+const saveTheme = theme => lsSet(THEME_KEY)(theme);
 
 const store = createStore({
   project:      _initialProject(),
@@ -57,6 +63,12 @@ const store = createStore({
   debugOpen:        false,
   cheatsheetOpen:   false,
   cheatsheetTab:    'builder',
+  // Per-topic Choice generator modal — `null` / `{ open: false }` while closed.
+  // See gameEditor/components/ChoiceGenerator.js for the shape.
+  generator:        { open: false },
+  // Light/dark mode for the editor chrome — editor preference, persisted
+  // separately from any project.
+  theme:            loadTheme(),
 });
 
 const { getState, setState } = store;
@@ -123,4 +135,5 @@ export {
   store, getState, setState, setProject,
   persist, listSlots, useSlot, newSlot, removeSlot,
   toast,
+  saveTheme,
 };

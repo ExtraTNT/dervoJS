@@ -85,7 +85,12 @@ const _effectFn = effect => {
     return `c => c.setState(s => ({ ${patches.join(', ')} }))`;
   }
   if (effect.mode === 'talkTo' && effect.npcId) {
-    return `c => { c.setState(s => ({ _npcPageIdx: { ...(s._npcPageIdx || {}), [${_q(effect.npcId)}]: 0 } })); c.talkTo(${_q(effect.npcId)}, c.scene); }`;
+    return `c => { c.setState(s => ({ ` +
+      `_npcPageIdx:      { ...(s._npcPageIdx      || {}), [${_q(effect.npcId)}]: 0 }, ` +
+      `_npcGreetingDone: { ...(s._npcGreetingDone || {}), [${_q(effect.npcId)}]: false }, ` +
+      `_npcTopic:        { ...(s._npcTopic        || {}), [${_q(effect.npcId)}]: null }, ` +
+      `_npcTopicStack:   { ...(s._npcTopicStack   || {}), [${_q(effect.npcId)}]: [] } ` +
+    `})); c.talkTo(${_q(effect.npcId)}, c.scene); }`;
   }
   if (effect.mode === 'enterCombat' && effect.combatId) {
     return `c => { const cb = __COMBATS[${_q(effect.combatId)}]; if (!cb) return; c.setState({ _combat: { id: ${_q(effect.combatId)}, enemyHp: cb.enemy.hp, log: cb.intro ? [cb.intro] : [], turn: 0, lastMoveImage: null, lastEnemyImage: null, returnTo: c.scene, outcome: null } }); c.goto("_combat:" + ${_q(effect.combatId)}); }`;
@@ -93,32 +98,70 @@ const _effectFn = effect => {
   return null;
 };
 
+// ─── Reusable emit fragments. All single-arg / curried. ──────────────────
+
+// Page literal expression for `pages: [...]` arrays in emitted dialogues.
+const _emitPageLit = pg =>
+  `{ text: ${_q(pg.text)}, image: ${_q(pg.image)}, video: ${_q(pg.video)}, advanceLabel: ${_q(pg.advanceLabel || 'More')} }`;
+
+// onEnter / onEnterCondition for a target room. Returns a fragment that fires
+// the room's onEnter Effect (if any) gated by its Condition. The fragment
+// assumes `c` is in scope.
+const _emitRoomEnter = project => roomId => {
+  const target  = (project?.rooms || []).find(r => r.id === roomId);
+  if (!target) return '';
+  const condExpr = _condExpr(target.onEnterCondition || { mode: 'always' });
+  const enterFn  = _effectFn(target.onEnter);
+  if (!enterFn) return '';
+  return `{ const live = { ...c, state: c.getState() }; if (${condExpr.replace(/c\.state/g, 'live.state')}) (${enterFn})(c); }`;
+};
+
+// _pageIdx reset + onEnter gate + goto(roomId). When roomId is '' the fallback
+// is "return to the calling scene" (the surrounding emit binds `back`).
+const _emitGotoRoom = project => roomId => {
+  if (!roomId) return `c.setState({ _scene: back });`;
+  return [
+    `c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [${_q(roomId)}]: 0 } }));`,
+    _emitRoomEnter(project)(roomId),
+    `c.goto(${_q(roomId)});`,
+  ].filter(Boolean).join(' ');
+};
+
+// Enter combat by id. Mirrors _emitGotoRoom in shape.
+const _emitGotoCombat = combatId => combatId
+  ? `{ const cb = __COMBATS[${_q(combatId)}]; if (cb) { ` +
+      `c.setState({ _combat: { id: ${_q(combatId)}, enemyHp: cb.enemy.hp, log: cb.intro ? [cb.intro] : [], turn: 0, lastMoveImage: null, returnTo: back, outcome: null } }); ` +
+      `c.goto("_combat:" + ${_q(combatId)}); } }`
+  : '';
+
+// exitBack fragment — pop the topic stack, or leave the NPC if empty.
+const _emitExitBack = npcId => {
+  const npcIdLit = _q(npcId);
+  return `{ const stack = c.state._npcTopicStack?.[${npcIdLit}] || []; ` +
+    `if (stack.length === 0) { c.setState(s => ({ _npcTopic: { ...(s._npcTopic || {}), [${npcIdLit}]: null }, _scene: back })); } ` +
+    `else { const prev = stack[stack.length - 1]; c.setState(s => ({ _npcTopic: { ...(s._npcTopic || {}), [${npcIdLit}]: prev }, _npcTopicStack: { ...(s._npcTopicStack || {}), [${npcIdLit}]: stack.slice(0, -1) } })); } }`;
+};
+
+// ─── Top-level choice emit. ─────────────────────────────────────────────
+
 // Emit a Choice descriptor literal: { label, if?, action? }. Navigation is
 // handled inside the action (not via `to:`) so we can fire the target room's
 // onEnter Effect through its onEnterCondition gate between action and goto.
-const _emitChoice = (ch, project) => {
-  const parts = [`label: ${_q(ch.label)}`];
+// Curried `ch => project`.
+const _emitChoice = ch => project => {
+  const parts    = [`label: ${_q(ch.label)}`];
   const hasCond  = ch.condition && ch.condition.mode !== 'always';
   const effectFn = _effectFn(ch.action);
-  const target   = ch.to ? (project?.rooms || []).find(r => r.id === ch.to) : null;
 
   if (hasCond) parts.push(`if: c => ${_condExpr(ch.condition)}`);
 
-  // Build action body
-  const lines = [];
-  if (effectFn) lines.push(`(${effectFn})(c);`);
-  if (ch.to) {
-    lines.push(`c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [${_q(ch.to)}]: 0 } }));`);
-    if (target) {
-      const enterCondExpr = _condExpr(target.onEnterCondition || { mode: 'always' });
-      const enterFn       = _effectFn(target.onEnter);
-      if (enterFn) {
-        // Re-read state via getState() so the gate sees the freshly-set page index.
-        lines.push(`{ const live = { ...c, state: c.getState() }; if (${enterCondExpr.replace(/c\.state/g, 'live.state')}) (${enterFn})(c); }`);
-      }
-    }
-    lines.push(`c.goto(${_q(ch.to)});`);
-  }
+  // The action body is (effect) + (page-idx reset + onEnter gate + goto). When
+  // ch.to is empty there's no navigation slice. _emitGotoRoom handles both.
+  const navLine = ch.to ? _emitGotoRoom(project)(ch.to) : '';
+  const lines   = [
+    effectFn ? `(${effectFn})(c);` : '',
+    navLine,
+  ].filter(Boolean);
   if (lines.length) parts.push(`action: c => { ${lines.join(' ')} }`);
   return `{ ${parts.join(', ')} }`;
 };
@@ -131,10 +174,10 @@ const _emitPageBody = page => {
   return parts.join(', ');
 };
 
-const _emitWardrobeRoomFn = (room, project) => {
+const _emitWardrobeRoomFn = room => project => {
   console.log(project)
   const wb = room.wardrobe || { portraitWidth: 240, portraitHeight: 320, layers: [], kinds: ['equipment'] };
-  const choicesLit = room.choices.map(c => _emitChoice(c, project)).join(', ');
+  const choicesLit = room.choices.map(c => _emitChoice(c)(project)).join(', ');
   return `${room.id}: ctx => {
     const inv = ctx.state.inventory || {};
     const wb = ${JSON.stringify(wb)};
@@ -181,7 +224,7 @@ const _emitWardrobeRoomFn = (room, project) => {
   }`;
 };
 
-const _emitInventoryRoomFn = (room, project) => {
+const _emitInventoryRoomFn = room => project => {
   const cfg = room.inventory || { kinds: [], layout: 'grid', showDescription: true, emptyMessage: 'You are not carrying anything.' };
   // Pre-compile each consumable's useEffect to a JS literal so we can dispatch
   // at runtime without re-walking the project shape.
@@ -192,7 +235,7 @@ const _emitInventoryRoomFn = (room, project) => {
       .filter(([, fn]) => fn)
   );
   const useEffectLiteral = '{ ' + Object.entries(useEffectMap).map(([id, fn]) => `${_q(id)}: ${fn}`).join(', ') + ' }';
-  const choicesLit = room.choices.map(c => _emitChoice(c, project)).join(', ');
+  const choicesLit = room.choices.map(c => _emitChoice(c)(project)).join(', ');
   return `${room.id}: ctx => {
     const cfg = ${JSON.stringify(cfg)};
     const itemList = ${JSON.stringify(project.items)};
@@ -304,11 +347,11 @@ const _emitInventoryRoomFn = (room, project) => {
   }`;
 };
 
-const _emitRoomFn = (room, project) => {
-  if (room.kind === 'wardrobe')  return _emitWardrobeRoomFn(room, project);
-  if (room.kind === 'inventory') return _emitInventoryRoomFn(room, project);
-  const pagesLit = room.pages.map(pg => `{ text: ${_q(pg.text)}, image: ${_q(pg.image)}, video: ${_q(pg.video)}, advanceLabel: ${_q(pg.advanceLabel || 'More')} }`).join(', ');
-  const choicesLit = room.choices.map(c => _emitChoice(c, project)).join(', ');
+const _emitRoomFn = room => project => {
+  if (room.kind === 'wardrobe')  return _emitWardrobeRoomFn(room)(project);
+  if (room.kind === 'inventory') return _emitInventoryRoomFn(room)(project);
+  const pagesLit = room.pages.map(_emitPageLit).join(', ');
+  const choicesLit = room.choices.map(c => _emitChoice(c)(project)).join(', ');
   return `${room.id}: ctx => {
     const pages = [${pagesLit}];
     const idx = Math.min((ctx.state._pageIdx?.[${_q(room.id)}] || 0), pages.length - 1);
@@ -331,7 +374,7 @@ const _emitRoomFn = (room, project) => {
 
 // Combat scene factory — emitted into scenes.js. Uses player skills + combat
 // extraMoves as available moves; enemy AI picks from weighted actions.
-const _emitCombatSceneFn = (combat, project) => {
+const _emitCombatSceneFn = combat => project => {
   const onWinFn  = _effectFn(combat.onWin);
   const onLoseFn = _effectFn(combat.onLose);
   return `"_combat:${combat.id}": ctx => {
@@ -557,9 +600,9 @@ const __SKILLS  = ${JSON.stringify((project.skills  || []).reduce((acc, s) => ({
 const __ITEMS   = ${JSON.stringify((project.items   || []).reduce((acc, it) => ({ ...acc, [it.id]: it }), {}))};
 
 const scenes = {
-  ${project.rooms.map(r => _emitRoomFn(r, project)).join(',\n  ')}${
+  ${project.rooms.map(r => _emitRoomFn(r)(project)).join(',\n  ')}${
     (project.combats || []).length
-      ? ',\n  ' + project.combats.map(c => _emitCombatSceneFn(c, project)).join(',\n  ')
+      ? ',\n  ' + project.combats.map(c => _emitCombatSceneFn(c)(project)).join(',\n  ')
       : ''
   },
 };
@@ -567,14 +610,82 @@ const scenes = {
 export { scenes };
 `;
 
-// NPC dialogue function for the non-shop case
-const _emitNpcDialogue = (npc, project) => {
-  const pagesLit = npc.pages.map(pg => `{ text: ${_q(pg.text)}, image: ${_q(pg.image)}, video: ${_q(pg.video)}, advanceLabel: ${_q(pg.advanceLabel || 'More')} }`).join(', ');
-  const choicesLit = npc.choices.map(c => _emitChoice(c, project)).join(', ');
-  return `ctx => {
+// One topic-context choice. Each flow translates to a concrete fragment:
+//   stay        → effect only, no navigation (re-render same topic)
+//   change      → push current topic, switch to ch.topicId, fire its onEnter
+//   exitBack    → pop the stack (or leave NPC if empty)
+//   exitRoom    → goto ch.to with onEnter gate (empty = return to caller)
+//   exitCombat  → setup _combat + goto _combat:<id>
+//
+// Curried `ch => npc => project` so call sites read top-to-bottom.
+const _emitTopicChoice = ch => npc => project => {
+  const npcIdLit   = _q(npc.id);
+  const topicIdLit = _q(ch.topicId || '');
+  const flow       = ch.flow || 'exitBack';
+  const hasCond    = ch.condition && ch.condition.mode !== 'always';
+  const effectFn   = _effectFn(ch.action);
+
+  const parts = [`label: ${_q(ch.label)}`];
+  if (hasCond) parts.push(`if: c => ${_condExpr(ch.condition)}`);
+
+  const navLine =
+    flow === 'stay'       ? '' :
+    flow === 'exitBack'   ? _emitExitBack(npc.id) :
+    flow === 'change' && ch.topicId
+      ? (() => {
+          // currentTopicId is bound by _emitNpcDialogue's surrounding scope.
+          const push = `c.setState(s => ({ ` +
+            `_npcTopicStack:   { ...(s._npcTopicStack   || {}), [${npcIdLit}]: [...(s._npcTopicStack?.[${npcIdLit}] || []), currentTopicId] }, ` +
+            `_npcTopic:        { ...(s._npcTopic        || {}), [${npcIdLit}]: ${topicIdLit} }, ` +
+            `_npcTopicPageIdx: { ...(s._npcTopicPageIdx || {}), [${npcIdLit}]: { ...(s._npcTopicPageIdx?.[${npcIdLit}] || {}), [${topicIdLit}]: 0 } } ` +
+          `}));`;
+          const target  = (npc.topics || []).find(t => t.id === ch.topicId);
+          const onEnter = target ? _effectFn(target.onEnter) : null;
+          return onEnter ? `${push} (${onEnter})(c);` : push;
+        })() :
+    flow === 'exitRoom'   ? _emitGotoRoom(project)(ch.to) :
+    flow === 'exitCombat' ? _emitGotoCombat(ch.combatId) :
+    '';
+
+  const lines = [
+    effectFn ? `(${effectFn})(c);` : '',
+    navLine,
+  ].filter(Boolean);
+
+  parts.push(`action: c => { ${lines.join(' ')} }`);
+  return `{ ${parts.join(', ')} }`;
+};
+
+// SIMPLE-mode (non-topic) NPC choice. Same shape as room navigation.
+const _emitSimpleNpcChoice = ch => project => {
+  const hasCond  = ch.condition && ch.condition.mode !== 'always';
+  const effectFn = _effectFn(ch.action);
+  const parts = [`label: ${_q(ch.label)}`];
+  if (hasCond) parts.push(`if: c => ${_condExpr(ch.condition)}`);
+  const lines = [
+    effectFn ? `(${effectFn})(c);` : '',
+    _emitGotoRoom(project)(ch.to),
+  ].filter(Boolean);
+  parts.push(`action: c => { ${lines.join(' ')} }`);
+  return `{ ${parts.join(', ')} }`;
+};
+
+// Emit the NPC dialogue scene function. Branches at the top on npc.advanced
+// to either the legacy flat path or the topic-tree path. Curried `npc => project`.
+const _emitNpcDialogue = npc => project => {
+  const npcIdLit = _q(npc.id);
+
+  // Greeting + simple-mode page literals (shared shape).
+  const pagesLit = npc.pages.map(_emitPageLit).join(', ');
+
+  // --- Simple flat dialogue path ---
+  if (!npc.advanced) {
+    const choicesLit = npc.choices.map(c => _emitSimpleNpcChoice(c)(project)).join(', ');
+    const hasChoices = npc.choices.length > 0;
+    return `ctx => {
       const back = ctx.scene;
       const pages = [${pagesLit}];
-      const idx = Math.min((ctx.state._npcPageIdx?.[${_q(npc.id)}] || 0), pages.length - 1);
+      const idx = Math.min((ctx.state._npcPageIdx?.[${npcIdLit}] || 0), pages.length - 1);
       const page = pages[idx];
       const isLast = idx === pages.length - 1;
       const body = [];
@@ -582,24 +693,80 @@ const _emitNpcDialogue = (npc, project) => {
       if (page.video) body.push(video({ src: page.video, controls: true, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
       if (page.text)  body.push(p({})([page.text]));
       const choices = isLast
-        ? [${choicesLit}${npc.choices.length ? ',' : ''} { label: 'Goodbye', action: c => c.setState({ _scene: back }) }]
-        : [{
-            label: page.advanceLabel || 'More',
-            action: c => c.setState(s => ({ _npcPageIdx: { ...(s._npcPageIdx || {}), [${_q(npc.id)}]: idx + 1 } })),
-          }];
+        ? [${choicesLit}${hasChoices ? '' : `{ label: 'Goodbye', action: c => c.setState({ _scene: back }) }`}]
+        : [{ label: page.advanceLabel || 'More', action: c => c.setState(s => ({ _npcPageIdx: { ...(s._npcPageIdx || {}), [${npcIdLit}]: idx + 1 } })) }];
       return Scene({ title: ${_q(npc.name)}, body, choices })(ctx);
+    }`;
+  }
+
+  // --- Advanced (topic-tree) path ---
+  const topics  = Array.isArray(npc.topics) ? npc.topics : [];
+  // Fall through to simple emit when toggle is on but no topics defined yet.
+  if (topics.length === 0) return _emitNpcDialogue({ ...npc, advanced: false })(project);
+  const entryId = npc.entryTopicId || topics[0].id;
+
+  // Per-topic render block. Keyed by topic id. Each block holds pages + choices.
+  const _autoBack = `{ label: 'Back', action: c => ${_emitExitBack(npc.id)} }`;
+  const topicRenderLit = topics.map(t => {
+    const tPagesLit   = (t.pages || []).map(_emitPageLit).join(', ');
+    const tChoicesLit = (t.choices || []).map(c => _emitTopicChoice(c)(npc)(project)).join(', ');
+    const hasChoices  = (t.choices || []).length > 0;
+    return `${_q(t.id)}: { ` +
+      `pages: [${tPagesLit}], ` +
+      `choices: [${tChoicesLit}${hasChoices ? '' : _autoBack}] ` +
+    `}`;
+  }).join(', ');
+
+  return `ctx => {
+      const back   = ctx.scene;
+      const TOPICS = { ${topicRenderLit} };
+      const ENTRY  = ${_q(entryId)};
+
+      // 1) Greeting pages (only on first visit each talkTo). _npcGreetingDone flips
+      //    true after the player clicks through the last greeting page.
+      const greetingPages = [${pagesLit}];
+      const greetIdx  = Math.min((ctx.state._npcPageIdx?.[${npcIdLit}] || 0), greetingPages.length - 1);
+      const greetPage = greetingPages[greetIdx];
+      const hasGreeting = greetingPages.length > 0 && (greetPage.text || greetPage.image || greetPage.video);
+      const inGreeting  = hasGreeting && !ctx.state._npcGreetingDone?.[${npcIdLit}];
+      if (inGreeting) {
+        const last = greetIdx === greetingPages.length - 1;
+        const body = [];
+        if (greetPage.image) body.push(img({ src: greetPage.image, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
+        if (greetPage.video) body.push(video({ src: greetPage.video, controls: true, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
+        if (greetPage.text)  body.push(p({})([greetPage.text]));
+        const choices = last
+          ? [{ label: greetPage.advanceLabel || 'Continue', action: c => c.setState(s => ({ _npcGreetingDone: { ...(s._npcGreetingDone || {}), [${npcIdLit}]: true } })) }]
+          : [{ label: greetPage.advanceLabel || 'More',     action: c => c.setState(s => ({ _npcPageIdx:      { ...(s._npcPageIdx      || {}), [${npcIdLit}]: greetIdx + 1 } })) }];
+        return Scene({ title: ${_q(npc.name)}, body, choices })(ctx);
+      }
+
+      // 2) Topic mode. Default to entry if no current topic.
+      const currentTopicId = ctx.state._npcTopic?.[${npcIdLit}] || ENTRY;
+      const tdata = TOPICS[currentTopicId] || TOPICS[ENTRY];
+      const tIdx  = Math.min((ctx.state._npcTopicPageIdx?.[${npcIdLit}]?.[currentTopicId] || 0), tdata.pages.length - 1);
+      const tPage = tdata.pages[tIdx];
+      const tLast = tIdx === tdata.pages.length - 1;
+      const tBody = [];
+      if (tPage.image) tBody.push(img({ src: tPage.image, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
+      if (tPage.video) tBody.push(video({ src: tPage.video, controls: true, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
+      if (tPage.text)  tBody.push(p({})([tPage.text]));
+      const tChoices = tLast
+        ? tdata.choices
+        : [{ label: tPage.advanceLabel || 'More', action: c => c.setState(s => ({ _npcTopicPageIdx: { ...(s._npcTopicPageIdx || {}), [${npcIdLit}]: { ...(s._npcTopicPageIdx?.[${npcIdLit}] || {}), [currentTopicId]: tIdx + 1 } } })) }];
+      return Scene({ title: ${_q(npc.name)}, body: tBody, choices: tChoices })(ctx);
     }`;
 };
 
 // NPC shop dialogue function — auto-builds buy choices from stock
-const _emitNpcShop = (npc, project) => {
+const _emitNpcShop = npc => project => {
   const stockLit = (npc.shop?.stock || []).map(entry => {
     const item = project.items.find(it => it.id === entry.itemId);
     const price = entry.price ?? item?.price ?? 0;
     const qty   = entry.quantity == null ? 'null' : entry.quantity;
     return `{ itemId: ${_q(entry.itemId)}, name: ${_q(item?.name || entry.itemId)}, description: ${_q(item?.description || '')}, price: ${price}, quantity: ${qty} }`;
   }).join(', ');
-  const tailChoicesLit = npc.choices.map(c => _emitChoice(c, project)).join(', ');
+  const tailChoicesLit = npc.choices.map(c => _emitChoice(c)(project)).join(', ');
   return `ctx => {
       const back = ctx.scene;
       const stock = [${stockLit}];
@@ -643,12 +810,16 @@ const emitWorld = project => `// AUTO-GENERATED by dervoJS gameEditor.
 import { p, div, img, video } from '../src/elements.js';
 import { Scene } from '../src/game.js';
 
+// Mirrors scenes.js — NPC dialogue functions reference __COMBATS for exit-to-combat
+// flow / enterCombat actions from inside a topic.
+const __COMBATS = ${JSON.stringify((project.combats || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {}))};
+
 const NPCS = {
   ${project.npcs.map(n => `${n.id}: {
     name:      ${_q(n.name)},
     locations: ${JSON.stringify(n.locations)},
     greeting:  ${_q(n.greeting)},
-    dialogue:  ${n.role === 'shop' ? _emitNpcShop(n, project) : _emitNpcDialogue(n, project)},
+    dialogue:  ${n.role === 'shop' ? _emitNpcShop(n)(project) : _emitNpcDialogue(n)(project)},
   }`).join(',\n  ')}
 };
 
@@ -680,6 +851,10 @@ const initialState = ${JSON.stringify({
   skills:     startingSkills,
   _pageIdx:    {},
   _npcPageIdx: {},
+  _npcGreetingDone: {},
+  _npcTopic:        {},
+  _npcTopicStack:   {},
+  _npcTopicPageIdx: {},
   _shopStock:  {},
   _combat:     null,
   _reading:    null,
@@ -828,6 +1003,15 @@ export { sidebar };
 
 const emitMain = project => {
   const hasSidebar = (project.sidebar?.enabled && project.sidebar.widgets.length > 0);
+  const overrides  = project.meta?.themeOverrides || {};
+  const colorsLit  = Object.keys(overrides).length
+    ? `{\n${Object.entries(overrides).map(([k, v]) => `    ${_q(k)}: ${_q(v)},`).join('\n')}\n  }`
+    : null;
+  // initStyles colors arg: only emit it when there are overrides, so the
+  // generated source stays tidy for projects that use defaults.
+  const initLine = colorsLit
+    ? `initStyles({ colors: ${colorsLit} });`
+    : `initStyles();`;
   return `// AUTO-GENERATED by dervoJS gameEditor.
 import { initStyles } from '../src/styles.js';
 import { createGame } from '../src/game.js';
@@ -835,7 +1019,7 @@ import { scenes }       from './scenes.js';
 import { NPCS }         from './world.js';
 import { initialState } from './items.js';
 ${hasSidebar ? "import { sidebar }     from './sidebar.js';\n" : ''}
-initStyles();
+${initLine}
 document.body.style.cssText = 'padding:0; margin:0';
 
 const game = createGame({
@@ -851,18 +1035,28 @@ game.mount(document.body);
 `;
 };
 
-const emitIndexHtml = project => `<!doctype html>
+// Escape `</style>` defensively so author-provided CSS can never break out of
+// the style block. The token is rare in CSS but possible inside content: "…".
+const _escapeStyleClose = css => String(css || '').replace(/<\/style/gi, '<\\/style');
+
+const emitIndexHtml = project => {
+  const gameCss = _escapeStyleClose(project.meta.gameCss || '');
+  return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${(project.meta.title || 'Untitled RPG').replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]))}</title>
+  <title>${(project.meta.title || 'Untitled RPG').replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]))}</title>${gameCss ? `
+  <style id="game-custom-css">
+${gameCss}
+  </style>` : ''}
 </head>
 <body>
   <script type="module" src="./main.js"></script>
 </body>
 </html>
 `;
+};
 
 const emitAll = project => {
   const out = {

@@ -51,9 +51,40 @@ const _BuilderTab = () => div({})([
   ),
 
   _section('NPCs tab',
-    _row('role: dialogue', ['Pages of dialogue + final-page Choices. Player history isn\'t pushed; ', _kbd('Goodbye'), ' returns to the calling room.']),
+    _row('role: dialogue', ['Two conversation systems toggled per-NPC via the ', _kbd('Advanced conversation'), ' switch.']),
     _row('role: shop',     ['Stock list → auto buy buttons. Each entry: ', _kbd('{ itemId, price?, quantity? }'), '. Null price → item default. Null quantity → infinite.']),
     _row('locations',      ['Array of room ids. ', _kbd('ctx.tickWorld()'), ' moves the NPC; ', _kbd('withTick(action)'), ' wraps an action to tick after it fires.']),
+    _row('Simple mode',    ['Default. ', _kbd('pages'), ' (advanced via "More") → ', _kbd('choices'), ' (flat). Choices use the ', _kbd('Goes to'), ' picker; empty = return to the calling room. A ', _kbd('Goodbye'), ' button is auto-added if you have no choices.']),
+    _row('Advanced mode',  ['Conversation tree: greeting pages → entry topic → other topics via ', _kbd('change'), ' flow. Click a topic node in the tree to edit it. Topic data is preserved if you toggle Advanced off — never deleted, just bypassed.']),
+    _row('Topic',          [_kbd('name'), ' + ', _kbd('onEnter'), ' Effect + ', _kbd('pages'), ' + ', _kbd('choices'), '. A topic is essentially a tiny scene scoped to the NPC.']),
+    _row('Entry topic',    ['Where the player lands after the greeting pages. Defaults to the first topic in the list.']),
+    _row('Topic-choice flow', [
+      _kbd('stay'), ' — fire the Effect and re-render the SAME topic. Use for "give me an item", "tell me more (npc line)", etc. — no navigation. ',
+      _kbd('change'), ' — push current topic onto stack, switch to picked topic (chains sub-threads). ',
+      _kbd('exitBack'), ' — pop the stack to the previous topic. If empty: leave the NPC. ',
+      _kbd('exitRoom'), ' — leave the NPC, goto picked room (empty → return to caller). ',
+      _kbd('exitCombat'), ' — leave the NPC, start picked combat.',
+    ]),
+    _row('Bulk generator', [
+      'The ', _kbd('✨ Generate from list…'), ' button on each topic opens a modal that maps over a source list. Sources: ',
+      _kbd('items'), ' / ', _kbd('npcs'), ' / ', _kbd('rooms'), ' / ', _kbd('flags'), ' / ', _kbd('skills'), ' / ', _kbd('combats'), ' / ',
+      _kbd('custom (comma-separated list)'),
+      '. Placeholders ', _kbd('{name}'), ', ', _kbd('{id}'), ', ', _kbd('{value}'),
+      ' interpolate into every template field.',
+    ]),
+    _row('Generator · Mode', [
+      _kbd('choices'), ' — N flat choices appended to the current topic. ',
+      _kbd('dialogues'), ' — for each element, generates a small reply topic (one or more pages + auto Back button) plus a ',
+      _kbd('change'), '-flow choice on the current topic that opens it. Reply pages take text (templated) and an image picked from the asset catalogue via AssetInput.',
+    ]),
+    _row('Generator · Advanced filters', [
+      _kbd('Ignore self'), ' (NPCs source only) — a one-click toggle that auto-omits the speaking NPC, so Mara never gets a "Talk about Mara" choice. ',
+      _kbd('Name/id contains'), ' — substring filter (case-insensitive). ',
+      _kbd('Exclude ids'), ' — comma-separated blacklist. ',
+      _kbd('Limit'), ' — cap N. ',
+      _kbd('Per-choice condition'), ' — optional JS expression with placeholders; becomes the Choice\'s js-mode Condition (e.g. ',
+      _kbd('(c.state.inventory?.["{id}"] ?? 0) === 0'), ' hides choices for items already collected).',
+    ]),
   ),
 
   _section('Items tab',
@@ -100,6 +131,22 @@ const _BuilderTab = () => div({})([
     _row('Source layout',  [_kbd('main.js'), ' / ', _kbd('scenes.js'), ' / ', _kbd('world.js'), ' / ', _kbd('items.js'), ' / ', _kbd('sidebar.js?'), ' / ', _kbd('index.html'), '. Drop next to ', _kbd('src/'), '.']),
     _row('Asset folders',  ['Uploaded media unpacks into ', _kbd('img/'), ' / ', _kbd('audio/'), ' / ', _kbd('video/'), ' subdirs. JS references by relative path.']),
     _row('Per-file preview', ['Click a tab to preview generated source. project.json is the raw schema — round-trips through Import.']),
+  ),
+
+  _section('Theme tab — designs the EXPORTED game',
+    _row('Where it lives',  ['Tokens are saved on ', _kbd('project.meta.themeOverrides'), '; custom CSS on ', _kbd('project.meta.gameCss'), '. Both travel with project.json and are baked into the exported game by codegen.']),
+    _row('Token editor',    ['Every CSS variable is editable inline. Changing ', _kbd('--accent'), ' (etc.) on a project rewrites every Button, Badge, and Scene chrome that uses that token. Edits paint live; the ', _kbd('×'), ' next to a row clears that override back to the default.']),
+    _row('Side-effect',     ['Token overrides also paint the editor itself (since editor + game share the same CSS-custom-property system). You\'re looking at your own game\'s palette while you work — that\'s the point.']),
+    _row('Topbar 🌗 / 🌞',   ['Editor comfort only — toggles the light/dark base palette for the editor chrome. Does NOT travel with the project; does NOT affect the exported game.']),
+    _row('Live mini-game',  ['A built-in tiny project (inn / road / Mara / goblin combat) runs in a small window on the Theme tab using ', _kbd('buildGameConfig → createGame → mount'), ' — the same pipeline the export uses. Token + CSS edits repaint it instantly via CSS-variable cascade. Use the ', _kbd('↻ Restart'), ' button to start over.']),
+    _row('Codegen output',  [_kbd('main.js'), ' gets an ', _kbd('initStyles({ colors: { … } })'), ' call with your overrides; ', _kbd('index.html'), ' gets a ', _kbd('<style id="game-custom-css">'), ' block with your CSS. The exported game looks identical to what you saw in the preview.']),
+    _row('CSS class targets', ['See the Class guide card on the Theme tab. Briefly: ', _kbd('.game-scene'), ' (wrapper), ', _kbd('.game-scene h2 / p / img'), ' (content), ', _kbd('.btn / .btn-primary / .btn-secondary / .btn-ghost / .btn-sm / .btn-lg'), ' (choice buttons).']),
+  ),
+
+  _section('Graph tab',
+    _row('Shapes',         ['Rooms ▭, NPCs ◯, combats ⬡. Click any shape to jump to its editor tab with that entity selected.']),
+    _row('Edges',          [_kbd('grey curve'), ' room exits, ', _kbd('dashed orange'), ' combat triggers (enterCombat / exitCombat), ', _kbd('solid green'), ' combat → winRoom, ', _kbd('solid red'), ' combat → loseRoom, ', _kbd('dashed thin'), ' NPC roaming radius.']),
+    _row('Media badges',   ['Bottom-right of every node: ', _kbd('I'), ' image (blue), ', _kbd('V'), ' video (purple), ', _kbd('A'), ' audio (green). All coloured via theme tokens — dark mode safe.']),
   ),
 ]);
 
@@ -317,11 +364,15 @@ const _StateTab = () => div({})([
     'state._debugOpen     // boolean for the floating debug panel',
     '',
     '// Editor-emitted state machines',
-    'state._pageIdx       // { roomId: pageIndex }  — room page sequence',
-    'state._npcPageIdx    // { npcId:  pageIndex }  — NPC dialogue sequence',
-    'state._shopStock     // { npcId:  { itemId: soldCount } }',
-    'state._combat        // active combat state (see Combat tab)',
-    'state._reading       // { roomId, itemId } | null — reading overlay',
+    'state._pageIdx          // { roomId: pageIndex }  — room page sequence',
+    'state._npcPageIdx       // { npcId:  pageIndex }  — NPC greeting page sequence',
+    'state._npcGreetingDone  // { npcId: bool } — advanced mode: greeting clicked through this visit',
+    'state._npcTopic         // { npcId: topicId|null } — current topic (advanced mode)',
+    'state._npcTopicStack    // { npcId: [topicId...] } — pushed by `change`, popped by `exitBack`',
+    'state._npcTopicPageIdx  // { npcId: { topicId: pageIndex } } — per-topic page idx',
+    'state._shopStock        // { npcId: { itemId: soldCount } }',
+    'state._combat           // active combat state (see Combat tab)',
+    'state._reading          // { roomId, itemId } | null — reading overlay',
     '',
     '// NPC world',
     'state.npcLocations   // { npcId: roomId }   updated by tickWorld()',
@@ -381,6 +432,90 @@ const _RecipesTab = () => div({})([
 
   _section('"Open phone" anywhere',
     p({ style: 'margin:0 0 6px; font-size:12.5px' })(['Sidebar tab → ', _kbd('+ Room link button'), '. Pick the phone room. Icon ', _kbd('📞'), '. Pushes onto history so ', _kbd('← Back'), ' returns.']),
+  ),
+
+  _section('Topic that gives an item without leaving the conversation',
+    p({ style: 'margin:0 0 6px; font-size:12.5px' })([
+      'NPC tab → toggle ', _kbd('Advanced'), ' → make a topic. Add a choice with Flow = ',
+      _kbd('stay'), ', and an Effect that gives the item. The player stays in the topic; the choice can fire repeatedly (or guard with a Condition like ',
+      _kbd('inv.bread < 3'), ' to cap it).',
+    ]),
+  ),
+
+  _section('NPC line on demand ("Tell me more")',
+    p({ style: 'margin:0 0 6px; font-size:12.5px' })([
+      'Topic choice with Flow = ', _kbd('stay'), ' and Effect = JS body that updates a flag (e.g. ',
+      _kbd('c.setState({ flags: { ...c.state.flags, told: true } })'), '). The current topic page already shows the line you wrote; the choice just unlocks more state for a follow-up topic.',
+    ]),
+  ),
+
+  _section('Bulk-generate "Take X" buttons for every consumable',
+    p({ style: 'margin:0 0 6px; font-size:12.5px' })([
+      'Topic editor → ', _kbd('✨ Generate from list…'),
+      '. Source: ', _kbd('Items'), '. Filter: ', _kbd('consumable'),
+      '. Label: ', _kbd('Take {name}'), '. Flow: ', _kbd('stay'),
+      '. Effect: simple, ', _kbd('inv.{id}'), ' / ', _kbd('give'), ' / ', _kbd('1'),
+      '. The preview shows how many will be generated; ', _kbd('Generate'),
+      ' appends them all to the topic\'s choice list.',
+    ]),
+  ),
+
+  _section('Bulk-generate "Travel to X" for every room',
+    p({ style: 'margin:0 0 6px; font-size:12.5px' })([
+      'Source: ', _kbd('Rooms'), '. Label: ', _kbd('Go to {name}'),
+      '. Flow: ', _kbd('exit · to room'), '. Target room-id template: ', _kbd('{id}'),
+      '. Use the filter to limit to one room kind (e.g. ', _kbd('scene'), ').',
+    ]),
+  ),
+
+  _section('Numeric loop with a custom list (bid 10/25/50/100 gold)',
+    p({ style: 'margin:0 0 6px; font-size:12.5px' })([
+      'Source: ', _kbd('Custom list'), '. Custom list: ', _kbd('10, 25, 50, 100'),
+      '. Label: ', _kbd('Bid {value}g'), '. Flow: ', _kbd('stay'),
+      '. Effect: simple, ', _kbd('gold'), ' / ', _kbd('sub'), ' / ', _kbd('{value}'),
+      '. Numeric value templates are auto-coerced to numbers when they parse cleanly.',
+    ]),
+  ),
+
+  _section('"Talk about John / Bob / Alice" (auto-generated mini-dialogues)',
+    p({ style: 'margin:0 0 6px; font-size:12.5px' })([
+      'Source: ', _kbd('NPCs'), '. Toggle ', _kbd('Ignore self'),
+      ' so the speaking NPC is auto-excluded. Mode: ', _kbd('dialogues'),
+      '. Link label: ', _kbd('Talk about {name}'),
+      '. Reply topic name: ', _kbd('About {name}'),
+      '. Add as many reply pages as you want (each takes text + an optional image from the asset catalogue) — the player advances via "More" and the last page leads to an auto Back. ',
+      _kbd('+ Add page'), ' inside the modal grows the reply.',
+    ]),
+  ),
+
+  _section('"Take X" — but hide items already collected',
+    p({ style: 'margin:0 0 6px; font-size:12.5px' })([
+      'Same as the "Take X for every consumable" recipe, but in ',
+      span({ style: 'text-transform:uppercase; font-size:11px; font-weight:600; color:var(--text-muted)' })(['Advanced']),
+      ' set Per-choice condition to ', _kbd('(c.state.inventory?.["{id}"] ?? 0) === 0'),
+      '. The generated Choices each get a js-mode Condition that hides them at runtime once the player has the item.',
+    ]),
+  ),
+
+  _section('Game-themed scene title with custom font + pill-shaped choice buttons',
+    p({ style: 'margin:0 0 6px; font-size:12.5px' })([
+      'Theme tab → Custom CSS textarea:',
+    ]),
+    _code(`.game-scene h2 {
+  font-family: 'Cinzel', serif;
+  letter-spacing: .02em;
+  text-shadow: 0 1px 0 var(--surface-2);
+}
+.game-scene .btn {
+  border-radius: 999px;
+  transition: transform .12s;
+}
+.game-scene .btn:hover {
+  transform: translateX(2px);
+}`),
+    p({ style: 'margin:6px 0 0; font-size:12px; color:var(--text-muted)' })([
+      'Saves to ', _kbd('project.meta.gameCss'), ' and re-renders the Game preview cards above instantly. Export bakes the exact same string into the player\'s ', _kbd('index.html'), '.',
+    ]),
   ),
 
   _section('Stat bar in the sidebar',

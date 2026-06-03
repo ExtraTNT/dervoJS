@@ -228,12 +228,43 @@ const emptyPage = () => ({
   advanceLabel:  'More',
 });
 
+// Choice navigation `flow`. The Choice editor picks one of these and the
+// renderer hands the player off accordingly AFTER the action's Effect fires.
+//   'navigate'   — simple/legacy: goto `to` (or stay if to:''). Used everywhere
+//                  outside the advanced topic system (rooms, simple NPCs).
+//   'stay'       — advanced topics only: fire the Effect and re-render the
+//                  CURRENT topic page. Use for "give me an item", "tell me
+//                  more (NPC says something, no nav)", etc. No picker needed.
+//   'change'     — advanced topics only: PUSH current topic on the stack and
+//                  switch to `topicId`. Used to dive into a sub-conversation.
+//   'exitBack'   — advanced topics only: POP the topic stack. If empty, leaves
+//                  the NPC and returns to the calling room.
+//   'exitRoom'   — advanced topics only: leave the NPC entirely and goto `to`.
+//                  (`to: ''` falls back to the calling room.)
+//   'exitCombat' — advanced topics only: leave the NPC and start `combatId`.
 const emptyChoice = () => ({
   id:        _rid(),
   label:     'New choice',
   to:        '',
   condition: emptyCondition(),
   action:    emptyEffect(),
+  flow:      'navigate',
+  topicId:   '',
+  combatId:  '',
+});
+
+// NPC topic — a self-contained "conversation thread" (like a tiny scene).
+//   `name`     — short label shown on the tree node + the topic editor header
+//   `onEnter`  — fires the first time the topic is entered each visit
+//   `pages`    — its own page sequence (More advances), same shape as room pages
+//   `choices`  — post-last-page choices; use flow:'change' to dive deeper,
+//                'exitBack' to pop back, 'exitRoom'/'exitCombat' to leave entirely
+const emptyTopic = () => ({
+  id:      `topic_${_rid()}`,
+  name:    'New topic',
+  onEnter: emptyEffect(),
+  pages:   [emptyPage()],
+  choices: [],
 });
 
 const emptyRoom = (id = `room_${_rid()}`) => ({
@@ -290,10 +321,16 @@ const emptyNpc = (id = `npc_${_rid()}`) => ({
   locations: [],
   greeting:  '',
   portrait:  '',
-  role:      'dialogue',        // 'dialogue' | 'shop'
-  pages:     [emptyPage()],
-  choices:   [],
-  shop:      { stock: [] },     // only used when role === 'shop'
+  role:          'dialogue',     // 'dialogue' | 'shop'
+  // Two conversation systems toggled per-NPC. Default: simple flat dialogue.
+  //   false: render `pages` then `choices` (legacy). `topics` is ignored.
+  //   true:  render `pages` (greeting) then the entry topic. `choices` is ignored.
+  advanced:      false,
+  pages:         [emptyPage()],  // greeting pages — shown before the entry topic in advanced mode
+  choices:       [],             // ONLY used when advanced === false (simple flat dialogue)
+  topics:        [],             // ONLY used when advanced === true
+  entryTopicId:  '',             // ADV: which topic to drop the player into after greeting. '' = topics[0]
+  shop:          { stock: [] },  // only used when role === 'shop'
 });
 
 const emptyProject = () => {
@@ -301,7 +338,7 @@ const emptyProject = () => {
   room.title = 'Starting Room';
   room.pages[0].text = 'Welcome. Edit this room to begin.';
   return {
-    meta:    { title: 'Untitled RPG', start: 'start', defaultMusic: '' },
+    meta:    { title: 'Untitled RPG', start: 'start', defaultMusic: '', gameCss: '', themeOverrides: {} },
     stats:   [
       { key: 'hp',   initial: 100 },
       { key: 'gold', initial: 0   },
@@ -337,6 +374,38 @@ const emptyAsset = (kind = 'image') => ({
   maxDim:   null,
 });
 
+// Map the v1 flow vocabulary to v2.
+//   'exit'         → 'navigate' (most common case; "exit + to:''" meant stay/return)
+//   'backToTopics' → 'exitBack'
+//   'goToTopic'    → 'change'
+const _migrateFlow = f =>
+  f === 'backToTopics' ? 'exitBack' :
+  f === 'goToTopic'    ? 'change'   :
+  f === 'exit'         ? 'navigate' :
+  (f ?? 'navigate');
+
+const _normaliseChoice = c => ({
+  id:        c.id ?? _rid(),
+  label:     c.label ?? '',
+  to:        c.to ?? '',
+  condition: c.condition ?? emptyCondition(),
+  action:    c.action ?? emptyEffect(),
+  flow:      _migrateFlow(c.flow),
+  topicId:   c.topicId  ?? '',
+  combatId:  c.combatId ?? '',
+});
+
+// `label`→`name`, `condition`/`once`/`onAsk` collapsed away: a topic is now a
+// pure thread (its visibility and one-shot logic, if needed, live on the
+// choices that point INTO it). `onEnter` replaces the v1 `onAsk`.
+const _normaliseTopic = t => ({
+  id:      t.id ?? `topic_${_rid()}`,
+  name:    t.name ?? t.label ?? 'Topic',           // v1 used `label`
+  onEnter: t.onEnter ?? t.onAsk ?? emptyEffect(),  // v1 used `onAsk`
+  pages:   Array.isArray(t.pages)   && t.pages.length ? t.pages : [emptyPage()],
+  choices: Array.isArray(t.choices) ? t.choices.map(_normaliseChoice) : [],
+});
+
 // Normalise an arbitrary parsed JSON to the current shape — fills missing fields
 // so the editor never has to render against undefined values. Returns the input
 // as-is for fields it already knows; this is forward-compatible with future
@@ -346,9 +415,13 @@ const normaliseProject = raw => {
   if (!raw || typeof raw !== 'object') return base;
   return {
     meta: {
-      title:        raw.meta?.title        ?? base.meta.title,
-      start:        raw.meta?.start        ?? base.meta.start,
-      defaultMusic: raw.meta?.defaultMusic ?? base.meta.defaultMusic,
+      title:          raw.meta?.title        ?? base.meta.title,
+      start:          raw.meta?.start        ?? base.meta.start,
+      defaultMusic:   raw.meta?.defaultMusic ?? base.meta.defaultMusic,
+      gameCss:        raw.meta?.gameCss      ?? base.meta.gameCss,
+      themeOverrides: (raw.meta?.themeOverrides && typeof raw.meta.themeOverrides === 'object')
+        ? raw.meta.themeOverrides
+        : base.meta.themeOverrides,
     },
     stats: Array.isArray(raw.stats) ? raw.stats : base.stats,
     flags: Array.isArray(raw.flags) ? raw.flags : base.flags,
@@ -380,7 +453,7 @@ const normaliseProject = raw => {
           onEnter:          r.onEnter          ?? emptyEffect(),
           onEnterCondition: r.onEnterCondition ?? emptyCondition(),
           pages:            Array.isArray(r.pages)   && r.pages.length ? r.pages   : [emptyPage()],
-          choices:          Array.isArray(r.choices) ? r.choices : [],
+          choices:          Array.isArray(r.choices) ? r.choices.map(_normaliseChoice) : [],
           wardrobe: r.wardrobe && typeof r.wardrobe === 'object'
             ? {
                 portraitWidth:  Number(r.wardrobe.portraitWidth)  || 240,
@@ -401,15 +474,18 @@ const normaliseProject = raw => {
       : base.rooms,
     npcs: Array.isArray(raw.npcs)
       ? raw.npcs.map(n => ({
-          id:        n.id,
-          name:      n.name      ?? '',
-          locations: Array.isArray(n.locations) ? n.locations : [],
-          greeting:  n.greeting  ?? '',
-          portrait:  n.portrait  ?? '',
-          role:      n.role      ?? 'dialogue',
-          pages:     Array.isArray(n.pages)   && n.pages.length   ? n.pages   : [emptyPage()],
-          choices:   Array.isArray(n.choices) ? n.choices : [],
-          shop:      n.shop && Array.isArray(n.shop.stock) ? n.shop : { stock: [] },
+          id:           n.id,
+          name:         n.name      ?? '',
+          locations:    Array.isArray(n.locations) ? n.locations : [],
+          greeting:     n.greeting  ?? '',
+          portrait:     n.portrait  ?? '',
+          role:         n.role      ?? 'dialogue',
+          advanced:     !!n.advanced,
+          pages:        Array.isArray(n.pages)   && n.pages.length   ? n.pages   : [emptyPage()],
+          choices:      Array.isArray(n.choices) ? n.choices.map(_normaliseChoice) : [],
+          topics:       Array.isArray(n.topics)  ? n.topics.map(_normaliseTopic)   : [],
+          entryTopicId: n.entryTopicId ?? '',
+          shop:         n.shop && Array.isArray(n.shop.stock) ? n.shop : { stock: [] },
         }))
       : base.npcs,
     sidebar: raw.sidebar && typeof raw.sidebar === 'object'
@@ -473,7 +549,7 @@ export {
   _rid,
   emptyProject, normaliseProject,
   emptyRoom, emptyWardrobeRoom, emptyInventoryRoom, emptyNpc, emptyItem, emptyShopEntry,
-  emptyPage, emptyChoice,
+  emptyPage, emptyChoice, emptyTopic,
   emptyCondition, emptyEffect, emptyOp,
   emptySidebar, emptyWidget, emptyPortraitLayer,
   emptyCombat, emptyCombatMove, emptyEnemyAction,

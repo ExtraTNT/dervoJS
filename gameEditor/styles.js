@@ -18,10 +18,10 @@ const CSS = `
     border:1px solid transparent; background:none; cursor:pointer;
     color:var(--text); font-size:13px; text-align:left; width:100%;
   }
-  .gef-list-btn:hover  { background: var(--surface-2, rgba(0,0,0,.04)); }
+  .gef-list-btn:hover  { background: var(--surface-2); }
   .gef-list-btn.active { background: var(--accent); color:#fff; }
   .gef-list-btn .gef-id { color: var(--text-muted); font-family: ui-monospace,monospace; font-size:11px; margin-left:auto; }
-  .gef-list-btn.active .gef-id { color: rgba(255,255,255,.7); }
+  .gef-list-btn.active .gef-id { color: rgba(255,255,255,.75); }
 
   .gef-page {
     border:1px solid var(--border); border-radius:var(--radius);
@@ -56,20 +56,21 @@ const CSS = `
   .gef-toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
     padding: 10px 16px; border-radius: var(--radius);
-    background: var(--text); color: var(--surface);
-    box-shadow: 0 4px 16px rgba(0,0,0,.15);
+    background: var(--text); color: var(--bg);
+    box-shadow: 0 4px 16px rgba(0,0,0,.25);
     z-index: 9999; font-size: 13px;
   }
-  .gef-toast-error { background: #c0392b; color: #fff; }
+  .gef-toast-error { background: var(--danger); color: #fff; }
 
-  .gef-graph svg { display:block; background: var(--surface); border-radius:var(--radius); border:1px solid var(--border); }
-  .gef-graph .gef-node { cursor:pointer; }
-  .gef-graph .gef-node rect { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
-  .gef-graph .gef-node.start rect { stroke: var(--accent); stroke-width: 2.5; }
+  /* Graph — styling now lives in panels/graph.js per-element so light/dark and
+     theme overrides apply directly via CSS custom properties. The CSS here is
+     just the SVG canvas chrome + hover state on the selected room. */
+  .gef-graph svg { display:block; background: var(--bg); border-radius:var(--radius); border:1px solid var(--border); }
+  .gef-graph .gef-node:hover rect,
+  .gef-graph .gef-node:hover path,
+  .gef-graph .gef-node:hover ellipse { filter: brightness(1.08); }
   .gef-graph .gef-node.active rect { fill: var(--accent); stroke: var(--accent); }
-  .gef-graph .gef-node text { fill: var(--text); font-size: 12px; font-family: ui-monospace,monospace; pointer-events: none; }
   .gef-graph .gef-node.active text { fill: #fff; }
-  .gef-graph path { stroke: var(--text-muted); stroke-width: 1.2; fill:none; marker-end:url(#arrow); }
 
   .gef-preview-host {
     border:1px solid var(--border); border-radius:var(--radius);
@@ -77,7 +78,8 @@ const CSS = `
   }
 
   .gef-code {
-    background: var(--surface-2, #f6f8fa); border:1px solid var(--border);
+    background: var(--surface-2); border:1px solid var(--border);
+    color: var(--text);
     border-radius: var(--radius); padding: 12px; overflow:auto;
     font-family: ui-monospace, monospace; font-size: 12.5px;
     white-space: pre; line-height: 1.5; max-height: 520px;
