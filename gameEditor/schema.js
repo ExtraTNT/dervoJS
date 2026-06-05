@@ -44,23 +44,114 @@ const emptyCondition = () => ({
 });
 const emptyEffect = () => ({
   mode: 'none',
-  ops: [],         // simple
-  body: '',        // js
+  ops:     [],        // simple
+  body:    '',        // js
+  table:   null,      // randomLoot — populated lazily by EffectEditor on mode switch
+  toRoom:  '',        // navigate   — target room id (any kind, including story)
+  steps:   [],        // multi      — array of nested Effects, fired in order
+  options: [],        // oneOf      — weighted picks; one option's effect fires
 });
 
 const emptyOp = (target = '') => ({ target, op: 'set', value: 0 });
+
+// One row in a random table — weight + a single outcome. `kind` decides which
+// of the kind-specific fields are read. Count / stat ranges use inclusive
+// min/max; equal values give a deterministic amount.
+//
+//   item       → give itemId × randInt(countMin..countMax)
+//   stat       → state[statKey] += randInt(statMin..statMax)
+//                (use this for ANY currency — gold, silver, gems — just pick the key)
+//   flag       → state.flags[flagKey] = flagValue
+//   navigate   → c.goto(roomId)          random destination
+//   learnSkill → adds skillId to state.skills (no-op if already known)
+//   talkNpc    → c.talkTo(npcId, c.scene) random NPC dialogue from a pool
+//   nothing    → no outcome (use to model "X% chance of nothing")
+//   js         → free-form body, has access to `c` — for anything else
+//
+// Weight bonuses (per entry) can raise the effective weight at roll time based
+// on stat/flag/inventory conditions; see emptyWeightBonus below.
+const emptyLootEntry = () => ({
+  id:       _rid(),
+  weight:   1,
+  kind:     'item',
+  // item
+  itemId:   '',
+  countMin: 1,
+  countMax: 1,
+  // stat (also used for any currency: gold / silver / gems / etc.)
+  statKey:  '',
+  statMin:  0,
+  statMax:  0,
+  // flag
+  flagKey:  '',
+  flagValue: true,
+  // navigate / talkNpc / learnSkill
+  roomId:   '',
+  npcId:    '',
+  skillId:  '',
+  // js
+  jsBody:   '',
+  // weight bonuses — see emptyWeightBonus
+  bonuses:  [],
+});
+
+// One conditional weight bonus on a random-table entry.
+//   condition  : a regular Condition (always / simple / hasItem / js)
+//                — when it evaluates truthy, the bonus applies
+//   amountMode : 'fixed'  → add `amountFixed`
+//                'stat'   → add Number(state[amountStat]) || 0
+// So "+5 if gold >= 10" = condition: stat gold >= 10, amountMode: fixed, amountFixed: 5
+//    "+hp"              = condition: always,         amountMode: stat, amountStat: 'hp'
+const emptyWeightBonus = () => ({
+  id:          _rid(),
+  condition:   emptyCondition(),
+  amountMode:  'fixed',
+  amountFixed: 1,
+  amountStat:  '',
+});
+
+// Loot table — a weighted bag of entries that the engine rolls against on the
+// `randomLoot` Effect mode. `picks` independent rolls are made; `unique: true`
+// removes the entry from the bag after it's picked (sampling without
+// replacement), which is right for chest contents. `showFlavour` appends a
+// "Loot: …" log line to the active scene's body (combat-log style).
+const emptyLootTable = () => ({
+  picks:       1,
+  unique:      false,
+  showFlavour: true,
+  entries:     [emptyLootEntry()],
+});
+
+// One option in a `oneOf` Effect: a weighted bag where exactly ONE option's
+// Effect fires per roll. Each option holds a full nested Effect (so it can be
+// `multi` / `navigate` / `randomLoot` / anything) plus the same weight + bonus
+// shape used by loot entries — so a single roll can do compound state changes,
+// stat bumps, navigation, etc., with dynamic odds based on stats / flags /
+// inventory. The label is purely for the editor / odds-preview line.
+const emptyOneOfOption = () => ({
+  id:      _rid(),
+  label:   'Option',
+  weight:  1,
+  bonuses: [],         // [WeightBonus] — same shape as on a LootEntry
+  effect:  emptyEffect(),
+});
 
 // Item kinds drive how the inventory room interacts with the item:
 //   consumable → "Use" button that fires useEffect, then decrements by 1
 //   readable   → "Read" button that opens the text inline
 //   equipment  → "Equip" / "Unequip" that toggles state.equipped[equipSlot]
 //   key / misc → no action button (display-only)
+// Price = a stat-key + amount. Gold is the default for newly-created items,
+// but any stat works (silver, gems, faith, etc.) so the project can model
+// multiple currencies. Equal values give a deterministic cost.
+const emptyPrice = (stat = 'gold', amount = 0) => ({ stat, amount });
+
 const emptyItem = (id = `item_${_rid()}`) => ({
   id,
   name:        'New Item',
   description: '',
   image:       '',
-  price:       0,
+  price:       emptyPrice(),    // { stat, amount }
   kind:        'misc',          // 'consumable' | 'equipment' | 'readable' | 'key' | 'misc'
   // Per-kind behaviour (each is ignored when the kind doesn't apply):
   useEffect:   emptyEffect(),   // consumable — fires on Use
@@ -70,9 +161,20 @@ const emptyItem = (id = `item_${_rid()}`) => ({
 
 const emptyShopEntry = (itemId = '') => ({
   itemId,
-  price:    null,        // null → use item.price
+  price:    null,        // null → use item.price (also a { stat, amount })
   quantity: null,        // null → infinite
 });
+
+// Normalise legacy / partial price values. Accepts:
+//   number      → { stat: 'gold', amount: N }
+//   { stat, amount } → as-is
+//   null/undefined → null (= use the item default in shop context)
+const _normalisePrice = p => {
+  if (p == null) return null;
+  if (typeof p === 'number') return { stat: 'gold', amount: Math.max(0, p) };
+  if (typeof p === 'object') return { stat: p.stat || 'gold', amount: Math.max(0, Number(p.amount) || 0) };
+  return { stat: 'gold', amount: 0 };
+};
 
 // Sidebar widgets shown in the in-game left column. Each widget has a `type`
 // that the preview interpreter / codegen knows how to render.
@@ -269,13 +371,20 @@ const emptyTopic = () => ({
 
 const emptyRoom = (id = `room_${_rid()}`) => ({
   id,
-  kind:             'scene',     // 'scene' | 'wardrobe'
+  kind:             'scene',     // 'scene' | 'wardrobe' | 'inventory' | 'story'
   title:            'New Room',
   music:            '',
   onEnter:          emptyEffect(),
   onEnterCondition: emptyCondition(),    // 'always' by default — gate onEnter behind a flag/stat/js check
   pages:            [emptyPage()],
   choices:          [],
+  // Optional end-of-dialog Effect. When the player reaches the last page AND
+  // no Choice navigates, this Effect runs (single "Continue" button labelled
+  // by the last page's advanceLabel). Nothing is auto-created — devs opt in.
+  // Common uses: simple ops (set state), randomLoot navigate (random outcome),
+  // js body (free-form). When empty, the player is on the last page with no
+  // exit — that's the author's choice.
+  onEnd:            emptyEffect(),
   // Wardrobe-only fields (ignored for kind:'scene'). Pre-seeded so flipping the
   // kind via the editor instantly has working defaults.
   wardrobe: {
@@ -297,6 +406,17 @@ const emptyWardrobeRoom = (id = `wardrobe_${_rid()}`) => ({
     layers:         [emptyPortraitLayer('body')],
     kinds:          ['equipment'],
   },
+});
+
+// Story room — a "narrative beat" room that lives in the Story Points tab
+// instead of the world map. Engine treats it as a scene room with one extra:
+// the `onEnd` Effect (inherited from emptyRoom) fires via an auto-Continue
+// button on the last page IF no Choice exists AND onEnd is configured. Both
+// Choices and onEnd are entirely opt-in — nothing is created by default.
+const emptyStoryRoom = (id = `story_${_rid()}`) => ({
+  ...emptyRoom(id),
+  kind:  'story',
+  title: 'New Story Point',
 });
 
 // Inventory room — paper-doll's plain counterpart. Shows EVERY item the
@@ -338,7 +458,7 @@ const emptyProject = () => {
   room.title = 'Starting Room';
   room.pages[0].text = 'Welcome. Edit this room to begin.';
   return {
-    meta:    { title: 'Untitled RPG', start: 'start', defaultMusic: '', gameCss: '', themeOverrides: {} },
+    meta:    { title: 'Untitled RPG', start: 'start', defaultMusic: '', gameCss: '', themeOverrides: {}, imports: [] },
     stats:   [
       { key: 'hp',   initial: 100 },
       { key: 'gold', initial: 0   },
@@ -422,6 +542,13 @@ const normaliseProject = raw => {
       themeOverrides: (raw.meta?.themeOverrides && typeof raw.meta.themeOverrides === 'object')
         ? raw.meta.themeOverrides
         : base.meta.themeOverrides,
+      imports: Array.isArray(raw.meta?.imports)
+        ? raw.meta.imports.map(imp => ({
+            file:    imp.file    ?? '',
+            target:  imp.target  ?? '',
+            binding: imp.binding ?? '',     // optional named/default/namespace clause
+          }))
+        : base.meta.imports,
     },
     stats: Array.isArray(raw.stats) ? raw.stats : base.stats,
     flags: Array.isArray(raw.flags) ? raw.flags : base.flags,
@@ -431,7 +558,7 @@ const normaliseProject = raw => {
           name:        it.name        ?? '',
           description: it.description ?? '',
           image:       it.image       ?? '',
-          price:       Number(it.price) || 0,
+          price:       _normalisePrice(it.price) || emptyPrice(),
           kind:        it.kind        ?? 'misc',
           useEffect:   it.useEffect   || emptyEffect(),
           text:        it.text        ?? '',
@@ -454,6 +581,7 @@ const normaliseProject = raw => {
           onEnterCondition: r.onEnterCondition ?? emptyCondition(),
           pages:            Array.isArray(r.pages)   && r.pages.length ? r.pages   : [emptyPage()],
           choices:          Array.isArray(r.choices) ? r.choices.map(_normaliseChoice) : [],
+          onEnd:            r.onEnd ?? emptyEffect(),
           wardrobe: r.wardrobe && typeof r.wardrobe === 'object'
             ? {
                 portraitWidth:  Number(r.wardrobe.portraitWidth)  || 240,
@@ -485,7 +613,16 @@ const normaliseProject = raw => {
           choices:      Array.isArray(n.choices) ? n.choices.map(_normaliseChoice) : [],
           topics:       Array.isArray(n.topics)  ? n.topics.map(_normaliseTopic)   : [],
           entryTopicId: n.entryTopicId ?? '',
-          shop:         n.shop && Array.isArray(n.shop.stock) ? n.shop : { stock: [] },
+          shop:         n.shop && Array.isArray(n.shop.stock)
+            ? {
+                ...n.shop,
+                stock: n.shop.stock.map(e => ({
+                  itemId:   e.itemId,
+                  price:    _normalisePrice(e.price),    // null → use item default
+                  quantity: e.quantity == null ? null : Math.max(0, Number(e.quantity) || 0),
+                })),
+              }
+            : { stock: [] },
         }))
       : base.npcs,
     sidebar: raw.sidebar && typeof raw.sidebar === 'object'
@@ -548,9 +685,10 @@ const normaliseProject = raw => {
 export {
   _rid,
   emptyProject, normaliseProject,
-  emptyRoom, emptyWardrobeRoom, emptyInventoryRoom, emptyNpc, emptyItem, emptyShopEntry,
+  emptyRoom, emptyWardrobeRoom, emptyInventoryRoom, emptyStoryRoom, emptyNpc, emptyItem, emptyShopEntry, emptyPrice,
   emptyPage, emptyChoice, emptyTopic,
   emptyCondition, emptyEffect, emptyOp,
+  emptyLootTable, emptyLootEntry, emptyWeightBonus, emptyOneOfOption,
   emptySidebar, emptyWidget, emptyPortraitLayer,
   emptyCombat, emptyCombatMove, emptyEnemyAction,
   emptySkill,

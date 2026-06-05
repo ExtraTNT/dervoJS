@@ -72,7 +72,7 @@ const _tokenRow = defaults => overrides => key => {
           title: 'Clear override (use default)',
           onclick: () => _clearOverride(key),
           style: 'border:none; background:none; cursor:pointer; color:var(--text-muted); font-size:11px; line-height:1; padding:2px 4px',
-        })(['×'])]
+        })(['x'])]
       : []),
     inp({
       type:  (hex || rgba) ? 'color' : 'text',
@@ -101,12 +101,48 @@ const _groupCard = defaults => overrides => group =>
 // and combat — so every game surface paints with the current theme + custom
 // CSS. Built once at module load; the engine handles its own state.
 
+// ─── Mini-game project ──────────────────────────────────────────────────
+//
+// Touches every game surface the editor can produce, so every theme token
+// and custom CSS rule has somewhere to land:
+//
+//   Scenes (inn / road)        Pages, scene title, choice list
+//   NPC dialogue (Mara)        NPC scene + Goodbye choice
+//   Shop (Brom)                Stock list → auto buy buttons
+//   Inventory room (bag)       Use / Equip / Unequip / Read action buttons
+//   Combat (goblin)            Enemy art, HP bars, move list, log lines
+//   Sidebar widgets            Title, Stats, Inventory, RoomLink
+//   Items                      consumable (potion) + equipment (sword)
+//   Assets                     three inline SVGs (potion / sword / goblin face)
+//                              referenced via the asset:<id> catalogue model
+//
+// SVGs are inline data URLs (URL-encoded) so the project is fully self-
+// contained — no upload, no network fetch.
+
+const _svg = body => `data:image/svg+xml;utf8,${encodeURIComponent(body)}`;
+
+const POTION_SVG = _svg(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="13" y="3" width="6" height="3" fill="#888" rx="1"/><path d="M12 6 L14 14 Q5 18 6 26 Q8 30 16 30 Q24 30 26 26 Q27 18 18 14 L20 6 Z" fill="#d33" stroke="#400" stroke-width="1"/><ellipse cx="13" cy="20" rx="2" ry="3" fill="#f88" opacity=".6"/></svg>`);
+
+const SWORD_SVG = _svg(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M16 2 L18.5 22 L13.5 22 Z" fill="#ccc" stroke="#333"/><rect x="10" y="22" width="12" height="3" fill="#543" stroke="#000"/><rect x="13" y="25" width="6" height="5" fill="#a52" stroke="#000" rx="1"/></svg>`);
+
+const GOBLIN_SVG = _svg(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="36" r="22" fill="#7a3" stroke="#240" stroke-width="1.5"/><ellipse cx="32" cy="20" rx="16" ry="6" fill="#7a3" stroke="#240" stroke-width="1.5"/><circle cx="25" cy="34" r="3.5" fill="#ff0"/><circle cx="39" cy="34" r="3.5" fill="#ff0"/><circle cx="25" cy="34" r="1.5" fill="#000"/><circle cx="39" cy="34" r="1.5" fill="#000"/><path d="M24 46 Q32 52 40 46" fill="#400" stroke="#000" stroke-width="1.2"/><path d="M16 22 L12 16 M48 22 L52 16" stroke="#240" stroke-width="2" fill="none"/></svg>`);
+
+// Schema shorthands so the literal stays readable.
+const _alwaysCond = () => ({ mode: 'always', key: '', op: '>=', value: 0, itemId: '', count: 1, expr: '' });
+const _noneEffect = () => ({ mode: 'none', ops: [], body: '' });
+const _wardrobeDefaults = () => ({ portraitWidth: 240, portraitHeight: 320, layers: [], kinds: ['equipment'] });
+const _invDefaults = () => ({ kinds: [], layout: 'grid', showDescription: true, emptyMessage: 'Empty.' });
+
 const _miniProject = () => ({
   meta:    { title: 'Theme Preview', start: 'inn', defaultMusic: '', gameCss: '', themeOverrides: {} },
-  stats:   [{ key: 'hp', initial: 78 }, { key: 'gold', initial: 142 }],
-  flags:   [{ key: 'metMara', initial: false }],
+  stats:   [
+    { key: 'hp',   initial: 78 },
+    { key: 'gold', initial: 142 },
+  ],
+  flags:   [],
   items:   [
-    { id: 'potion', name: 'Healing Potion', description: 'Restores 10 HP.', image: '', price: 5, kind: 'consumable', useEffect: { mode: 'simple', ops: [{ target: 'hp', op: 'add', value: 10 }] }, text: '', equipSlot: '' },
+    { id: 'potion', name: 'Healing Potion', description: 'Restores 10 HP.', image: 'asset:asset_potion', price: 5,  kind: 'consumable', useEffect: { mode: 'simple', ops: [{ target: 'hp', op: 'add', value: 10 }], body: '' }, text: '', equipSlot: '' },
+    { id: 'sword',  name: 'Iron Sword',     description: 'Plain but sharp.',   image: 'asset:asset_sword',  price: 25, kind: 'equipment',  useEffect: _noneEffect(), text: '', equipSlot: 'weapon' },
   ],
   startingInventory: { potion: 2 },
   startingEquipped:  {},
@@ -122,43 +158,65 @@ const _miniProject = () => ({
   rooms: [
     {
       id: 'inn', kind: 'scene', title: 'The Old Inn',
-      music: '', onEnter: { mode: 'none', ops: [], body: '' }, onEnterCondition: { mode: 'always', key: '', op: '>=', value: 0, itemId: '', count: 1, expr: '' },
+      music: '', onEnter: _noneEffect(), onEnterCondition: _alwaysCond(),
       pages: [{
         id: 'p1',
         text: 'You push open the heavy oak door. A fire crackles in the hearth, and the smell of stew curls toward you. The barkeeper glances up.',
         image: '', video: '', advanceLabel: 'More',
       }],
       choices: [
-        { id: 'c1', label: 'Step outside (combat!)', to: '', condition: { mode: 'always', key: '', op: '>=', value: 0, itemId: '', count: 1, expr: '' }, action: { mode: 'enterCombat', combatId: 'goblin', ops: [], body: '' }, flow: 'navigate', topicId: '', combatId: '' },
-        { id: 'c2', label: 'Walk back to the road',   to: 'road', condition: { mode: 'always', key: '', op: '>=', value: 0, itemId: '', count: 1, expr: '' }, action: { mode: 'none', ops: [], body: '' }, flow: 'navigate', topicId: '', combatId: '' },
+        { id: 'c1', label: 'Step outside (combat!)', to: '',     condition: _alwaysCond(), action: { mode: 'enterCombat', combatId: 'goblin', ops: [], body: '' }, flow: 'navigate', topicId: '', combatId: '' },
+        { id: 'c2', label: 'Walk to the road',       to: 'road', condition: _alwaysCond(), action: _noneEffect(), flow: 'navigate', topicId: '', combatId: '' },
       ],
-      wardrobe:  { portraitWidth: 240, portraitHeight: 320, layers: [], kinds: ['equipment'] },
-      inventory: { kinds: [], layout: 'grid', showDescription: true, emptyMessage: 'Empty.' },
+      wardrobe:  _wardrobeDefaults(),
+      inventory: _invDefaults(),
     },
     {
       id: 'road', kind: 'scene', title: 'The Road',
-      music: '', onEnter: { mode: 'none', ops: [], body: '' }, onEnterCondition: { mode: 'always', key: '', op: '>=', value: 0, itemId: '', count: 1, expr: '' },
+      music: '', onEnter: _noneEffect(), onEnterCondition: _alwaysCond(),
       pages: [{ id: 'p2', text: 'A muddy track winds north. Wind whistles in the grass.', image: '', video: '', advanceLabel: 'More' }],
-      choices: [{ id: 'c3', label: 'Back to the inn', to: 'inn', condition: { mode: 'always', key: '', op: '>=', value: 0, itemId: '', count: 1, expr: '' }, action: { mode: 'none', ops: [], body: '' }, flow: 'navigate', topicId: '', combatId: '' }],
-      wardrobe:  { portraitWidth: 240, portraitHeight: 320, layers: [], kinds: ['equipment'] },
+      choices: [{ id: 'c3', label: 'Back to the inn', to: 'inn', condition: _alwaysCond(), action: _noneEffect(), flow: 'navigate', topicId: '', combatId: '' }],
+      wardrobe:  _wardrobeDefaults(),
+      inventory: _invDefaults(),
+    },
+    {
+      id: 'bag', kind: 'inventory', title: 'Bag',
+      music: '', onEnter: _noneEffect(), onEnterCondition: _alwaysCond(),
+      pages: [{ id: 'p3', text: 'You unfasten the straps and look inside.', image: '', video: '', advanceLabel: 'More' }],
+      choices: [{ id: 'c4', label: 'Close bag', to: 'inn', condition: _alwaysCond(), action: _noneEffect(), flow: 'navigate', topicId: '', combatId: '' }],
+      wardrobe:  _wardrobeDefaults(),
       inventory: { kinds: [], layout: 'grid', showDescription: true, emptyMessage: 'Empty.' },
     },
   ],
-  npcs: [{
-    id: 'mara', name: 'Mara', locations: ['inn'],
-    greeting: 'Mara wipes a pewter mug with her apron.',
-    portrait: '', role: 'dialogue', advanced: false,
-    pages:   [{ id: 'np1', text: '"Welcome, traveller. The roads have been strange lately."', image: '', video: '', advanceLabel: 'More' }],
-    choices: [{ id: 'nc1', label: 'Goodbye', to: '', condition: { mode: 'always', key: '', op: '>=', value: 0, itemId: '', count: 1, expr: '' }, action: { mode: 'none', ops: [], body: '' }, flow: 'navigate', topicId: '', combatId: '' }],
-    topics:  [], entryTopicId: '',
-    shop:    { stock: [] },
-  }],
+  npcs: [
+    {
+      id: 'mara', name: 'Mara', locations: ['inn'],
+      greeting: 'Mara wipes a pewter mug with her apron.',
+      portrait: '', role: 'dialogue', advanced: false,
+      pages:   [{ id: 'np1', text: '"Welcome, traveller. The roads have been strange lately."', image: '', video: '', advanceLabel: 'More' }],
+      choices: [{ id: 'nc1', label: 'Goodbye', to: '', condition: _alwaysCond(), action: _noneEffect(), flow: 'navigate', topicId: '', combatId: '' }],
+      topics:  [], entryTopicId: '',
+      shop:    { stock: [] },
+    },
+    {
+      id: 'brom', name: 'Brom', locations: ['inn'],
+      greeting: 'Brom polishes a row of trinkets behind a small counter.',
+      portrait: '', role: 'shop', advanced: false,
+      pages:   [{ id: 'np2', text: '"Anything catch your eye? Fair prices, friend."', image: '', video: '', advanceLabel: 'More' }],
+      choices: [],
+      topics:  [], entryTopicId: '',
+      shop:    { stock: [
+        { itemId: 'potion', price: null, quantity: null },
+        { itemId: 'sword',  price: null, quantity: 1 },
+      ]},
+    },
+  ],
   combats: [{
     id: 'goblin', name: 'Goblin Ambush',
     enemy: {
-      name: 'Goblin', hp: 8, defense: 0, image: '',
+      name: 'Goblin', hp: 8, defense: 0, image: 'asset:asset_goblin',
       actions: [{ id: 'a1', label: 'Stab', kind: 'attack', damage: 2, damageRandom: 1, healAmount: 0, healRandom: 0, hitPercent: 80, weight: 1, useWhen: 'always', hpThreshold: 50, jsCondition: '', image: '', flavourText: 'The goblin lunges!' }],
-      loot: {},
+      loot: { potion: 1 },
     },
     playerStat: 'hp', intro: 'A goblin springs from the bushes!',
     extraMoves: [],
@@ -166,11 +224,23 @@ const _miniProject = () => ({
     winText: 'You defeat the goblin.', loseText: 'You collapse, defeated.',
     winImage: '', loseImage: '',
     onWin:  { mode: 'simple', ops: [{ target: 'gold', op: 'add', value: 5 }], body: '' },
-    onLose: { mode: 'none',   ops: [], body: '' },
+    onLose: _noneEffect(),
     linkedNpcId: '',
   }],
-  sidebar:       { enabled: false, widgets: [] },
-  assets:        [],
+  sidebar: {
+    enabled: true,
+    widgets: [
+      { id: 'w1', type: 'title',    label: 'Theme Preview' },
+      { id: 'w2', type: 'stats',    keys: [] },                       // empty = show all stats
+      { id: 'w3', type: 'inventory', layout: 'grid' },
+      { id: 'w4', type: 'roomLink', label: 'Open bag', roomId: 'bag', icon: '🎒' },
+    ],
+  },
+  assets: [
+    { id: 'asset_potion', name: 'Potion', kind: 'image', data: POTION_SVG, mime: 'image/svg+xml', byteSize: POTION_SVG.length, quality: null, maxDim: null },
+    { id: 'asset_sword',  name: 'Sword',  kind: 'image', data: SWORD_SVG,  mime: 'image/svg+xml', byteSize: SWORD_SVG.length,  quality: null, maxDim: null },
+    { id: 'asset_goblin', name: 'Goblin', kind: 'image', data: GOBLIN_SVG, mime: 'image/svg+xml', byteSize: GOBLIN_SVG.length, quality: null, maxDim: null },
+  ],
   assetDefaults: { imageQuality: 0.8, imageMaxDim: 1080 },
 });
 
@@ -211,19 +281,19 @@ const _miniGameCard = () => Card({ title: 'Live mini-game preview' })([
       span({ style: 'font-family:ui-monospace,monospace; background:var(--surface-2); padding:1px 5px; border-radius:3px' })(['buildGameConfig → createGame → mount']),
       '). Edit a token or paste custom CSS — the player\'s game on the right repaints instantly.',
     ]),
-    div({ style: 'display:flex; gap:8px; align-items:center' })([
+    div({ style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap' })([
       button({
         type: 'button',
         onclick: _restartMiniGame,
         style: 'padding:5px 12px; font-size:12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); cursor:pointer',
       })(['↻ Restart mini game']),
-      span({ style: 'font-size:11.5px; color:var(--text-muted)' })([
-        'Try the choices — talk to Mara, walk to the road, trigger combat.',
+      span({ style: 'font-size:11.5px; color:var(--text-muted); flex:1; min-width:200px' })([
+        'Try: talk to Mara, buy from Brom\'s shop, use the bag (sidebar), step outside for combat.',
       ]),
     ]),
     div({
       id: 'theme-mini-game-host',
-      style: 'width:100%; height:540px; border:1px solid var(--border); border-radius:var(--radius); overflow:auto; background:var(--bg); position:relative',
+      style: 'width:100%; height:640px; border:1px solid var(--border); border-radius:var(--radius); overflow:auto; background:var(--bg); position:relative',
     })([]),
   ]),
 ]);

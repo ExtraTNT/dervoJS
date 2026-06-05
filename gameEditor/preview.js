@@ -13,6 +13,7 @@
 import { div, p, img, video, span, h3, button } from '../src/elements.js';
 import { Scene, NpcChoices, NpcLine } from '../src/game.js';
 import { resolveAssetsForPreview } from './extractAssets.js';
+import { Just, Nothing, bind, guard, fromMaybe } from '../lib/odocosjs/src/core.js';
 
 const _safeFn = (argNames, body) => {
   try { return new Function(...argNames, body); }
@@ -103,6 +104,130 @@ const _compileCondition = cond => {
   return () => true;
 };
 
+// Inclusive integer range. Defensive against swapped min/max.
+const _randIntRange = (lo, hi) => {
+  const a = Math.min(Number(lo) || 0, Number(hi) || 0);
+  const b = Math.max(Number(lo) || 0, Number(hi) || 0);
+  return a + Math.floor(Math.random() * (b - a + 1));
+};
+
+// Effective weight = base + sum of every applicable bonus's resolved amount.
+// A bonus applies when its `condition` evaluates truthy against ctx; the
+// amount is either a literal (`amountFixed`) or the live value of a stat
+// (`amountStat` → state[key]).
+const _resolveWeight = c => entry => {
+  let total = Math.max(0, Number(entry.weight) || 0);
+  for (const b of (entry.bonuses || [])) {
+    const guard = _compileCondition(b.condition);
+    if (!guard(c)) continue;
+    const add = b.amountMode === 'stat'
+      ? (b.amountStat ? Number(c.state[b.amountStat]) || 0 : 0)
+      : (Number(b.amountFixed) || 0);
+    total += add;
+  }
+  return Math.max(0, total);
+};
+
+// Weighted-random pick over entries with ctx-aware effective weights. Returns
+// the chosen index or -1 if every entry resolves to weight 0.
+const _weightedPick = c => entries => {
+  const weights = entries.map(_resolveWeight(c));
+  const total   = weights.reduce((a, w) => a + w, 0);
+  if (total <= 0) return -1;
+  let r = Math.random() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return i;
+  }
+  return weights.length - 1;
+};
+
+// Apply one resolved loot entry to ctx. Returns a short label for the
+// optional "Loot: …" flavour line (or null when the entry is `nothing`).
+const _applyLootEntry = (entry, c) => {
+  switch (entry.kind) {
+    case 'item': {
+      if (!entry.itemId) return null;
+      const n = Math.max(0, _randIntRange(entry.countMin, entry.countMax));
+      if (n === 0) return null;
+      c.setState(s => ({ inventory: { ...(s.inventory || {}), [entry.itemId]: (Number(s.inventory?.[entry.itemId]) || 0) + n } }));
+      return `${entry.itemId} ×${n}`;
+    }
+    case 'stat': {
+      if (!entry.statKey) return null;
+      const n = _randIntRange(entry.statMin, entry.statMax);
+      if (n === 0) return null;
+      c.setState(s => ({ [entry.statKey]: (Number(s[entry.statKey]) || 0) + n }));
+      return `${entry.statKey} ${n > 0 ? '+' : ''}${n}`;
+    }
+    case 'flag': {
+      if (!entry.flagKey) return null;
+      c.setState(s => ({ flags: { ...(s.flags || {}), [entry.flagKey]: !!entry.flagValue } }));
+      return `flag ${entry.flagKey} = ${entry.flagValue ? 'true' : 'false'}`;
+    }
+    case 'navigate': {
+      if (!entry.roomId) return null;
+      c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [entry.roomId]: 0 } }));
+      c.goto(entry.roomId);
+      return `→ ${entry.roomId}`;
+    }
+    case 'learnSkill': {
+      if (!entry.skillId) return null;
+      c.setState(s => {
+        const cur = Array.isArray(s.skills) ? s.skills : [];
+        return cur.includes(entry.skillId) ? {} : { skills: [...cur, entry.skillId] };
+      });
+      return `learned ${entry.skillId}`;
+    }
+    case 'talkNpc': {
+      if (!entry.npcId) return null;
+      c.setState(s => ({
+        _npcPageIdx:      { ...(s._npcPageIdx      || {}), [entry.npcId]: 0 },
+        _npcGreetingDone: { ...(s._npcGreetingDone || {}), [entry.npcId]: false },
+        _npcTopic:        { ...(s._npcTopic        || {}), [entry.npcId]: null },
+        _npcTopicStack:   { ...(s._npcTopicStack   || {}), [entry.npcId]: [] },
+      }));
+      c.talkTo(entry.npcId, c.scene);
+      return `talkTo ${entry.npcId}`;
+    }
+    case 'js': {
+      const fn = _safeFn(['c'], entry.jsBody || '');
+      try { fn(c); } catch (e) { console.warn('[preview] loot JS threw:', e.message); }
+      return entry.label || 'js';
+    }
+    case 'nothing':
+    default:
+      return null;
+  }
+};
+
+// Compile a LootTable to a (c)=>void runner. `picks` rolls; `unique` removes
+// the picked entry from the bag between rolls. Resolved flavour strings are
+// pushed onto `state._lootLog` so combat outcome screens / JS sidebar widgets
+// / room pages can display "Loot: …" if they want. The buffer is bounded
+// (last 8) so it can't grow forever.
+const _compileRandomLoot = rawTable => {
+  const table = rawTable || { picks: 1, unique: false, showFlavour: true, entries: [] };
+  return c => {
+    const picks = Math.max(1, Number(table.picks) || 1);
+    const bag   = [...(table.entries || [])];
+    const wins  = [];
+    for (let i = 0; i < picks; i++) {
+      if (bag.length === 0) break;
+      const idx = _weightedPick(c)(bag);
+      if (idx < 0) break;
+      const entry = bag[idx];
+      const flavour = _applyLootEntry(entry, c);
+      if (flavour) wins.push(flavour);
+      if (table.unique) bag.splice(idx, 1);
+    }
+    if (table.showFlavour !== false && wins.length) {
+      const line = `Loot: ${wins.join(', ')}`;
+      c.setState(s => ({ _lootLog: [...((s._lootLog || []).slice(-7)), line] }));
+    }
+  };
+};
+
 // Returns a function (ctx) => void. `project` (optional) is used by enterCombat
 // to read the target combat's enemy.hp for the initial state.
 const _compileEffect = (effect, project) => {
@@ -117,6 +242,38 @@ const _compileEffect = (effect, project) => {
         }
         return next;
       });
+    };
+  }
+  if (effect.mode === 'randomLoot') {
+    return _compileRandomLoot(effect.table);
+  }
+  if (effect.mode === 'navigate') {
+    return c => {
+      if (!effect.toRoom) return;
+      c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [effect.toRoom]: 0 } }));
+      c.goto(effect.toRoom);
+    };
+  }
+  if (effect.mode === 'multi') {
+    // Compile each step once; runner fires them in order. Nested multi works
+    // by recursion since _compileEffect is the same function.
+    const steps = (effect.steps || []).map(s => _compileEffect(s, project));
+    return c => { for (const fn of steps) fn(c); };
+  }
+  if (effect.mode === 'oneOf') {
+    // Pick ONE option per call. Effective weight = base + Σ applicable bonuses
+    // (same machinery as random loot entries via _resolveWeight). The picked
+    // option's Effect fires — any mode, including another oneOf or multi.
+    const opts = (effect.options || []).map(o => ({
+      weight:  Number(o.weight) || 0,
+      bonuses: o.bonuses || [],
+      effect:  _compileEffect(o.effect, project),
+    }));
+    return c => {
+      if (opts.length === 0) return;
+      const idx = _weightedPick(c)(opts);
+      if (idx < 0) return;
+      opts[idx].effect(c);
     };
   }
   if (effect.mode === 'talkTo') {
@@ -164,9 +321,92 @@ const _mediaNode = page => {
   return nodes;
 };
 
-const _pageBody = page => [
+// ─── Inline expression evaluator ────────────────────────────────────────
+//
+// Any narrative text field can embed `${expr}` snippets that get evaluated
+// against the live state. Authoring example:
+//
+//   "You have ${gold} gold pieces. Your hp is ${hp} / 100."
+//   "${flags.metMage ? 'The mage nods at you.' : 'Strangers pass you by.'}"
+//   "Bread in pack: ${inventory.bread ?? 0}"
+//
+// The expression runs as `(state) => (<expr>)` with `state` AND each top-level
+// key destructured into scope (so bare `gold` works without `state.`). Compile
+// failures and runtime throws degrade to the literal `${expr}` so authors see
+// what broke without a crash.
+
+// Compiled template cache. Keyed on the source string (Map, not WeakMap).
+// Project text strings are bounded by the project size, so it can't run away.
+const _templateCache = new Map();
+
+// Maybe helpers — matches the parser-combinator style used by src/components/Markdown.js.
+const _liftIndex = i => i < 0 ? Nothing : Just(i);
+const _findClose = marker => from => text => _liftIndex(text.indexOf(marker, from));
+
+// Try to consume a `${expr}` at the start of `text`. Returns Just({ seg, rest })
+// on match; Nothing otherwise. `seg` is `{ src, fn }` when the expression
+// compiles, or the verbatim string when it doesn't (so the author sees the
+// broken source instead of a silent crash).
+const _matchExpr = text =>
+  bind(guard(text.startsWith('${'))(2))                (s =>
+  bind(_findClose('}')(s)(text))                       (e => {
+    const verbatim = text.slice(0, e + 1);
+    const rest     = text.slice(e + 1);
+    try {
+      // eslint-disable-next-line no-new-func
+      const fn = new Function('state', `with (state) { return (${text.slice(s, e)}); }`);
+      return Just({ seg: { src: verbatim, fn }, rest });
+    } catch (_) {
+      return Just({ seg: verbatim, rest });
+    }
+  }));
+
+// Walk `text` once, emitting a list of segments. Consume an expression when
+// _matchExpr succeeds; otherwise glue a single literal character onto the tail
+// segment (or start a new one).
+const _compileTemplate = text => {
+  const out = [];
+  let rest = text;
+  let buf  = '';
+  const _flush = () => { if (buf) { out.push(buf); buf = ''; } };
+  while (rest.length) {
+    const matched = fromMaybe(null)(_matchExpr(rest));
+    if (matched) {
+      _flush();
+      out.push(matched.seg);
+      rest = matched.rest;
+    } else {
+      buf += rest[0];
+      rest = rest.slice(1);
+    }
+  }
+  _flush();
+  return out;
+};
+
+// Public: substitute every `${expr}` in `text` using `state`. Curried so call
+// sites read `_evalText(ctx.state)(page.text)`.
+const _evalText = state => text => {
+  if (!text || typeof text !== 'string' || !text.includes('${')) return text || '';
+  let segs = _templateCache.get(text);
+  if (!segs) { segs = _compileTemplate(text); _templateCache.set(text, segs); }
+  const s = state || {};
+  return segs.map(seg => {
+    if (typeof seg === 'string') return seg;
+    try {
+      const v = seg.fn(s);
+      return v == null ? '' : String(v);
+    } catch (_) {
+      return seg.src;          // runtime throw → visible verbatim
+    }
+  }).join('');
+};
+
+// Curried `ctx => page => vnode[]`. Text fields run through _evalText so
+// authors can drop `${gold}` etc. into any page body.
+const _pageBody = ctx => page => [
   ..._mediaNode(page),
-  ...(page.text ? [p({})([page.text])] : []),
+  ...(page.text ? [p({})([_evalText(ctx.state)(page.text)])] : []),
 ];
 
 // Build the scene fn for a room. Wardrobe rooms render a paper-doll + the
@@ -182,12 +422,27 @@ const _buildSceneFn = (room, project) => ctx => {
   const page    = room.pages[safeIdx];
   const isLast  = safeIdx === room.pages.length - 1;
 
-  const body = _pageBody(page);
+  const body = _pageBody(ctx)(page);
   if (isLast) body.push(...NpcLine(ctx));
+
+  // Opt-in end-of-dialog Effect. On the last page, when no Choice is defined
+  // AND room.onEnd is non-none, render a single button (labelled by the page's
+  // advanceLabel) that fires the Effect. Useful for "drink beer → randomLoot
+  // navigate" or any auto-routing at the end of a story chain. NOTHING is
+  // created automatically — devs opt in by configuring onEnd.
+  const onEndFn       = _compileEffect(room.onEnd, project);
+  const hasOnEnd      = room.onEnd && room.onEnd.mode && room.onEnd.mode !== 'none';
+  const onEndFallback = isLast && room.choices.length === 0 && hasOnEnd
+    ? [{
+        label:  page.advanceLabel || 'Continue',
+        action: c => onEndFn(c),
+      }]
+    : [];
 
   const choices = isLast
     ? [
         ...room.choices.map(ch => _buildChoice(ch, project, room.id)),
+        ...onEndFallback,
         ...NpcChoices(ctx),
       ]
     : [{
@@ -230,7 +485,7 @@ const _buildInventoryRoomFn = (room, project) => ctx => {
         body: [
           ...(book.image ? [img({ src: book.image, style: 'max-width:200px; display:block; margin:0 auto 12px; border-radius:8px' })([])] : []),
           div({ style: 'max-width:640px; margin:0 auto; padding:16px 20px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); white-space:pre-wrap; line-height:1.6; font-size:14px' })([
-            book.text || '(the pages are blank.)',
+            _evalText(ctx.state)(book.text) || '(the pages are blank.)',
           ]),
         ],
         choices: [{ label: '← Close', action: c => c.setState({ _reading: null }) }],
@@ -392,12 +647,15 @@ const _buildChoice = (ch, project, fromRoomId) => {
     label: ch.label,
     if:    c => guard(c),
     action: c => {
+      // Snapshot the scene id before firing the action. If the action navigates
+      // (e.g. randomLoot picked a `navigate` entry, or an enterCombat/talkTo
+      // effect), we YIELD and skip the choice's default `to:`. This lets the
+      // action's effect dynamically override the destination.
+      const before = c.scene;
       effect(c);
+      if (c.getState()._scene !== before) return;
       if (!ch.to) return;
-      // Reset page index for the destination first so the latest state seen
-      // by the gate matches what the player will see.
       c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [ch.to]: 0 } }));
-      // Re-read state via getState() because c.state is render-time stale.
       const live = { ...c, state: c.getState() };
       if (enterGuard(live)) enterEffect(c);
       c.goto(ch.to);
@@ -407,22 +665,30 @@ const _buildChoice = (ch, project, fromRoomId) => {
   };
 };
 
+// Resolve a shop entry's effective price = entry.price ?? item.price. Both are
+// { stat, amount } shapes after normalisation; falls back to `gold 0` if the
+// item disappeared. Returns the resolved `{ stat, amount }`.
+const _resolvePrice = (entry, item) => {
+  if (entry.price && typeof entry.price === 'object') return { stat: entry.price.stat || 'gold', amount: Number(entry.price.amount) || 0 };
+  if (item?.price && typeof item.price === 'object')  return { stat: item.price.stat  || 'gold', amount: Number(item.price.amount)  || 0 };
+  return { stat: 'gold', amount: 0 };
+};
+
 const _buildShopScene = (npc, project) => {
   const stock = npc.shop?.stock || [];
   return ctx => {
     const back = ctx.scene;
     const inv  = ctx.state.inventory || {};
-    const gold = Number(ctx.state.gold || 0);
     const npcStock = ctx.state._shopStock?.[npc.id] || {};
     const remaining = entry => entry.quantity == null ? Infinity : Math.max(0, entry.quantity - (npcStock[entry.itemId] || 0));
 
     const buy = entry => c => {
       const item  = project.items.find(it => it.id === entry.itemId);
-      const price = entry.price ?? item?.price ?? 0;
-      if (gold < price) return;
+      const { stat, amount } = _resolvePrice(entry, item);
+      if ((Number(c.state[stat]) || 0) < amount) return;
       if (remaining(entry) <= 0) return;
       c.setState(s => ({
-        gold:      Number(s.gold || 0) - price,
+        [stat]:    (Number(s[stat]) || 0) - amount,
         inventory: { ...(s.inventory || {}), [entry.itemId]: Number(s.inventory?.[entry.itemId] || 0) + 1 },
         _shopStock: {
           ...(s._shopStock || {}),
@@ -435,19 +701,19 @@ const _buildShopScene = (npc, project) => {
       ? [p({})(['(Nothing for sale right now.)'])]
       : [div({ style: 'display:flex; flex-direction:column; gap:8px' })(
           stock.map(entry => {
-            const item  = project.items.find(it => it.id === entry.itemId);
-            const name  = item?.name || entry.itemId;
-            const price = entry.price ?? item?.price ?? 0;
-            const rem   = remaining(entry);
-            const have  = Number(inv[entry.itemId] || 0);
+            const item   = project.items.find(it => it.id === entry.itemId);
+            const name   = item?.name || entry.itemId;
+            const { stat, amount } = _resolvePrice(entry, item);
+            const rem    = remaining(entry);
+            const have   = Number(inv[entry.itemId] || 0);
             return div({
               style: 'display:grid; grid-template-columns: 1fr auto auto; gap:8px; align-items:center; padding:8px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface)',
             })([
               div({})([
                 div({ style: 'font-weight:600' })([name]),
-                ...(item?.description ? [div({ style: 'font-size:12px; color:var(--text-muted)' })([item.description])] : []),
+                ...(item?.description ? [div({ style: 'font-size:12px; color:var(--text-muted)' })([_evalText(ctx.state)(item.description)])] : []),
                 div({ style: 'font-size:12px; color:var(--text-muted); margin-top:2px' })([
-                  `Price: ${price}g · You have: ${have}${rem === Infinity ? '' : ` · Left: ${rem}`}`,
+                  `Price: ${amount} ${stat} · You have: ${have}${rem === Infinity ? '' : ` · Left: ${rem}`}`,
                 ]),
               ]),
               span({})([]),
@@ -459,17 +725,17 @@ const _buildShopScene = (npc, project) => {
     return Scene({
       title: npc.name,
       body:  [
-        ...(npc.greeting ? [p({ style: 'font-style:italic; color:var(--text-muted)' })([npc.greeting])] : []),
+        ...(npc.greeting ? [p({ style: 'font-style:italic; color:var(--text-muted)' })([_evalText(ctx.state)(npc.greeting)])] : []),
         ...stockBody,
       ],
       choices: [
         ...stock.map(entry => {
-          const item  = project.items.find(it => it.id === entry.itemId);
-          const price = entry.price ?? item?.price ?? 0;
-          const rem   = remaining(entry);
+          const item   = project.items.find(it => it.id === entry.itemId);
+          const { stat, amount } = _resolvePrice(entry, item);
+          const rem    = remaining(entry);
           return {
-            label: `Buy ${item?.name || entry.itemId} (${price}g)`,
-            if: c => Number(c.state.gold || 0) >= price && rem > 0,
+            label: `Buy ${item?.name || entry.itemId} (${amount} ${stat})`,
+            if: c => (Number(c.state[stat]) || 0) >= amount && rem > 0,
             action: buy(entry),
           };
         }),
@@ -510,7 +776,7 @@ const _renderNpcSimple = (npc, project, back, ctx) => {
   const safeIdx = Math.min(idx, npc.pages.length - 1);
   const page    = npc.pages[safeIdx];
   const isLast  = safeIdx === npc.pages.length - 1;
-  const body    = _pageBody(page);
+  const body    = _pageBody(ctx)(page);
 
   if (!isLast) {
     return Scene({
@@ -541,7 +807,9 @@ const _buildSimpleNpcChoice = (ch, project, back) => {
     label: ch.label,
     if:    c => guard(c),
     action: c => {
+      const before = c.scene;
       effect(c);
+      if (c.getState()._scene !== before) return;   // effect navigated; yield
       if (!ch.to) { c.setState({ _scene: back }); return; }
       const target      = (project.rooms || []).find(r => r.id === ch.to);
       const enterGuard  = target ? _compileCondition(target.onEnterCondition) : () => true;
@@ -572,7 +840,7 @@ const _renderNpcAdvanced = (npc, project, back, ctx) => {
   if (inGreeting && !greetingLast) {
     return Scene({
       title: npc.name,
-      body:  _pageBody(greetingPage),
+      body:  _pageBody(ctx)(greetingPage),
       choices: [{
         label: greetingPage.advanceLabel || 'More',
         action: c => c.setState(s => ({
@@ -584,7 +852,7 @@ const _renderNpcAdvanced = (npc, project, back, ctx) => {
   if (inGreeting && greetingLast) {
     return Scene({
       title: npc.name,
-      body:  _pageBody(greetingPage),
+      body:  _pageBody(ctx)(greetingPage),
       choices: [{
         label: greetingPage.advanceLabel || 'Continue',
         action: c => c.setState(s => ({
@@ -607,7 +875,7 @@ const _renderNpcTopic = (npc, topic, allTopics, project, back, ctx) => {
   const safeIdx = Math.min(idx, pages.length - 1);
   const page   = pages[safeIdx];
   const isLast = safeIdx === pages.length - 1;
-  const body   = _pageBody(page);
+  const body   = _pageBody(ctx)(page);
 
   if (!isLast) {
     return Scene({
@@ -663,7 +931,11 @@ const _buildTopicChoice = (ch, npc, topic, allTopics, project, back) => {
     label: ch.label,
     if:    c => guard(c),
     action: c => {
+      const before = c.scene;
       effect(c);
+      // If the effect already navigated (randomLoot navigate, enterCombat,
+      // talkTo, etc.) we yield to it and skip the choice's flow-based nav.
+      if (c.getState()._scene !== before) return;
 
       // `stay` — effect ran, no navigation. The scene re-renders on next tick;
       // current topic + page index are untouched.
@@ -925,7 +1197,7 @@ const _buildCombatSceneFn = (combat, project) => ctx => {
   // also removes the NPC from world by clearing its location.
   if (cs.outcome === 'win' || cs.outcome === 'lose') {
     const targetRoom = (cs.outcome === 'win' ? combat.winRoom : combat.loseRoom) || cs.returnTo;
-    const flavour    =  cs.outcome === 'win' ? (combat.winText  || 'You won!') : (combat.loseText || 'You were defeated.');
+    const flavour    =  _evalText(ctx.state)(cs.outcome === 'win' ? (combat.winText  || 'You won!') : (combat.loseText || 'You were defeated.'));
     const lootEntries = cs.outcome === 'win' ? Object.entries(combat.enemy.loot || {}).filter(([, n]) => Number(n) > 0) : [];
     const onWinFn  = _compileEffect(combat.onWin,  project);
     const onLoseFn = _compileEffect(combat.onLose, project);
@@ -1100,7 +1372,7 @@ const _buildCombatSceneFn = (combat, project) => ctx => {
             : []),
           ...((cs.lastMoveText || cs.lastEnemyText)
             ? [p({ style: 'margin:0; text-align:center; font-style:italic; color:var(--text-muted); font-size:13px; max-width:380px' })([
-                cs.lastMoveText || cs.lastEnemyText,
+                _evalText(ctx.state)(cs.lastMoveText || cs.lastEnemyText),
               ])]
             : []),
         ])]
@@ -1170,6 +1442,7 @@ const buildGameConfig = rawProject => {
     _shopStock:  {},
     _combat:     null,
     _reading:    null,
+    _lootLog:    [],  // last 8 "Loot: X ×2" lines from randomLoot picks
   };
 
   // Auto-reset NPC page index on talkTo (the engine doesn't expose a hook, so

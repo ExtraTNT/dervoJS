@@ -15,6 +15,56 @@
 
 const _q = s => JSON.stringify(s ?? '');
 
+// Project → extra import lines, scoped to one of the generated files
+// ('main' / 'scenes' / 'world' / 'items' / 'sidebar'). Each entry yields one
+// `import <binding> from '<target>';` line (or a bare `import '<target>';`
+// when the binding is empty for side-effect imports). Author errors fall
+// through quietly — empty target = skipped.
+const _extraImports = (project, file) => {
+  const list = (project.meta?.imports || []).filter(imp => imp && imp.file === file && imp.target);
+  if (list.length === 0) return '';
+  return list.map(imp => imp.binding
+    ? `import ${imp.binding} from '${imp.target}';`
+    : `import '${imp.target}';`
+  ).join('\n') + '\n';
+};
+
+// Inline-template helper baked into the top of every emitted file that
+// renders narrative text. Mirrors the preview-time _evalText: substitutes
+// `${expr}` snippets using a `with (state)` scope, caching compiled segments
+// per source string. Compile/runtime failures degrade to the verbatim source
+// so authors see what broke instead of crashing the scene.
+const _TEMPLATE_HELPER = `
+const __tplCache = new Map();
+const _t = (state, text) => {
+  if (!text || typeof text !== 'string' || text.indexOf('\${') < 0) return text || '';
+  let segs = __tplCache.get(text);
+  if (!segs) {
+    segs = [];
+    let i = 0;
+    while (i < text.length) {
+      const s = text.indexOf('\${', i);
+      if (s < 0) { segs.push(text.slice(i)); break; }
+      if (s > i) segs.push(text.slice(i, s));
+      const e = text.indexOf('}', s + 2);
+      if (e < 0) { segs.push(text.slice(s)); break; }
+      const verb = text.slice(s, e + 1);
+      let fn;
+      try { fn = new Function('state', 'with (state) { return (' + text.slice(s + 2, e) + '); }'); }
+      catch (_) { segs.push(verb); i = e + 1; continue; }
+      segs.push({ src: verb, fn });
+      i = e + 1;
+    }
+    __tplCache.set(text, segs);
+  }
+  const st = state || {};
+  return segs.map(seg => {
+    if (typeof seg === 'string') return seg;
+    try { const v = seg.fn(st); return v == null ? '' : String(v); }
+    catch (_) { return seg.src; }
+  }).join('');
+};`;
+
 // Compile a Condition to a JS expression string that returns boolean.
 // `c` (ctx) is in scope. JS-mode expressions are emitted verbatim.
 const _condExpr = cond => {
@@ -75,6 +125,115 @@ const _opPatch = op => {
   return `[${_q(target)}]: ${next}`;
 };
 
+// One weight bonus: `{ guard: c=>bool, amountMode, amountFixed, amountStat }`.
+// The guard is a compiled Condition expression — we wrap it inline so the
+// emitted entry stays self-contained.
+const _emitWeightBonus = bonus => `{ ` +
+  `guard: c => ${_condExpr(bonus.condition)}, ` +
+  `amountMode: ${_q(bonus.amountMode || 'fixed')}, ` +
+  `amountFixed: ${Number(bonus.amountFixed) || 0}, ` +
+  `amountStat: ${_q(bonus.amountStat || '')} ` +
+`}`;
+
+// Random loot — emit the table data + a small runner that does the same
+// weighted-pick / unique / picks dance the preview interpreter does. The
+// runner is a pure function literal, so this composes inside choice actions
+// and combat onWin/onLose like any other Effect.
+const _emitLootEntry = entry => `{ ` +
+  `weight: ${Math.max(0, Number(entry.weight) || 0)}, ` +
+  `kind: ${_q(entry.kind || 'item')}, ` +
+  `itemId: ${_q(entry.itemId || '')}, ` +
+  `countMin: ${Number(entry.countMin) || 0}, ` +
+  `countMax: ${Number(entry.countMax) || 0}, ` +
+  `statKey: ${_q(entry.statKey || '')}, ` +
+  `statMin: ${Number(entry.statMin) || 0}, ` +
+  `statMax: ${Number(entry.statMax) || 0}, ` +
+  `flagKey: ${_q(entry.flagKey || '')}, ` +
+  `flagValue: ${entry.flagValue !== false ? 'true' : 'false'}, ` +
+  `roomId: ${_q(entry.roomId || '')}, ` +
+  `skillId: ${_q(entry.skillId || '')}, ` +
+  `npcId: ${_q(entry.npcId || '')}, ` +
+  `jsBody: ${_q(entry.jsBody || '')}, ` +
+  `bonuses: [${(entry.bonuses || []).map(_emitWeightBonus).join(', ')}] ` +
+`}`;
+
+const _emitRandomLoot = rawTable => {
+  const table = rawTable || { picks: 1, unique: false, showFlavour: true, entries: [] };
+  const entriesLit = (table.entries || []).map(_emitLootEntry).join(', ');
+  const picks = Math.max(1, Number(table.picks) || 1);
+  return `c => {
+      const _rand = (lo, hi) => { const a = Math.min(lo|0, hi|0), b = Math.max(lo|0, hi|0); return a + Math.floor(Math.random() * (b - a + 1)); };
+      // Effective weight = base + sum of every applicable bonus.
+      const _wt = e => {
+        let t = Math.max(0, e.weight);
+        for (const b of (e.bonuses || [])) {
+          if (!b.guard(c)) continue;
+          t += b.amountMode === 'stat' ? (Number(c.state[b.amountStat]) || 0) : (Number(b.amountFixed) || 0);
+        }
+        return Math.max(0, t);
+      };
+      const _pick = bag => { const ws = bag.map(_wt); const tot = ws.reduce((a, w) => a + w, 0); if (tot <= 0) return -1; let r = Math.random() * tot; for (let i = 0; i < ws.length; i++) { r -= ws[i]; if (r <= 0) return i; } return ws.length - 1; };
+      const _apply = (e, c) => {
+        if (e.kind === 'item' && e.itemId) {
+          const n = Math.max(0, _rand(e.countMin, e.countMax));
+          if (n === 0) return null;
+          c.setState(s => ({ inventory: { ...(s.inventory || {}), [e.itemId]: (Number(s.inventory?.[e.itemId]) || 0) + n } }));
+          return e.itemId + ' ×' + n;
+        }
+        if (e.kind === 'stat' && e.statKey) {
+          const n = _rand(e.statMin, e.statMax);
+          if (n === 0) return null;
+          c.setState(s => ({ [e.statKey]: (Number(s[e.statKey]) || 0) + n }));
+          return e.statKey + ' ' + (n > 0 ? '+' : '') + n;
+        }
+        if (e.kind === 'flag' && e.flagKey) {
+          c.setState(s => ({ flags: { ...(s.flags || {}), [e.flagKey]: !!e.flagValue } }));
+          return 'flag ' + e.flagKey + ' = ' + (e.flagValue ? 'true' : 'false');
+        }
+        if (e.kind === 'navigate' && e.roomId) {
+          c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [e.roomId]: 0 } }));
+          c.goto(e.roomId);
+          return '→ ' + e.roomId;
+        }
+        if (e.kind === 'learnSkill' && e.skillId) {
+          c.setState(s => { const cur = Array.isArray(s.skills) ? s.skills : []; return cur.includes(e.skillId) ? {} : { skills: [...cur, e.skillId] }; });
+          return 'learned ' + e.skillId;
+        }
+        if (e.kind === 'talkNpc' && e.npcId) {
+          c.setState(s => ({
+            _npcPageIdx:      { ...(s._npcPageIdx      || {}), [e.npcId]: 0 },
+            _npcGreetingDone: { ...(s._npcGreetingDone || {}), [e.npcId]: false },
+            _npcTopic:        { ...(s._npcTopic        || {}), [e.npcId]: null },
+            _npcTopicStack:   { ...(s._npcTopicStack   || {}), [e.npcId]: [] },
+          }));
+          c.talkTo(e.npcId, c.scene);
+          return 'talkTo ' + e.npcId;
+        }
+        if (e.kind === 'js') {
+          try { (new Function('c', e.jsBody || ''))(c); } catch (_) {}
+          return 'js';
+        }
+        return null;
+      };
+      const bag  = [${entriesLit}];
+      const wins = [];
+      const picks = ${picks};
+      const unique = ${table.unique ? 'true' : 'false'};
+      const showFlavour = ${table.showFlavour !== false ? 'true' : 'false'};
+      for (let i = 0; i < picks; i++) {
+        if (bag.length === 0) break;
+        const idx = _pick(bag); if (idx < 0) break;
+        const e = bag[idx];
+        const f = _apply(e, c); if (f) wins.push(f);
+        if (unique) bag.splice(idx, 1);
+      }
+      if (showFlavour && wins.length) {
+        const line = 'Loot: ' + wins.join(', ');
+        c.setState(s => ({ _lootLog: [...((s._lootLog || []).slice(-7)), line] }));
+      }
+    }`;
+};
+
 // Compile an Effect into a (c) => void body. Always returns a function literal string.
 const _effectFn = effect => {
   if (!effect || effect.mode === 'none') return null;
@@ -83,6 +242,43 @@ const _effectFn = effect => {
     const patches = (effect.ops || []).map(_opPatch).filter(Boolean);
     if (patches.length === 0) return null;
     return `c => c.setState(s => ({ ${patches.join(', ')} }))`;
+  }
+  if (effect.mode === 'randomLoot') {
+    return _emitRandomLoot(effect.table);
+  }
+  if (effect.mode === 'navigate' && effect.toRoom) {
+    return `c => { c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [${_q(effect.toRoom)}]: 0 } })); c.goto(${_q(effect.toRoom)}); }`;
+  }
+  if (effect.mode === 'multi') {
+    // Emit each step independently and chain the function literals. Filter
+    // out null sub-effects so an empty-simple or none-mode step doesn't break
+    // the chain.
+    const stepFns = (effect.steps || []).map(_effectFn).filter(Boolean);
+    if (stepFns.length === 0) return null;
+    return `c => { ${stepFns.map(fn => `(${fn})(c);`).join(' ')} }`;
+  }
+  if (effect.mode === 'oneOf') {
+    // Weighted "exactly one outcome" picker. Each option holds an arbitrary
+    // nested Effect — recursion handles the nesting. Inline _wt mirrors the
+    // randomLoot version so bonus semantics stay identical.
+    const opts = (effect.options || []).map(o => {
+      const subFn = _effectFn(o.effect) || '() => {}';
+      return `{ ` +
+        `weight: ${Math.max(0, Number(o.weight) || 0)}, ` +
+        `bonuses: [${(o.bonuses || []).map(_emitWeightBonus).join(', ')}], ` +
+        `effect: ${subFn} ` +
+      `}`;
+    }).join(', ');
+    if (!effect.options || effect.options.length === 0) return null;
+    return `c => {
+      const opts = [${opts}];
+      const _wt = e => { let t = Math.max(0, e.weight); for (const b of (e.bonuses || [])) { if (!b.guard(c)) continue; t += b.amountMode === 'stat' ? (Number(c.state[b.amountStat]) || 0) : (Number(b.amountFixed) || 0); } return Math.max(0, t); };
+      const ws = opts.map(_wt); const tot = ws.reduce((a, w) => a + w, 0);
+      if (tot <= 0) return;
+      let r = Math.random() * tot;
+      for (let i = 0; i < ws.length; i++) { r -= ws[i]; if (r <= 0) { opts[i].effect(c); return; } }
+      opts[opts.length - 1].effect(c);
+    }`;
   }
   if (effect.mode === 'talkTo' && effect.npcId) {
     return `c => { c.setState(s => ({ ` +
@@ -175,7 +371,6 @@ const _emitPageBody = page => {
 };
 
 const _emitWardrobeRoomFn = room => project => {
-  console.log(project)
   const wb = room.wardrobe || { portraitWidth: 240, portraitHeight: 320, layers: [], kinds: ['equipment'] };
   const choicesLit = room.choices.map(c => _emitChoice(c)(project)).join(', ');
   return `${room.id}: ctx => {
@@ -253,7 +448,7 @@ const _emitInventoryRoomFn = room => project => {
           title: book.name || book.id,
           body: [
             ...(book.image ? [img({ src: book.image, style: 'max-width:200px; display:block; margin:0 auto 12px; border-radius:8px' })([])] : []),
-            div({ style: 'max-width:640px; margin:0 auto; padding:16px 20px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); white-space:pre-wrap; line-height:1.6; font-size:14px' })([book.text || '(the pages are blank.)']),
+            div({ style: 'max-width:640px; margin:0 auto; padding:16px 20px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); white-space:pre-wrap; line-height:1.6; font-size:14px' })([_t(ctx.state, book.text) || '(the pages are blank.)']),
           ],
           choices: [{ label: '← Close', action: c => c.setState({ _reading: null }) }],
         })(ctx);
@@ -352,6 +547,14 @@ const _emitRoomFn = room => project => {
   if (room.kind === 'inventory') return _emitInventoryRoomFn(room)(project);
   const pagesLit = room.pages.map(_emitPageLit).join(', ');
   const choicesLit = room.choices.map(c => _emitChoice(c)(project)).join(', ');
+  // Optional end-of-dialog Effect — when the last page has no Choices AND the
+  // room defines an onEnd Effect, render one button that fires it. Nothing is
+  // auto-created. The button's label inherits the page's advanceLabel so the
+  // dev can keep narrative voice ("Drink", "Continue", "Wake up", …).
+  const onEndFn  = _effectFn(room.onEnd);
+  const onEndLit = (room.choices.length === 0 && onEndFn)
+    ? `, { label: page.advanceLabel || 'Continue', action: c => (${onEndFn})(c) }`
+    : '';
   return `${room.id}: ctx => {
     const pages = [${pagesLit}];
     const idx = Math.min((ctx.state._pageIdx?.[${_q(room.id)}] || 0), pages.length - 1);
@@ -360,10 +563,10 @@ const _emitRoomFn = room => project => {
     const body = [];
     if (page.image) body.push(img({ src: page.image, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
     if (page.video) body.push(video({ src: page.video, controls: true, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
-    if (page.text)  body.push(p({})([page.text]));
+    if (page.text)  body.push(p({})([_t(ctx.state, page.text)]));
     if (isLast) body.push(...NpcLine(ctx));
     const choices = isLast
-      ? [${choicesLit}${room.choices.length ? ',' : ''} ...NpcChoices(ctx)]
+      ? [${choicesLit}${room.choices.length ? ',' : ''} ...NpcChoices(ctx)${onEndLit}]
       : [{
           label: page.advanceLabel || 'More',
           action: c => c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [${_q(room.id)}]: idx + 1 } })),
@@ -387,7 +590,7 @@ const _emitCombatSceneFn = combat => project => {
     }
     if (cs.outcome === 'win' || cs.outcome === 'lose') {
       const targetRoom = (cs.outcome === 'win' ? cb.winRoom : cb.loseRoom) || cs.returnTo;
-      const flavour    =  cs.outcome === 'win' ? cb.winText : cb.loseText;
+      const flavour    =  _t(ctx.state, cs.outcome === 'win' ? cb.winText : cb.loseText);
       const lootEntries = cs.outcome === 'win' ? Object.entries(cb.enemy.loot || {}).filter(([, n]) => Number(n) > 0) : [];
       const outcomeImg = cs.outcome === 'win'
         ? (cb.winImage  || cb.enemy.image)
@@ -576,7 +779,7 @@ const _emitCombatSceneFn = combat => project => {
               ? [img({ src: cs.lastMoveImage || cs.lastEnemyImage, style: 'max-width:200px; max-height:180px; display:block; border-radius:8px' })([])]
               : []),
             ...((cs.lastMoveText || cs.lastEnemyText)
-              ? [p({ style: 'margin:0; text-align:center; font-style:italic; color:var(--text-muted); font-size:13px; max-width:380px' })([cs.lastMoveText || cs.lastEnemyText])]
+              ? [p({ style: 'margin:0; text-align:center; font-style:italic; color:var(--text-muted); font-size:13px; max-width:380px' })([_t(ctx.state, cs.lastMoveText || cs.lastEnemyText)])]
               : []),
           ])]
         : []),
@@ -592,8 +795,9 @@ const _emitCombatSceneFn = combat => project => {
 
 // Generate the scenes.js source file
 const emitScenes = project => `// AUTO-GENERATED by dervoJS gameEditor. Edit the project in the editor.
-import { div, span, p, img, video, button } from '../src/elements.js';
+${_extraImports(project, 'scenes')}import { div, span, p, img, video, button } from '../src/elements.js';
 import { Scene, NpcChoices, NpcLine } from '../src/game.js';
+${_TEMPLATE_HELPER}
 
 const __COMBATS = ${JSON.stringify((project.combats || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {}))};
 const __SKILLS  = ${JSON.stringify((project.skills  || []).reduce((acc, s) => ({ ...acc, [s.id]: s }), {}))};
@@ -691,7 +895,7 @@ const _emitNpcDialogue = npc => project => {
       const body = [];
       if (page.image) body.push(img({ src: page.image, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
       if (page.video) body.push(video({ src: page.video, controls: true, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
-      if (page.text)  body.push(p({})([page.text]));
+      if (page.text)  body.push(p({})([_t(ctx.state, page.text)]));
       const choices = isLast
         ? [${choicesLit}${hasChoices ? '' : `{ label: 'Goodbye', action: c => c.setState({ _scene: back }) }`}]
         : [{ label: page.advanceLabel || 'More', action: c => c.setState(s => ({ _npcPageIdx: { ...(s._npcPageIdx || {}), [${npcIdLit}]: idx + 1 } })) }];
@@ -734,7 +938,7 @@ const _emitNpcDialogue = npc => project => {
         const body = [];
         if (greetPage.image) body.push(img({ src: greetPage.image, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
         if (greetPage.video) body.push(video({ src: greetPage.video, controls: true, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
-        if (greetPage.text)  body.push(p({})([greetPage.text]));
+        if (greetPage.text)  body.push(p({})([_t(ctx.state, greetPage.text)]));
         const choices = last
           ? [{ label: greetPage.advanceLabel || 'Continue', action: c => c.setState(s => ({ _npcGreetingDone: { ...(s._npcGreetingDone || {}), [${npcIdLit}]: true } })) }]
           : [{ label: greetPage.advanceLabel || 'More',     action: c => c.setState(s => ({ _npcPageIdx:      { ...(s._npcPageIdx      || {}), [${npcIdLit}]: greetIdx + 1 } })) }];
@@ -750,7 +954,7 @@ const _emitNpcDialogue = npc => project => {
       const tBody = [];
       if (tPage.image) tBody.push(img({ src: tPage.image, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
       if (tPage.video) tBody.push(video({ src: tPage.video, controls: true, style: 'max-width:100%; border-radius:8px; display:block; margin-bottom:8px' })([]));
-      if (tPage.text)  tBody.push(p({})([tPage.text]));
+      if (tPage.text)  tBody.push(p({})([_t(ctx.state, tPage.text)]));
       const tChoices = tLast
         ? tdata.choices
         : [{ label: tPage.advanceLabel || 'More', action: c => c.setState(s => ({ _npcTopicPageIdx: { ...(s._npcTopicPageIdx || {}), [${npcIdLit}]: { ...(s._npcTopicPageIdx?.[${npcIdLit}] || {}), [currentTopicId]: tIdx + 1 } } })) }];
@@ -759,12 +963,22 @@ const _emitNpcDialogue = npc => project => {
 };
 
 // NPC shop dialogue function — auto-builds buy choices from stock
+// Resolve effective price from a (possibly-null) entry.price + the item's
+// default price. Both shapes are { stat, amount }. Returns the literal that
+// becomes the entry's `priceStat` / `priceAmount` fields in the emitted JS.
+const _resolvePriceCodegen = (entry, item) => {
+  const p = (entry.price && typeof entry.price === 'object') ? entry.price
+          : (item?.price && typeof item.price === 'object') ? item.price
+          : { stat: 'gold', amount: 0 };
+  return { stat: p.stat || 'gold', amount: Number(p.amount) || 0 };
+};
+
 const _emitNpcShop = npc => project => {
   const stockLit = (npc.shop?.stock || []).map(entry => {
-    const item = project.items.find(it => it.id === entry.itemId);
-    const price = entry.price ?? item?.price ?? 0;
-    const qty   = entry.quantity == null ? 'null' : entry.quantity;
-    return `{ itemId: ${_q(entry.itemId)}, name: ${_q(item?.name || entry.itemId)}, description: ${_q(item?.description || '')}, price: ${price}, quantity: ${qty} }`;
+    const item    = project.items.find(it => it.id === entry.itemId);
+    const { stat, amount } = _resolvePriceCodegen(entry, item);
+    const qty     = entry.quantity == null ? 'null' : entry.quantity;
+    return `{ itemId: ${_q(entry.itemId)}, name: ${_q(item?.name || entry.itemId)}, description: ${_q(item?.description || '')}, priceStat: ${_q(stat)}, priceAmount: ${amount}, quantity: ${qty} }`;
   }).join(', ');
   const tailChoicesLit = npc.choices.map(c => _emitChoice(c)(project)).join(', ');
   return `ctx => {
@@ -774,29 +988,29 @@ const _emitNpcShop = npc => project => {
       const sold = ctx.state._shopStock?.[${_q(npc.id)}] || {};
       const remain = e => e.quantity == null ? Infinity : Math.max(0, e.quantity - (sold[e.itemId] || 0));
       const buy = e => c => {
-        if (Number(c.state.gold || 0) < e.price) return;
+        if ((Number(c.state[e.priceStat]) || 0) < e.priceAmount) return;
         if (remain(e) <= 0) return;
         c.setState(s => ({
-          gold: Number(s.gold || 0) - e.price,
-          inventory: { ...(s.inventory || {}), [e.itemId]: Number(s.inventory?.[e.itemId] || 0) + 1 },
-          _shopStock: { ...(s._shopStock || {}), [${_q(npc.id)}]: { ...(s._shopStock?.[${_q(npc.id)}] || {}), [e.itemId]: (s._shopStock?.[${_q(npc.id)}]?.[e.itemId] || 0) + 1 } },
+          [e.priceStat]: (Number(s[e.priceStat]) || 0) - e.priceAmount,
+          inventory:     { ...(s.inventory || {}), [e.itemId]: Number(s.inventory?.[e.itemId] || 0) + 1 },
+          _shopStock:    { ...(s._shopStock || {}), [${_q(npc.id)}]: { ...(s._shopStock?.[${_q(npc.id)}] || {}), [e.itemId]: (s._shopStock?.[${_q(npc.id)}]?.[e.itemId] || 0) + 1 } },
         }));
       };
       const body = [
-        ${npc.greeting ? `p({ style: 'font-style:italic; color:var(--text-muted)' })([${_q(npc.greeting)}]),` : ''}
+        ${npc.greeting ? `p({ style: 'font-style:italic; color:var(--text-muted)' })([_t(ctx.state, ${_q(npc.greeting)})]),` : ''}
         ...(stock.length === 0
           ? [p({})(['(Nothing for sale right now.)'])]
           : stock.map(e => div({ style: 'display:grid; grid-template-columns: 1fr; gap:4px; padding:8px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); margin-bottom:8px' })([
               div({ style: 'font-weight:600' })([e.name]),
               ...(e.description ? [div({ style: 'font-size:12px; color:var(--text-muted)' })([e.description])] : []),
-              div({ style: 'font-size:12px; color:var(--text-muted)' })([\`Price: \${e.price}g · You have: \${(inv[e.itemId] || 0)}\${remain(e) === Infinity ? '' : \` · Left: \${remain(e)}\`}\`]),
+              div({ style: 'font-size:12px; color:var(--text-muted)' })([\`Price: \${e.priceAmount} \${e.priceStat} · You have: \${(inv[e.itemId] || 0)}\${remain(e) === Infinity ? '' : \` · Left: \${remain(e)}\`}\`]),
             ]))
         ),
       ];
       const choices = [
         ...stock.map(e => ({
-          label: \`Buy \${e.name} (\${e.price}g)\`,
-          if: c => Number(c.state.gold || 0) >= e.price && remain(e) > 0,
+          label: \`Buy \${e.name} (\${e.priceAmount} \${e.priceStat})\`,
+          if: c => (Number(c.state[e.priceStat]) || 0) >= e.priceAmount && remain(e) > 0,
           action: buy(e),
         })),
         ${tailChoicesLit}${npc.choices.length ? ',' : ''}
@@ -807,8 +1021,9 @@ const _emitNpcShop = npc => project => {
 };
 
 const emitWorld = project => `// AUTO-GENERATED by dervoJS gameEditor.
-import { p, div, img, video } from '../src/elements.js';
+${_extraImports(project, 'world')}import { p, div, img, video } from '../src/elements.js';
 import { Scene } from '../src/game.js';
+${_TEMPLATE_HELPER}
 
 // Mirrors scenes.js — NPC dialogue functions reference __COMBATS for exit-to-combat
 // flow / enterCombat actions from inside a topic.
@@ -841,7 +1056,7 @@ const emitItems = project => {
     ? project.startingSkills.filter(id => (project.skills || []).find(s => s.id === id))
     : [];
   return `// AUTO-GENERATED by dervoJS gameEditor.
-const ITEMS = ${JSON.stringify(project.items.reduce((acc, it) => ({ ...acc, [it.id]: it }), {}), null, 2)};
+${_extraImports(project, 'items')}const ITEMS = ${JSON.stringify(project.items.reduce((acc, it) => ({ ...acc, [it.id]: it }), {}), null, 2)};
 
 const initialState = ${JSON.stringify({
   ...Object.fromEntries(project.stats.map(s => [s.key, Number(s.initial) || 0])),
@@ -858,6 +1073,7 @@ const initialState = ${JSON.stringify({
   _shopStock:  {},
   _combat:     null,
   _reading:    null,
+  _lootLog:    [],
 }, null, 2)};
 
 export { ITEMS, initialState };
@@ -877,7 +1093,7 @@ const _emitSidebarFile = project => {
   const widgetLiterals = sb.widgets.map(w => JSON.stringify(w)).join(', ');
 
   return `// AUTO-GENERATED by dervoJS gameEditor.
-import { div, span, p, img, video, h3, button } from '../src/elements.js';
+${_extraImports(project, 'sidebar')}import { div, span, p, img, video, h3, button } from '../src/elements.js';
 
 const WIDGETS = [${widgetLiterals}];
 const PROJECT_TITLE = ${_q(project.meta.title)};
@@ -1013,7 +1229,7 @@ const emitMain = project => {
     ? `initStyles({ colors: ${colorsLit} });`
     : `initStyles();`;
   return `// AUTO-GENERATED by dervoJS gameEditor.
-import { initStyles } from '../src/styles.js';
+${_extraImports(project, 'main')}import { initStyles } from '../src/styles.js';
 import { createGame } from '../src/game.js';
 import { scenes }       from './scenes.js';
 import { NPCS }         from './world.js';

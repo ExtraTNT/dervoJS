@@ -151,6 +151,72 @@ const MetaPanel = project => {
       ]),
     ]),
 
+    Card({ title: 'Additional imports' })([
+      Stack({ gap: 10 })([
+        p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
+          'Extra JS modules to inject into the generated game bundle. Each row produces one ',
+          span({ style: 'font-family:ui-monospace,monospace; background:var(--surface-2); padding:1px 5px; border-radius:3px' })(['import <binding> from "<specifier>";']),
+          ' line at the top of the chosen generated file, BEFORE the auto-imports. Leave the binding blank for a side-effect-only ',
+          span({ style: 'font-family:ui-monospace,monospace; background:var(--surface-2); padding:1px 5px; border-radius:3px' })(['import "<specifier>";']),
+          '. Use this to bring in the dervoJS Markdown renderer, your own UI bits, or anything else your JS-mode bodies need.',
+        ]),
+        ...(project.meta.imports || []).map((imp, i) => {
+          const _patch = patch => {
+            const imports = [...(project.meta.imports || [])];
+            imports[i] = { ...imports[i], ...patch };
+            _setMeta({ imports });
+          };
+          const _remove = () => {
+            const imports = [...(project.meta.imports || [])];
+            imports.splice(i, 1);
+            _setMeta({ imports });
+          };
+          return div({ style: 'border:1px solid var(--border); border-radius:var(--radius); padding:10px 12px; background:var(--surface)' })([
+            Grid({ cols: 3, gap: 8 })([
+              Select({
+                label:    i === 0 ? 'Generated file' : '',
+                options:  [
+                  { value: '',        label: '— pick file —' },
+                  { value: 'main',    label: 'main.js'    },
+                  { value: 'scenes',  label: 'scenes.js'  },
+                  { value: 'world',   label: 'world.js'   },
+                  { value: 'items',   label: 'items.js'   },
+                  { value: 'sidebar', label: 'sidebar.js (if enabled)' },
+                ],
+                value:    imp.file || '',
+                onChange: onText(v => _patch({ file: v })),
+              }),
+              TextInput({
+                label:       i === 0 ? 'Binding (named / default / *)' : '',
+                value:       imp.binding || '',
+                onChange:    onText(v => _patch({ binding: v })),
+                placeholder: '{ markdownToVnode } · M · * as N · (blank)',
+              }),
+              TextInput({
+                label:       i === 0 ? 'Module specifier' : '',
+                value:       imp.target || '',
+                onChange:    onText(v => _patch({ target: v })),
+                placeholder: '../src/components/Markdown.js',
+              }),
+            ]),
+            div({ style: 'display:flex; justify-content:space-between; align-items:center; margin-top:6px; gap:8px' })([
+              span({ style: 'font-size:11px; font-family:ui-monospace,monospace; color:var(--text-muted); flex:1; word-break:break-all' })([
+                imp.target
+                  ? (imp.binding
+                      ? `import ${imp.binding} from '${imp.target}';`
+                      : `import '${imp.target}';`)
+                  : '(specifier required)',
+              ]),
+              Button({ variant: 'ghost', size: 'sm', onClick: _remove })(['Remove']),
+            ]),
+          ]);
+        }),
+        Button({ size: 'sm', variant: 'ghost', onClick: () => {
+          const imports = [...(project.meta.imports || []), { file: 'main', target: '', binding: '' }];
+          _setMeta({ imports });
+        } })(['+ Add module']),
+      ]),
+    ]),
     Card({ title: 'Summary' })([
       div({ style: 'display:flex; gap:8px; flex-wrap:wrap' })([
         Badge({ variant: 'blue'   })([`${project.rooms.length} room${project.rooms.length === 1 ? '' : 's'}`]),

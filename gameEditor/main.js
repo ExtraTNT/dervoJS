@@ -28,6 +28,8 @@ import { SkillsPanel }  from './panels/skills.js';
 import { AssetsPanel }  from './panels/assets.js';
 import { CheatSheet }   from './cheatsheet.js';
 import { ThemePanel }   from './panels/theme.js';
+import { StoryPointsPanel } from './panels/storyPoints.js';
+import { StateExplorer }    from './components/StateExplorer.js';
 
 // Boot with persisted editor theme; per-project token overrides are applied
 // via the subscribe hook below so they also re-apply on slot switch.
@@ -84,7 +86,9 @@ store.subscribe(s => _syncCustomCss(s.project.meta.gameCss));
 
 const TABS = [
   { id: 'meta',    label: 'Project'  },
+  { id: 'theme',   label: 'Theme'    },
   { id: 'rooms',   label: 'Rooms'    },
+  { id: 'stories', label: 'Story Points' },
   { id: 'npcs',    label: 'NPCs'     },
   { id: 'items',   label: 'Items'    },
   { id: 'skills',  label: 'Skills'   },
@@ -94,7 +98,6 @@ const TABS = [
   { id: 'graph',   label: 'Graph'    },
   { id: 'preview', label: 'Preview'  },
   { id: 'export',  label: 'Export'   },
-  { id: 'theme',   label: 'Theme'    },
 ];
 
 const _topBar = s =>
@@ -113,6 +116,11 @@ const _topBar = s =>
     Button({ variant: 'ghost', size: 'sm', onClick: _toggleTheme, title: 'Toggle light / dark' })([
       s.theme === 'dark' ? '🌞' : '🌗',
     ]),
+    Button({
+      variant: 'ghost', size: 'sm',
+      onClick: () => setState({ stateExplorerOpen: !s.stateExplorerOpen }),
+      title:   'State explorer — what ${…} can reference',
+    })(['📊 State']),
     Button({ variant: 'ghost', size: 'sm', onClick: () => setState({ cheatsheetOpen: !s.cheatsheetOpen }) })(['? Cheat sheet']),
     Button({ variant: 'ghost', size: 'sm', onClick: persist })(['💾 Save']),
   ]);
@@ -169,6 +177,7 @@ const _activePanel = s => {
   switch (s.activeTab) {
     case 'meta':    return MetaPanel(s.project);
     case 'rooms':   return RoomsPanel(s);
+    case 'stories': return StoryPointsPanel(s);
     case 'npcs':    return NpcsPanel(s);
     case 'items':   return ItemsPanel(s);
     case 'skills':  return SkillsPanel(s);
@@ -205,6 +214,8 @@ const view = s => [
   ]),
   ..._toast(s.toast),
   ...CheatSheet(s),
+  StateExplorer(s),
+  //TODO: add debugger for development
 ];
 
 mount(store)(document.body)(view);

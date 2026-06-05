@@ -31,6 +31,7 @@ const _vars = project => ({
   items:   project.items,
   skills:  project.skills || [],
   npcs:    project.npcs,
+  rooms:   project.rooms,
   combats: project.combats || [],
 });
 
@@ -78,10 +79,12 @@ const _duplicateRoom = id => setProject(p => {
   return { ...p, rooms: [...p.rooms, copy] };
 });
 
-const RoomList = (project, selectedId) =>
-  Stack({ gap: 4 })([
-    h2({ style: 'font-size:14px; margin:0 0 4px' })([`Rooms (${project.rooms.length})`]),
-    ...project.rooms.map(r =>
+const RoomList = (project, selectedId) => {
+  // Story rooms live in the Story Points tab — keep the world-map list clean.
+  const worldRooms = project.rooms.filter(r => r.kind !== 'story');
+  return Stack({ gap: 4 })([
+    h2({ style: 'font-size:14px; margin:0 0 4px' })([`Rooms (${worldRooms.length})`]),
+    ...worldRooms.map(r =>
       button({
         className: `gef-list-btn${r.id === selectedId ? ' active' : ''}`,
         onclick:   () => setState({ selectedRoomId: r.id }),
@@ -100,6 +103,7 @@ const RoomList = (project, selectedId) =>
       Button({ size: 'sm', variant: 'ghost', onClick: _addInventoryRoom })(['+ Inventory']),
     ]),
   ]);
+};
 
 const ITEM_KIND_OPTS = ['consumable', 'equipment', 'key', 'misc'];
 
@@ -380,9 +384,12 @@ const RoomEditor = (room, project) => {
 
 const RoomsPanel = state => {
   const { project, selectedRoomId } = state;
-  const selected = project.rooms.find(r => r.id === selectedRoomId)
-                || project.rooms.find(r => r.id === project.meta.start)
-                || project.rooms[0];
+  // Resolve to a non-story room — story-kind rooms live in their own tab.
+  const worldRooms = project.rooms.filter(r => r.kind !== 'story');
+  const pickedById = worldRooms.find(r => r.id === selectedRoomId);
+  const selected   = pickedById
+                  || worldRooms.find(r => r.id === project.meta.start)
+                  || worldRooms[0];
 
   return div({ style: 'display:grid; grid-template-columns: 260px 1fr; gap:16px; align-items:start' })([
     div({})([RoomList(project, selected?.id)]),

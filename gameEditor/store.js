@@ -38,7 +38,7 @@ const _initialProject = () => {
 
 const _initialTab = () => {
   const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#/, '');
-  const known = ['rooms', 'npcs', 'items', 'skills', 'combats', 'assets', 'sidebar', 'meta', 'graph', 'preview', 'export', 'theme'];
+  const known = ['rooms', 'stories', 'npcs', 'items', 'skills', 'combats', 'assets', 'sidebar', 'meta', 'graph', 'preview', 'export', 'theme'];
   return known.includes(h) ? h : 'rooms';
 };
 
@@ -53,6 +53,7 @@ const store = createStore({
   activeTab:    _initialTab(),    // rooms | npcs | items | meta | graph | preview | export
   // selection state per panel
   selectedRoomId:   null,
+  selectedStoryId:  null,
   selectedNpcId:    null,
   selectedPageId:   null,
   selectedChoiceId: null,
@@ -63,6 +64,9 @@ const store = createStore({
   debugOpen:        false,
   cheatsheetOpen:   false,
   cheatsheetTab:    'builder',
+  // ${…} reference panel (state explorer floating window).
+  stateExplorerOpen:     false,
+  stateExplorerExpanded: {},   // { [path]: true } — which rows are showing JSON
   // Per-topic Choice generator modal — `null` / `{ open: false }` while closed.
   // See gameEditor/components/ChoiceGenerator.js for the shape.
   generator:        { open: false },

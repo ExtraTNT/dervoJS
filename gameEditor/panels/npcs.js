@@ -55,6 +55,7 @@ const _vars = project => ({
   items:   project.items,
   skills:  project.skills || [],
   npcs:    project.npcs,
+  rooms:   project.rooms,
   combats: project.combats || [],
 });
 
@@ -118,13 +119,21 @@ const ShopStockEditor = (npc, project) => {
   const stock = npc.shop?.stock || [];
   const _setStock = next => _updateNpc(npc.id, n => ({ ...n, shop: { ...(n.shop || {}), stock: next } }));
 
+  const statOpts = [{ value: '', label: '(item default)' }, ...project.stats.map(s => ({ value: s.key, label: s.key }))];
   return Stack({ gap: 8 })([
     p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
-      'Items the NPC sells. Leave price blank to use the item\'s default price; leave quantity blank for infinite.',
+      'Items the NPC sells. Leave currency/amount blank to use the item\'s default price; leave quantity blank for infinite.',
     ]),
     ...stock.map((entry, i) => {
-      const item = project.items.find(it => it.id === entry.itemId);
-      return div({ style: 'display:grid; grid-template-columns: 2fr 110px 110px 40px; gap:8px; align-items:end' })([
+      const item       = project.items.find(it => it.id === entry.itemId);
+      const itemPrice  = item?.price || { stat: 'gold', amount: 0 };
+      const price      = entry.price;     // null = use item default
+      // Patcher: setting either side flips the entry from null → { stat, amount }.
+      const _patchPrice = patch => _setStock(stock.map((s, k) =>
+        k === i ? { ...s, price: { stat: itemPrice.stat, amount: itemPrice.amount, ...(s.price || {}), ...patch } } : s
+      ));
+      const _clearPrice = () => _setStock(stock.map((s, k) => k === i ? { ...s, price: null } : s));
+      return div({ style: 'display:grid; grid-template-columns: 2fr 130px 90px 90px 40px; gap:8px; align-items:end' })([
         Select({
           label:    i === 0 ? 'Item' : '',
           options:  [
@@ -134,11 +143,17 @@ const ShopStockEditor = (npc, project) => {
           value:    entry.itemId,
           onChange: onText(v => _setStock(stock.map((s, k) => k === i ? { ...s, itemId: v } : s))),
         }),
+        Select({
+          label:    i === 0 ? 'Currency' : '',
+          options:  statOpts,
+          value:    price ? price.stat : '',
+          onChange: onText(v => { if (v === '') _clearPrice(); else _patchPrice({ stat: v }); }),
+        }),
         TextInput({
-          label:    i === 0 ? 'Price' : '',
-          value:    entry.price == null ? '' : String(entry.price),
-          onChange: onText(v => _setStock(stock.map((s, k) => k === i ? { ...s, price: v === '' ? null : Math.max(0, Number(v) || 0) } : s))),
-          placeholder: item ? String(item.price) : '—',
+          label:    i === 0 ? 'Amount' : '',
+          value:    price ? String(price.amount) : '',
+          onChange: onText(v => { if (v === '') _clearPrice(); else _patchPrice({ amount: Math.max(0, Number(v) || 0) }); }),
+          placeholder: `${itemPrice.amount} ${itemPrice.stat}`,
         }),
         TextInput({
           label:    i === 0 ? 'Qty' : '',

@@ -32,6 +32,7 @@ const _vars = project => ({
   items:   project.items,
   skills:  project.skills || [],
   npcs:    project.npcs   || [],
+  rooms:   project.rooms,
   combats: project.combats || [],
 });
 
@@ -96,18 +97,26 @@ const ItemEditor = (item, project) => {
             onChange: onText(v => set({ name: v })),
           }),
         ]),
+        Select({
+          label:    'Kind',
+          options:  KIND_OPTS,
+          value:    item.kind,
+          onChange: onText(v => set({ kind: v })),
+        }),
+        // Default price = a stat key (any currency: gold / silver / gems / …)
+        // + an amount. Shop entries can override per stock row.
         Grid({ cols: 2, gap: 10 })([
           Select({
-            label:    'Kind',
-            options:  KIND_OPTS,
-            value:    item.kind,
-            onChange: onText(v => set({ kind: v })),
+            label:    'Default price · currency stat',
+            options:  [{ value: '', label: '— pick stat —' }, ...project.stats.map(s => ({ value: s.key, label: s.key }))],
+            value:    item.price?.stat || 'gold',
+            onChange: onText(v => set({ price: { ...(item.price || {}), stat: v || 'gold', amount: Number(item.price?.amount) || 0 } })),
           }),
           NumberInput({
-            label:    'Default price (gold)',
-            value:    Number(item.price) || 0,
+            label:    `Default price · amount (${item.price?.stat || 'gold'})`,
+            value:    Number(item.price?.amount) || 0,
             min:      0,
-            onChange: v => set({ price: Number(v) || 0 }),
+            onChange: v => set({ price: { ...(item.price || {}), stat: item.price?.stat || 'gold', amount: Math.max(0, Number(v) || 0) } }),
           }),
         ]),
         AssetInput({

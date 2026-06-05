@@ -31,6 +31,7 @@ const _vars = project => ({
   items:   project.items,
   skills:  project.skills || [],
   npcs:    project.npcs,
+  rooms:   project.rooms,
   combats: project.combats || [],
 });
 
