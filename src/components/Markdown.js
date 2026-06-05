@@ -1,25 +1,32 @@
+/**
+ * Markdown parser and renderer.
+ * Ported from Bardos, therefore not always clean.
+ * TODO: cleanup, etha reduce
+ */
+
+
 import { vnode } from '../../lib/odocosjs/src/render.js';
 import { pipe, Just, Nothing, toMaybe, bind, guard } from '../../lib/odocosjs/src/core.js';
 import { eq, gt } from '../../lib/odocosjs/src/math.js';
 import { highlight, defaultRegistry } from './Highlight.js';
 
 // Element constructors 
-const el = tag => children => vnode(tag)({})(children);
+const el = tag => vnode(tag)({});
 
 const div       = el('div');
 const p         = el('p');
 const ul        = el('ul');
 const ol        = el('ol');
-const li        = children => el('li')(children);
+const li        = el('li');
 const pre       = el('pre');
-const em        = children => el('em')(children);
-const strong    = children => el('strong')(children);
-const blockquote = children => el('blockquote')(children);
-const a         = attrs => children => vnode('a')(attrs)(children);
+const em        = el('em');
+const strong    = el('strong');
+const blockquote = el('blockquote');
+const a         = vnode('a');
 const img       = attrs => vnode('img')(attrs)([]);
-const h         = level => children => el(`h${level}`)(children);
+const h         = level => el(`h${level}`);
 const hr        = () => vnode('hr')({})([]);
-const code      = children => vnode('code')({})(children);
+const code      = vnode('code')({});
 
 // Utility combinators 
 const map = f => xs => xs.map(f);

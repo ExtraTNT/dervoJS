@@ -72,7 +72,7 @@ const _defaultTopBar = title => ctx =>
       title: 'Toggle theme',
       onclick: () => { toggleTheme(); ctx.setState({}); },
       style: _iconBtnStyle,
-    })(['🌗']),
+    })([document.documentElement.dataset.theme === 'dark' ? '🌞' : '🌗']),
     button({
       type: 'button',
       title: 'Save game',

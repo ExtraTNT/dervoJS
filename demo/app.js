@@ -141,7 +141,7 @@ const pageView = state =>
         onclick: () => { toggleTheme(); setState({}); },
         type: 'button',
         style: 'flex-shrink:0',
-      })(['🌗']),
+      })([state.theme === 'dark' ? '🌞' : '🌗']),
       button({
         type: 'button',
         title: 'State Debugger',
