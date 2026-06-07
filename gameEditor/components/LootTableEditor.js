@@ -217,6 +217,23 @@ const _entryRow = vars => entries => index => onChange => {
         onChange: next => onPatch({ bonuses: next }),
         label:    'Weight bonuses — raise odds dynamically',
       }),
+
+      // Optional per-pick message. Pushed to state._messageQueue when THIS
+      // entry is picked; the next scene render shows the buffer + Continue.
+      // Multi-pick tables accumulate one entry per roll.
+      div({ style: 'border-top:1px dashed var(--border-2); padding-top:8px; margin-top:4px' })([
+        span({ style: 'font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600; display:block; margin-bottom:4px' })([
+          'Message (optional, ${…} template)',
+        ]),
+        textarea({
+          value:   entry.message || '',
+          oninput: e => onPatch({ message: e.target.value }),
+          rows: 2,
+          spellcheck: false,
+          style: 'width:100%; padding:8px; border:1px solid var(--border); border-radius:var(--radius); font-family:ui-monospace,monospace; font-size:12.5px; background:var(--surface-2); color:var(--text); resize:vertical; box-sizing:border-box',
+          placeholder: 'You picked up ${gain.gold ?? 0} gold!',
+        })([]),
+      ]),
     ]),
   ]);
 };

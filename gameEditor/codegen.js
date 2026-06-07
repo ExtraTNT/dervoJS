@@ -29,6 +29,66 @@ const _extraImports = (project, file) => {
   ).join('\n') + '\n';
 };
 
+// Message-buffer helpers baked into scenes.js. Mirror the preview-time
+// versions: _diff, _pushMsg, _startAction, _withMessageOverlay. Every choice
+// action calls _startAction(c) at the top to snapshot state into _msgInit and
+// reset _messageQueue; every Effect that carries a `message` field calls
+// _pushMsg(c, tpl) after its core ran; every scene render is wrapped with
+// _withMessageOverlay so a non-empty queue shows a Continue interstitial.
+const _MESSAGE_HELPERS = `
+const __isObj = v => v != null && typeof v === 'object' && !Array.isArray(v);
+const _diff = (init, after) => {
+  const out = {};
+  const keys = new Set([...Object.keys(init || {}), ...Object.keys(after || {})]);
+  for (const k of keys) {
+    if (k.startsWith('_')) continue;
+    const a = (init  || {})[k];
+    const b = (after || {})[k];
+    if (__isObj(a) || __isObj(b)) {
+      const sub = _diff(a || {}, b || {});
+      if (Object.keys(sub).length) out[k] = sub;
+    } else if (Array.isArray(a) || Array.isArray(b)) {
+      const before = a || [], now = b || [];
+      const added = now.filter(x => !before.includes(x));
+      if (added.length) out[k] = added;
+    } else if (typeof b === 'number') {
+      const d = b - (Number(a) || 0);
+      if (d > 0) out[k] = d;
+    } else if (typeof b === 'boolean') {
+      if (b === true && !a) out[k] = true;
+    }
+  }
+  return out;
+};
+const _pushMsg = (c, tpl) => {
+  if (!tpl) return;
+  const state = c.getState();
+  const init  = state._msgInit || {};
+  const gain  = _diff(init, state);
+  const loss  = _diff(state, init);
+  const scope = { ...state, init, gain, loss };
+  const text = _t(scope, tpl);
+  if (!text) return;
+  c.setState(s => ({ _messageQueue: [...(s._messageQueue || []), text] }));
+};
+const _startAction = c => {
+  c.setState(s => {
+    const init = { ...s };
+    delete init._msgInit;
+    delete init._messageQueue;
+    return { _msgInit: init, _messageQueue: [] };
+  });
+};
+const _withMessageOverlay = sceneFn => ctx => {
+  const queue = ctx.state._messageQueue || [];
+  if (queue.length === 0) return sceneFn(ctx);
+  return Scene({
+    title: '',
+    body: queue.map(m => p({ style: 'margin:0 0 10px; line-height:1.55' })([m])),
+    choices: [{ label: 'Continue', action: c => c.setState({ _messageQueue: [] }) }],
+  })(ctx);
+};`;
+
 // Inline-template helper baked into the top of every emitted file that
 // renders narrative text. Mirrors the preview-time _evalText: substitutes
 // `${expr}` snippets using a `with (state)` scope, caching compiled segments
@@ -154,7 +214,8 @@ const _emitLootEntry = entry => `{ ` +
   `skillId: ${_q(entry.skillId || '')}, ` +
   `npcId: ${_q(entry.npcId || '')}, ` +
   `jsBody: ${_q(entry.jsBody || '')}, ` +
-  `bonuses: [${(entry.bonuses || []).map(_emitWeightBonus).join(', ')}] ` +
+  `bonuses: [${(entry.bonuses || []).map(_emitWeightBonus).join(', ')}], ` +
+  `message: ${_q(entry.message || '')} ` +
 `}`;
 
 const _emitRandomLoot = rawTable => {
@@ -225,6 +286,7 @@ const _emitRandomLoot = rawTable => {
         const idx = _pick(bag); if (idx < 0) break;
         const e = bag[idx];
         const f = _apply(e, c); if (f) wins.push(f);
+        if (e.message) _pushMsg(c, e.message);
         if (unique) bag.splice(idx, 1);
       }
       if (showFlavour && wins.length) {
@@ -235,7 +297,7 @@ const _emitRandomLoot = rawTable => {
 };
 
 // Compile an Effect into a (c) => void body. Always returns a function literal string.
-const _effectFn = effect => {
+const _effectFnCore = effect => {
   if (!effect || effect.mode === 'none') return null;
   if (effect.mode === 'js') return `c => { ${effect.body || ''} }`;
   if (effect.mode === 'simple') {
@@ -292,6 +354,16 @@ const _effectFn = effect => {
     return `c => { const cb = __COMBATS[${_q(effect.combatId)}]; if (!cb) return; c.setState({ _combat: { id: ${_q(effect.combatId)}, enemyHp: cb.enemy.hp, log: cb.intro ? [cb.intro] : [], turn: 0, lastMoveImage: null, lastEnemyImage: null, returnTo: c.scene, outcome: null } }); c.goto("_combat:" + ${_q(effect.combatId)}); }`;
   }
   return null;
+};
+
+// Wrap the core emit to push an Effect.message after the core runs. Returns
+// null if the effect is a no-op AND has no message; otherwise returns the
+// wrapped function literal as a string.
+const _effectFn = effect => {
+  const core = _effectFnCore(effect);
+  if (!effect || !effect.message) return core;
+  if (!core) return `c => { _pushMsg(c, ${_q(effect.message)}) }`;
+  return `c => { (${core})(c); _pushMsg(c, ${_q(effect.message)}); }`;
 };
 
 // ─── Reusable emit fragments. All single-arg / curried. ──────────────────
@@ -358,7 +430,7 @@ const _emitChoice = ch => project => {
     effectFn ? `(${effectFn})(c);` : '',
     navLine,
   ].filter(Boolean);
-  if (lines.length) parts.push(`action: c => { ${lines.join(' ')} }`);
+  if (lines.length) parts.push(`action: c => { _startAction(c); ${lines.join(' ')} }`);
   return `{ ${parts.join(', ')} }`;
 };
 
@@ -373,7 +445,7 @@ const _emitPageBody = page => {
 const _emitWardrobeRoomFn = room => project => {
   const wb = room.wardrobe || { portraitWidth: 240, portraitHeight: 320, layers: [], kinds: ['equipment'] };
   const choicesLit = room.choices.map(c => _emitChoice(c)(project)).join(', ');
-  return `${room.id}: ctx => {
+  return `${room.id}: _withMessageOverlay(ctx => {
     const inv = ctx.state.inventory || {};
     const wb = ${JSON.stringify(wb)};
     const itemList = ${JSON.stringify(project.items)};
@@ -416,7 +488,7 @@ const _emitWardrobeRoomFn = room => project => {
       ? p({ style: 'color:var(--text-muted); text-align:center; margin:0 0 12px' })(['(nothing in this category)'])
       : div({ style: 'display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:8px; margin:0 auto 12px; max-width:720px' })(carrying.map(_card));
     return Scene({ title: ${_q(room.title || 'Wardrobe')}, body: [portraitBox, grid], choices: [${choicesLit}] })(ctx);
-  }`;
+  })`;
 };
 
 const _emitInventoryRoomFn = room => project => {
@@ -431,7 +503,7 @@ const _emitInventoryRoomFn = room => project => {
   );
   const useEffectLiteral = '{ ' + Object.entries(useEffectMap).map(([id, fn]) => `${_q(id)}: ${fn}`).join(', ') + ' }';
   const choicesLit = room.choices.map(c => _emitChoice(c)(project)).join(', ');
-  return `${room.id}: ctx => {
+  return `${room.id}: _withMessageOverlay(ctx => {
     const cfg = ${JSON.stringify(cfg)};
     const itemList = ${JSON.stringify(project.items)};
     const useEffects = ${useEffectLiteral};
@@ -539,7 +611,7 @@ const _emitInventoryRoomFn = room => project => {
             ]))
           )];
     return Scene({ title: ${_q(room.title || 'Inventory')}, body, choices: [${choicesLit}] })(ctx);
-  }`;
+  })`;
 };
 
 const _emitRoomFn = room => project => {
@@ -555,7 +627,10 @@ const _emitRoomFn = room => project => {
   const onEndLit = (room.choices.length === 0 && onEndFn)
     ? `, { label: page.advanceLabel || 'Continue', action: c => (${onEndFn})(c) }`
     : '';
-  return `${room.id}: ctx => {
+  // _withMessageOverlay shows accumulated Effect.message lines as a Continue
+  // interstitial whenever state._messageQueue is non-empty. Empty queue →
+  // straight to the real scene render.
+  return `${room.id}: _withMessageOverlay(ctx => {
     const pages = [${pagesLit}];
     const idx = Math.min((ctx.state._pageIdx?.[${_q(room.id)}] || 0), pages.length - 1);
     const page = pages[idx];
@@ -572,7 +647,7 @@ const _emitRoomFn = room => project => {
           action: c => c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [${_q(room.id)}]: idx + 1 } })),
         }];
     return Scene({ title: ${_q(room.title)}, body, choices })(ctx);
-  }`;
+  })`;
 };
 
 // Combat scene factory — emitted into scenes.js. Uses player skills + combat
@@ -580,7 +655,7 @@ const _emitRoomFn = room => project => {
 const _emitCombatSceneFn = combat => project => {
   const onWinFn  = _effectFn(combat.onWin);
   const onLoseFn = _effectFn(combat.onLose);
-  return `"_combat:${combat.id}": ctx => {
+  return `"_combat:${combat.id}": _withMessageOverlay(ctx => {
     const cb = __COMBATS[${_q(combat.id)}];
     const cs = ctx.state._combat;
     if (!cs || cs.id !== ${_q(combat.id)}) {
@@ -790,7 +865,7 @@ const _emitCombatSceneFn = combat => project => {
       ),
     ];
     return Scene({ title: cb.name, body, choices: moveButtons })(ctx);
-  }`;
+  })`;
 };
 
 // Generate the scenes.js source file
@@ -798,6 +873,7 @@ const emitScenes = project => `// AUTO-GENERATED by dervoJS gameEditor. Edit the
 ${_extraImports(project, 'scenes')}import { div, span, p, img, video, button } from '../src/elements.js';
 import { Scene, NpcChoices, NpcLine } from '../src/game.js';
 ${_TEMPLATE_HELPER}
+${_MESSAGE_HELPERS}
 
 const __COMBATS = ${JSON.stringify((project.combats || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {}))};
 const __SKILLS  = ${JSON.stringify((project.skills  || []).reduce((acc, s) => ({ ...acc, [s.id]: s }), {}))};
@@ -856,7 +932,7 @@ const _emitTopicChoice = ch => npc => project => {
     navLine,
   ].filter(Boolean);
 
-  parts.push(`action: c => { ${lines.join(' ')} }`);
+  parts.push(`action: c => { _startAction(c); ${lines.join(' ')} }`);
   return `{ ${parts.join(', ')} }`;
 };
 
@@ -870,7 +946,7 @@ const _emitSimpleNpcChoice = ch => project => {
     effectFn ? `(${effectFn})(c);` : '',
     _emitGotoRoom(project)(ch.to),
   ].filter(Boolean);
-  parts.push(`action: c => { ${lines.join(' ')} }`);
+  parts.push(`action: c => { _startAction(c); ${lines.join(' ')} }`);
   return `{ ${parts.join(', ')} }`;
 };
 
@@ -1024,6 +1100,7 @@ const emitWorld = project => `// AUTO-GENERATED by dervoJS gameEditor.
 ${_extraImports(project, 'world')}import { p, div, img, video } from '../src/elements.js';
 import { Scene } from '../src/game.js';
 ${_TEMPLATE_HELPER}
+${_MESSAGE_HELPERS}
 
 // Mirrors scenes.js — NPC dialogue functions reference __COMBATS for exit-to-combat
 // flow / enterCombat actions from inside a topic.
@@ -1070,10 +1147,12 @@ const initialState = ${JSON.stringify({
   _npcTopic:        {},
   _npcTopicStack:   {},
   _npcTopicPageIdx: {},
-  _shopStock:  {},
-  _combat:     null,
-  _reading:    null,
-  _lootLog:    [],
+  _shopStock:     {},
+  _combat:        null,
+  _reading:       null,
+  _lootLog:       [],
+  _messageQueue:  [],
+  _msgInit:       {},
 }, null, 2)};
 
 export { ITEMS, initialState };

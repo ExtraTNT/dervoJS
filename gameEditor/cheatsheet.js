@@ -70,6 +70,39 @@ const _BuilderTab = () => div({})([
     ]),
   ),
 
+  _section('Message buffer — opt-in Continue overlay between actions',
+    _row('What it is', [
+      'Every Effect (and every randomLoot entry) has an optional ', _kbd('Message'),
+      ' template. When the effect fires, the rendered message is appended to ',
+      _kbd('state._messageQueue'),
+      '. On the next scene render, if the queue is non-empty, the player sees the accumulated messages above a single ',
+      _kbd('Continue'),
+      ' button; clicking it clears the queue and falls through to the actual scene. Empty queue → continues normally with zero UI overhead.',
+    ]),
+    _row('Accumulation', [
+      _kbd('multi'), ' steps each push their own message in order. ',
+      _kbd('randomLoot'), ' picks push the picked entry\'s message (multi-pick tables accumulate one per roll). ',
+      _kbd('oneOf'), ' fires the picked option\'s nested Effect, whose message pushes normally. So one click can stack several lines.',
+    ]),
+    _row('Extra scope', [
+      'Inside ', _kbd('Message'), ' templates the ', _kbd('${…}'),
+      ' scope also exposes ', _kbd('init'), ' (state snapshot pre-action), ',
+      _kbd('gain'), ' (per-key positive deltas — stats up, items gained, flags flipped true, skills learned), and ',
+      _kbd('loss'), ' (per-key negative deltas, as positive numbers). Example: ',
+      _kbd('The gold reserves of ${init.gold} got increased by ${gain.gold} to ${gold}.'),
+    ]),
+    _row('Conditional copy', [
+      'Use ', _kbd('gain'), ' to decide what to say. Example for a loot pick that might give an item or just stats: ',
+      _kbd('${gain.potion ? "Plus a potion!" : ""}'),
+      '. Empty results render nothing.',
+    ]),
+    _row('Reserved keys', [
+      _kbd('state._messageQueue'), ' (pending lines) and ', _kbd('state._msgInit'),
+      ' (init snapshot) are managed automatically — every choice action seeds them via ', _kbd('_startAction(c)'),
+      '. Don\'t mutate them by hand in JS effects.',
+    ]),
+  ),
+
   _section('Rooms tab',
     _row('Room kinds',    ['Four templates: ', _kbd('scene'), ' (pages + choices), ', _kbd('wardrobe'), ' (paper-doll + equipment list), ', _kbd('inventory'), ' (all items with Use/Read/Equip buttons), ', _kbd('story'), ' (narrative-arc, lives in Story Points tab). Switch with the Room kind dropdown.']),
     _row('Page sequence', ['Each scene room is a sequence of pages. Page index lives at ', _kbd('state._pageIdx[roomId]'), '; a "More" choice advances. Real choices render on the final page.']),

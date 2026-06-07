@@ -346,6 +346,33 @@ const EffectEditor = ({ effect, onChange, vars = { stats: [], flags: [], items: 
         ])]
       : []),
 
+    // Optional Message template. Pushed to state._messageQueue AFTER the
+    // core effect runs. Multi steps + randomLoot per-entry messages accumulate
+    // — the next scene render shows them as a single Continue interstitial.
+    // Scope: state + init (pre-action snapshot) + gain / loss (deltas).
+    ...(e.mode !== 'none'
+      ? [div({ style: 'margin-top:8px' })([
+          span({ style: 'font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600; display:block; margin-bottom:4px' })([
+            'Message (optional, ${…} template)',
+          ]),
+          textarea({
+            value: e.message || '',
+            oninput: ev => set({ message: ev.target.value }),
+            rows: 2,
+            spellcheck: false,
+            style: 'width:100%; padding:8px; border:1px solid var(--border); border-radius:var(--radius); font-family:ui-monospace,monospace; font-size:12.5px; background:var(--surface); color:var(--text); resize:vertical; box-sizing:border-box',
+            placeholder: 'You found ${gain.gold} gold (had ${init.gold}, now ${gold}).',
+          })([]),
+          span({ style: 'font-size:11px; color:var(--text-muted); display:block; margin-top:4px' })([
+            'Scope: ', span({ style: 'font-family:ui-monospace,monospace' })(['state']),
+            ' + ', span({ style: 'font-family:ui-monospace,monospace' })(['init']),
+            ' (pre-action snapshot) + ', span({ style: 'font-family:ui-monospace,monospace' })(['gain']),
+            ' / ', span({ style: 'font-family:ui-monospace,monospace' })(['loss']),
+            ' (per-key deltas). See 📊 State for paths.',
+          ]),
+        ])]
+      : []),
+
     // Inline preview of the exact JS the Export tab will write for this effect.
     // null means the effect compiles to no action (e.g. mode 'none' or all-empty ops).
     (() => {

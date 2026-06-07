@@ -219,6 +219,9 @@ const _compileRandomLoot = rawTable => {
       const entry = bag[idx];
       const flavour = _applyLootEntry(entry, c);
       if (flavour) wins.push(flavour);
+      // Per-entry author message accumulates alongside the engine's "Loot:"
+      // log line, so authors can write a richer one-shot blurb per pick.
+      if (entry.message) _pushMsg(c, entry.message);
       if (table.unique) bag.splice(idx, 1);
     }
     if (table.showFlavour !== false && wins.length) {
@@ -228,9 +231,98 @@ const _compileRandomLoot = rawTable => {
   };
 };
 
+// ─── Message buffer + state-diff scope ────────────────────────────────
+//
+// Any Effect (or LootEntry) can carry an optional `message` template. After
+// the action's core fires, the template is evaluated against:
+//   state — post-action live state
+//   init  — snapshot of state just before the OUTER choice action ran
+//   gain  — per-key positive deltas (numeric stat-ups, item increases,
+//           newly-true flags, newly-learned skills)
+//   loss  — per-key negative deltas (mirror of gain)
+//
+// The rendered string is appended to state._messageQueue. The next scene
+// render shows the buffer as a Continue interstitial, then clears it. Multi
+// steps + randomLoot picks accumulate naturally — each pushes one entry.
+
+const _isObj = v => v != null && typeof v === 'object' && !Array.isArray(v);
+
+// Walk init/after recursively and produce only POSITIVE deltas. Stats and
+// inventory show numeric differences; arrays (skills) show new additions;
+// flags show those that became true. Pass arguments swapped for `loss`.
+const _diff = (init, after) => {
+  const out  = {};
+  const keys = new Set([...Object.keys(init || {}), ...Object.keys(after || {})]);
+  for (const k of keys) {
+    if (k.startsWith('_')) continue;            // engine internals — skip
+    const a = (init  || {})[k];
+    const b = (after || {})[k];
+    if (_isObj(a) || _isObj(b)) {
+      const sub = _diff(a || {}, b || {});
+      if (Object.keys(sub).length) out[k] = sub;
+    } else if (Array.isArray(a) || Array.isArray(b)) {
+      const before = a || [];
+      const now    = b || [];
+      const added  = now.filter(x => !before.includes(x));
+      if (added.length) out[k] = added;
+    } else if (typeof b === 'number') {
+      const d = b - (Number(a) || 0);
+      if (d > 0) out[k] = d;
+    } else if (typeof b === 'boolean') {
+      if (b === true && !a) out[k] = true;       // flag flipped to true
+    }
+  }
+  return out;
+};
+
+// Render `tpl` (with `${expr}` snippets) against the gain/loss/init scope and
+// append to state._messageQueue. No-op if tpl is empty or renders to empty.
+const _pushMsg = (c, tpl) => {
+  if (!tpl) return;
+  const state = c.getState();
+  const init  = state._msgInit || {};
+  const gain  = _diff(init, state);
+  const loss  = _diff(state, init);
+  const scope = { ...state, init, gain, loss };
+  const text = _evalText(scope)(tpl);
+  if (!text) return;
+  c.setState(s => ({ _messageQueue: [...(s._messageQueue || []), text] }));
+};
+
+// Snapshot state at the top of any choice action so messages can resolve init
+// / gain / loss against a single reference point. Also resets _messageQueue
+// so messages from the PREVIOUS action don't leak forward.
+const _startAction = c => {
+  c.setState(s => {
+    // Don't carry the previous action's bookkeeping into the new init.
+    const init = { ...s };
+    delete init._msgInit;
+    delete init._messageQueue;
+    return { _msgInit: init, _messageQueue: [] };
+  });
+};
+
+// Wrap a scene render fn so it shows the accumulated message buffer first.
+// Continue clears the buffer; the next render falls through to the original
+// scene. Curried `sceneFn => ctx => vnode`.
+const _withMessageOverlay = sceneFn => ctx => {
+  const queue = ctx.state._messageQueue || [];
+  if (queue.length === 0) return sceneFn(ctx);
+  return Scene({
+    title: '',
+    body: queue.map(m => p({ style: 'margin:0 0 10px; line-height:1.55' })([m])),
+    choices: [{
+      label: 'Continue',
+      action: c => c.setState({ _messageQueue: [] }),
+    }],
+  })(ctx);
+};
+
 // Returns a function (ctx) => void. `project` (optional) is used by enterCombat
 // to read the target combat's enemy.hp for the initial state.
-const _compileEffect = (effect, project) => {
+// _compileEffectCore = the unwrapped per-mode runner. _compileEffect wraps it
+// with the message-push tail so EVERY mode gets the same opt-in messaging.
+const _compileEffectCore = (effect, project) => {
   if (!effect || effect.mode === 'none') return () => {};
   if (effect.mode === 'simple') {
     return c => {
@@ -312,6 +404,15 @@ const _compileEffect = (effect, project) => {
     return c => { try { fn(c); } catch (e) { console.warn('[preview] effect threw:', e.message); } };
   }
   return () => {};
+};
+
+// Public `_compileEffect` — wraps the core runner with an optional message
+// push. Nested effects (multi/oneOf steps, randomLoot entries) flow through
+// the same wrapper so their own .message fields fire after their core logic.
+const _compileEffect = (effect, project) => {
+  const core = _compileEffectCore(effect, project);
+  if (!effect || !effect.message) return core;
+  return c => { core(c); _pushMsg(c, effect.message); };
 };
 
 const _mediaNode = page => {
@@ -505,6 +606,7 @@ const _buildInventoryRoomFn = (room, project) => ctx => {
       buttons.push(button({
         type: 'button',
         onclick: () => {
+          _startAction(ctx);
           useFn(ctx);
           ctx.setState(s => ({ inventory: _consumeOne(s, it.id) }));
         },
@@ -651,6 +753,7 @@ const _buildChoice = (ch, project, fromRoomId) => {
       // (e.g. randomLoot picked a `navigate` entry, or an enterCombat/talkTo
       // effect), we YIELD and skip the choice's default `to:`. This lets the
       // action's effect dynamically override the destination.
+      _startAction(c);
       const before = c.scene;
       effect(c);
       if (c.getState()._scene !== before) return;
@@ -807,6 +910,7 @@ const _buildSimpleNpcChoice = (ch, project, back) => {
     label: ch.label,
     if:    c => guard(c),
     action: c => {
+      _startAction(c);
       const before = c.scene;
       effect(c);
       if (c.getState()._scene !== before) return;   // effect navigated; yield
@@ -931,6 +1035,7 @@ const _buildTopicChoice = (ch, npc, topic, allTopics, project, back) => {
     label: ch.label,
     if:    c => guard(c),
     action: c => {
+      _startAction(c);
       const before = c.scene;
       effect(c);
       // If the effect already navigated (randomLoot navigate, enterCombat,
@@ -1223,6 +1328,7 @@ const _buildCombatSceneFn = (combat, project) => ctx => {
       choices: [{
         label: 'Continue',
         action: c => {
+          _startAction(c);
           // 1. Apply loot (only on win)
           if (cs.outcome === 'win' && lootEntries.length) {
             c.setState(s => {
@@ -1391,13 +1497,16 @@ const buildGameConfig = rawProject => {
   // Resolve every `asset:<id>` ref to the actual data URL once, so the rest
   // of this file can stay agnostic of the catalogue model.
   const project = resolveAssetsForPreview(rawProject);
+  // Every scene render goes through _withMessageOverlay so a non-empty
+  // _messageQueue shows a Continue interstitial BEFORE the underlying scene
+  // paints. Empty queue → straight to the scene.
   const scenes = Object.fromEntries(
-    project.rooms.map(r => [r.id, _buildSceneFn(r, project)])
+    project.rooms.map(r => [r.id, _withMessageOverlay(_buildSceneFn(r, project))])
   );
 
   // Combat scenes — addressed as `_combat:<id>`; enterCombat goto's these.
   for (const cb of (project.combats || [])) {
-    scenes[`_combat:${cb.id}`] = _buildCombatSceneFn(cb, project);
+    scenes[`_combat:${cb.id}`] = _withMessageOverlay(_buildCombatSceneFn(cb, project));
   }
 
   const npcs = Object.fromEntries(
@@ -1440,9 +1549,11 @@ const buildGameConfig = rawProject => {
     _npcTopicStack:   {},  // { [npcId]: [topicId...] }  stack pushed by `change`, popped by `exitBack`
     _npcTopicPageIdx: {},  // { [npcId]: { [topicId]: idx } }
     _shopStock:  {},
-    _combat:     null,
-    _reading:    null,
-    _lootLog:    [],  // last 8 "Loot: X ×2" lines from randomLoot picks
+    _combat:        null,
+    _reading:       null,
+    _lootLog:       [],   // last 8 "Loot: X ×2" lines from randomLoot picks
+    _messageQueue:  [],   // pending Effect.message lines — shown as Continue overlay
+    _msgInit:       {},   // pre-action state snapshot for init / gain / loss scope
   };
 
   // Auto-reset NPC page index on talkTo (the engine doesn't expose a hook, so

@@ -209,7 +209,18 @@ const _engineSection = expandedKeys => state => () => _section('Engine internals
   _row(expandedKeys)(state)({ path: 'state._reading',       exampleExpr: '_reading?.itemId',       description: 'reading-overlay target or null' }),
   _row(expandedKeys)(state)({ path: 'state._shopStock',     exampleExpr: '_shopStock.brom?.potion', description: 'per-NPC stock sold' }),
   _row(expandedKeys)(state)({ path: 'state._lootLog',       exampleExpr: '_lootLog.at(-1)',        description: 'last "Loot: …" line from randomLoot' }),
+  _row(expandedKeys)(state)({ path: 'state._messageQueue',  exampleExpr: '_messageQueue.length',   description: 'Effect.message lines pending Continue dismissal' }),
+  _row(expandedKeys)(state)({ path: 'state._msgInit',       exampleExpr: 'init.gold',              description: 'snapshot of state taken at the start of the current action — read it as bare `init` inside ${…} message templates (e.g. ${init.gold})' }),
   _row(expandedKeys)(state)({ path: 'state.npcLocations',   exampleExpr: 'npcLocations.mara',      description: '{ npcId: roomId } — updated by tickWorld()' }),
+]);
+
+// ─── Message-template scope (init / gain / loss) section ──────────────
+
+const _messageScopeSection = expandedKeys => state => () => _section('Message templates — extra scope')(`inside Effect.message and LootEntry.message, ${'$'}{…} expressions also see:`)([
+  _row(expandedKeys)(state)({ path: 'init',  exampleExpr: 'init.gold',           description: 'every top-level state key, snapshotted before the choice action ran. So `init.gold` = how much gold you HAD.' }),
+  _row(expandedKeys)(state)({ path: 'gain',  exampleExpr: 'gain.gold ?? 0',      description: 'per-key POSITIVE deltas: stat-ups, item count-ups, newly-true flags, newly-learned skills. `gain.gold` = how much gold you GAINED.' }),
+  _row(expandedKeys)(state)({ path: 'gain.inventory', exampleExpr: 'gain.inventory?.potion', description: 'nested for the inventory map. Use to detect which items were given.' }),
+  _row(expandedKeys)(state)({ path: 'loss',  exampleExpr: 'loss.gold',           description: 'per-key NEGATIVE deltas (expressed as positive numbers). Use for "you lost X" messaging.' }),
 ]);
 
 // ─── Intro ───────────────────────────────────────────────────────────────
@@ -262,6 +273,7 @@ const StateExplorer = uiState => {
         _equippedSection(expandedKeys)(initialState)(project),
         _skillsSection(expandedKeys)(initialState)(project),
         _engineSection(expandedKeys)(initialState)(),
+        _messageScopeSection(expandedKeys)(initialState)(),
       ]),
     ]),
   ]);

@@ -50,6 +50,12 @@ const emptyEffect = () => ({
   toRoom:  '',        // navigate   — target room id (any kind, including story)
   steps:   [],        // multi      — array of nested Effects, fired in order
   options: [],        // oneOf      — weighted picks; one option's effect fires
+  // Optional message template. After this effect fires, the rendered message
+  // is pushed onto state._messageQueue. The next scene render displays the
+  // accumulated queue as a "Continue" interstitial. Empty → no message.
+  // Template scope: `state`, `init` (state snapshot pre-action), `gain` /
+  // `loss` (per-key positive / negative deltas). See StateExplorer.
+  message: '',
 });
 
 const emptyOp = (target = '') => ({ target, op: 'set', value: 0 });
@@ -93,6 +99,9 @@ const emptyLootEntry = () => ({
   jsBody:   '',
   // weight bonuses — see emptyWeightBonus
   bonuses:  [],
+  // Optional message template — pushed onto state._messageQueue when this
+  // entry is PICKED. Multi-pick tables accumulate one message per pick.
+  message:  '',
 });
 
 // One conditional weight bonus on a random-table entry.
