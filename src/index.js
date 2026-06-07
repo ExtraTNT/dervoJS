@@ -53,7 +53,7 @@ export { parseInline, parseMarkdown, markdownToVnode, setHighlightRegistry, regi
 export { NumberInput }                                               from './components/NumberInput.js';
 export { ColorPicker, DEFAULT_SWATCHES }                            from './components/ColorPicker.js';
 export { DateTimePicker }                                            from './components/DateTimePicker.js';
-export { Typography, H1, H2, H3, H4, H5, H6, P, Code, Pre, Quote, collectHeadings, slugify } from './components/Typography.js';
+export { Typography, H1, H2, H3, H4, H5, H6, P, Code, Pre, Quote, Cite, collectHeadings, collectCites, numberCites, slugify } from './components/Typography.js';
 
 // Charts 
 export { PieChart, BarChart, LineChart, MultiLineChart, SparkLine, PALETTE } from './components/Charts.js';

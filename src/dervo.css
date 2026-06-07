@@ -618,6 +618,48 @@ body {
 .typo-pre  { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:1rem; font-family:var(--font-mono,monospace); font-size:.875rem; overflow-x:auto; margin:.75rem 0; line-height:1.5; }
 .typo-blockquote { border-left:3px solid var(--accent); padding:.4rem 1rem; margin:.75rem 0; color:var(--text-subtle,var(--text-muted)); font-style:italic; }
 
+/*  Citations  */
+/* Outer wrapper Typography stamps around (link + sup). Kept as inline so it
+   wraps naturally inside paragraphs and headings. */
+.typo-cite-rendered { display:inline; }
+.typo-cite-link {
+  color:var(--accent); text-decoration:none; border-bottom:1px dashed var(--accent);
+  transition:color .12s, border-color .12s;
+}
+.typo-cite-link:hover { color:var(--accent-hover); border-color:var(--accent-hover); }
+.typo-cite-marker {
+  color:var(--accent); text-decoration:none; font-weight:600;
+  font-size:.78em; padding:0 1px;
+}
+.typo-cite-marker:hover { text-decoration:underline; }
+
+/* Unprocessed Cite markers (component used outside Typography) still degrade
+   to a coloured inline. */
+.typo-cite { color:var(--accent); }
+
+/*  References list  */
+.typo-references {
+  margin-top:2rem; padding-top:.75rem; border-top:1px solid var(--border);
+}
+.typo-references-title {
+  font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--text-muted); margin-bottom:.5rem;
+}
+.typo-references-list { padding-left:1.25rem; margin:0; font-size:.92rem; color:var(--text); }
+.typo-references-item { margin:.25rem 0; line-height:1.55; }
+.typo-references-item::marker { color:var(--text-muted); font-weight:600; }
+.typo-references-back {
+  color:var(--text-muted); text-decoration:none; margin-right:.4rem;
+  display:inline-block; transition:color .12s;
+}
+.typo-references-back:hover { color:var(--accent); }
+.typo-references-label { color:var(--text); }
+.typo-references-sep   { color:var(--text-subtle,var(--text-muted)); }
+.typo-references-href {
+  color:var(--accent); text-decoration:none; word-break:break-all;
+}
+.typo-references-href:hover { text-decoration:underline; }
+
 /*  Media  */
 .media-outer { width:100%; }
 .media-wrap  { position:relative; overflow:hidden; background:#000; border-radius:var(--radius); width:100%; }

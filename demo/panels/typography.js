@@ -1,7 +1,7 @@
 import {
   div, span, p, hr, ul, li, a, strong, em,
   Card, Row, Col, Stack,
-  Typography, H1, H2, H3, H4, H5, H6, P, Code, Pre, Quote,
+  Typography, H1, H2, H3, H4, H5, H6, P, Code, Pre, Quote, Cite,
 } from '../../src/index.js';
 import { doc } from '../components/doc.js';
 
@@ -47,6 +47,23 @@ const sampleContent = [
   ]),
   P({})(['Use ', Code({})(['Quote']), ' for pull-quotes, callouts, or cited excerpts.']),
 
+  H2({})(['Citations']),
+  P({})([
+    'Inline sources go through ', Code({})(['Cite']),
+    '. The article ',
+    Cite({ href: 'https://en.wikipedia.org/wiki/Writing_style' })(['Reference (book)']),
+    ' explains the convention, and the ', em({})(['Chicago Manual of Style']),
+    ' ',
+    Cite({ href: 'https://www.chicagomanualofstyle.org/' })(['(17th edition)']),
+    ' formalises it. Typography numbers each unique URL automatically and links the superscript marker to the References list at the bottom — try clicking one.',
+  ]),
+  P({})([
+    'Citing the same source twice, even with different inline text, reuses the same ',
+    Code({})(['[N]']), ': ',
+    Cite({ href: 'https://en.wikipedia.org/wiki/Writing_style' })(['Wikipedia again']),
+    ' lands on ', Code({})(['[1]'])
+  ]),
+
   H3({})(['Lists (native HTML)']),
   P({})(['Ordered and unordered lists inside a ', Code({})(['.typography']), ' context inherit comfortable spacing:']),
   ul({ style: 'padding-left:1.5rem; margin:.5rem 0' })([
@@ -58,7 +75,7 @@ const sampleContent = [
   H2({})(['Table of Contents']),
   P({})([
     'Wrap your content with ', Code({})(['Typography({ toc: true, tocPosition: "right" })([…])']),
-    '. The component recursively scans children for ', Code({})(['h1']), '–', Code({})(['h6']),
+    '. The component recursively scans children for ', Code({})(['h1']), '-', Code({})(['h6']),
     ' vnodes, slugifies their text, injects ', Code({})(['id']),
     ' attributes for anchor links, and renders a sticky TOC panel on the chosen side.',
   ]),
@@ -68,14 +85,15 @@ const sampleContent = [
 
   H2({})(['API reference']),
   P({})([
-    Code({})(['Typography({ toc, tocPosition, tocTitle, tocSticky, className, style })']),
+    Code({})(['Typography({ toc, tocPosition, tocTitle, tocSticky, refsTitle, className, style })']),
     ' -> ', Code({})(['children => vnode']),
   ]),
   P({})(['Convenience exports: ', Code({})(['H1']), ', ', Code({})(['H2']), ', ', Code({})(['H3']),
     ', ', Code({})(['H4']), ', ', Code({})(['H5']), ', ', Code({})(['H6']),
     ', ', Code({})(['P']), ', ', Code({})(['Code']), ', ', Code({})(['Pre']),
-    ', ', Code({})(['Quote']),
+    ', ', Code({})(['Quote']), ', ', Code({})(['Cite']),
     '.  Also: ', Code({})(['collectHeadings(vnodes)']),
+    ', ', Code({})(['collectCites(vnodes)']),
     ', ', Code({})(['slugify(text)']), ' for lower-level use.']
   ),
 ];
@@ -94,7 +112,11 @@ export const typographyPanel = () =>
       doc([`Typography({ toc: true, tocPosition: 'right', tocSticky: true })([
   H1({})(['Page Title']),
   H2({})(['Section']),
-  P({})(['Body text…']),
+  P({})([
+    'Body text with a source ',
+    Cite({ href: 'https://example.com/paper' })(['Smith et al.']),
+    ' inline.',
+  ]),
   Pre({ lang: 'js' })(['const x = 1;']),
   Quote({ cite: 'Knuth' })(['Premature optimisation is the root of all evil.']),
 ])`   ]),

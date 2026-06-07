@@ -38,7 +38,7 @@ export const philosophyPanel = state =>
           ]),
           H2({})(['Templating']),
           P({})([
-            `dervoJS makes heavy use for templates wiht partial application and it is encurraged to do so for your projects too.
+            `dervoJS makes heavy use of templates with partial application and it is encouraged to do so for your projects too.
             a function for a vnode gets called like: `,
             Code({})([`vnode('tag')({props})([content])`]),
             `dervoJS has elements, that apply the first parameter, so you can use `,
