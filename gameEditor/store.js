@@ -70,6 +70,16 @@ const store = createStore({
   // Per-topic Choice generator modal — `null` / `{ open: false }` while closed.
   // See gameEditor/components/ChoiceGenerator.js for the shape.
   generator:        { open: false },
+  // Folder grouping — collapsed[panelKey][folder] = true means that folder's
+  // entries are hidden in the panel's list. See components/FolderedList.js.
+  collapsedFolders: {},
+  // Quick Builder wizard state. `open` shows the floating modal; `idx` is the
+  // current step in the MultiStep; `values` is the in-progress form snapshot.
+  // See components/QuickBuilder.js.
+  quickBuilder: { open: false, idx: 0, values: null },
+  // Per-op Advanced drawer state in the EffectEditor. Keyed by a path-style
+  // rowKey produced by the editor (effect → step → op index). Editor-only.
+  expandedOpRows: {},
   // Light/dark mode for the editor chrome — editor preference, persisted
   // separately from any project.
   theme:            loadTheme(),

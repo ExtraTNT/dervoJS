@@ -222,7 +222,7 @@ const DOCS = [
     props: [
       { name: 'open',      type: 'boolean',  default: 'false', desc: 'Controls visibility' },
       { name: 'title',     type: 'string',   default: '—',     desc: 'Modal heading' },
-      { name: 'onClose',   type: 'function', default: '—',     desc: 'Called on × click or backdrop click' },
+      { name: 'onClose',   type: 'function', default: '—',     desc: 'Called on x click or backdrop click' },
       { name: 'footer',    type: 'vnode[]',  default: '—',     desc: 'Footer (usually action buttons)' },
       { name: 'className', type: 'string',   default: "''",    desc: 'Extra CSS class(es) on root element' },
       { name: 'style',     type: 'string',   default: "''",    desc: 'Extra inline CSS on root element' },
@@ -959,7 +959,7 @@ export const debugPanel = state =>
       { name: 'moved',         type: 'n',        default: '—', desc: 'Existing nodes repositioned (insertBefore on an already-in-tree node). High moved + low created/replaced = keys are working correctly — DOM is being reused, just reordered.' },
       { name: 'propSets',      type: 'n',        default: '—', desc: 'Elements that entered prop-diffing. O(elements in tree) per frame — normal reconciler overhead, not a mutation count.' },
       { name: 'textEdits',     type: 'n',        default: '—', desc: 'Text node nodeValue writes. Each is one direct DOM mutation. High textEdits = many interpolated strings changing every frame.' },
-      { name: 'mutation rate', type: '%',        default: '—', desc: '(created + replaced + removed + moved) / visited × 100 %. 0–5 % = healthy large stable tree. >30 % on a minor state change = nodes are being rebuilt — add stable keys to your lists.' },
+      { name: 'mutation rate', type: '%',        default: '—', desc: '(created + replaced + removed + moved) / visited x 100 %. 0–5 % = healthy large stable tree. >30 % on a minor state change = nodes are being rebuilt — add stable keys to your lists.' },
     ],
   },
   {

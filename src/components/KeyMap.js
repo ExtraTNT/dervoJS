@@ -71,7 +71,7 @@ const formatCombo = combo => {
 /**
  * Purely functional keyboard-event manager.
  * Routing is delegated to the shared createBus pub/sub from listeners.js —
- * each (scope × combo) pair becomes a bus event; no custom dispatch logic needed.
+ * each (scope x combo) pair becomes a bus event; no custom dispatch logic needed.
  *
  * @param {Object}      [opts]
  * @param {boolean}     [opts.debug=false]    console.debug every keydown event

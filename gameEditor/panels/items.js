@@ -17,6 +17,7 @@ import { emptyItem } from '../schema.js';
 import { onText } from '../helpers.js';
 import { EffectEditor } from '../components/EffectEditor.js';
 import { AssetInput }   from '../components/AssetInput.js';
+import { FolderedList, FolderField, folderSuggestions } from '../components/FolderedList.js';
 
 const KIND_OPTS = [
   { value: 'misc',       label: 'Miscellaneous' },
@@ -113,7 +114,7 @@ const ItemEditor = (item, project) => {
             onChange: onText(v => set({ price: { ...(item.price || {}), stat: v || 'gold', amount: Number(item.price?.amount) || 0 } })),
           }),
           NumberInput({
-            label:    `Default price · amount (${item.price?.stat || 'gold'})`,
+            label:    `Default price (${item.price?.stat || 'gold'})`,
             value:    Number(item.price?.amount) || 0,
             min:      0,
             onChange: v => set({ price: { ...(item.price || {}), stat: item.price?.stat || 'gold', amount: Math.max(0, Number(v) || 0) } }),
@@ -132,6 +133,12 @@ const ItemEditor = (item, project) => {
           onChange:    onText(v => set({ description: v })),
           placeholder: 'A short flavour line.',
         }),
+        FolderField({
+          id:          `item-folder-${item.id}`,
+          value:       item.folder,
+          onChange:    v => set({ folder: v }),
+          suggestions: folderSuggestions(project.items),
+        }),
       ]),
     ]),
 
@@ -145,6 +152,7 @@ const ItemEditor = (item, project) => {
               effect:   item.useEffect,
               vars:     _vars(project),
               label:    'Effect when used',
+              rowKey:   `item:${item.id}:use`,
               onChange: v => set({ useEffect: v }),
             }),
           ]),
@@ -209,6 +217,7 @@ const ItemEditor = (item, project) => {
 const ItemsPanel = state => {
   const { project, selectedItemId } = state;
   const selected = project.items.find(it => it.id === selectedItemId) || project.items[0];
+  const collapsed = state.collapsedFolders?.items || {};
 
   return div({ style: 'display:grid; grid-template-columns: 280px 1fr; gap:16px; align-items:start' })([
     div({})([
@@ -216,7 +225,12 @@ const ItemsPanel = state => {
         h2({ style: 'font-size:14px; margin:0 0 4px' })([`Items (${project.items.length})`]),
         ...(project.items.length === 0
           ? [div({ className: 'gef-empty' })(['No items yet.'])]
-          : project.items.map(it => ItemRow(it, selected?.id))),
+          : [FolderedList({
+              items:      project.items,
+              panelKey:   'items',
+              collapsed,
+              renderItem: it => ItemRow(it, selected?.id),
+            })]),
         Button({ size: 'sm', variant: 'ghost', onClick: _addItem, style: 'margin-top:8px' })(['+ Add item']),
       ]),
     ]),

@@ -73,7 +73,7 @@ _km.addScoped('zone-a')('r')(_el => e => {
 // Zone B scoped bindings 
 //  Enter    — ping (uses the focused element's tag name)
 //  Ctrl+↑   — bulk +5 pings
-//  Ctrl+↓   — bulk −5 pings (floor 0)
+//  Ctrl+↓   — bulk -5 pings (floor 0)
 
 _km.addScoped('zone-b')('enter')(el => e => {
   e.preventDefault();
@@ -173,7 +173,7 @@ const HelpOverlay = () =>
         div({ style: 'font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-bottom:8px' })(['Zone B (when Zone B is focused)']),
         BindingRow('↵')('Ping (logs focused element tag)'),
         BindingRow('Ctrl+↑')('Bulk +5 pings'),
-        BindingRow('Ctrl+↓')('Bulk −5 pings'),
+        BindingRow('Ctrl+↓')('Bulk -5 pings'),
       ]),
     ]),
   ]);
@@ -264,7 +264,7 @@ export const keymapPanel = state => {
           div({ style: 'display:flex; flex-direction:column; gap:4px' })([
             BindingRow('↵')('ping (logs element tag)'),
             BindingRow('Ctrl+↑')('+5 pings'),
-            BindingRow('Ctrl+↓')('−5 pings'),
+            BindingRow('Ctrl+↓')('-5 pings'),
           ]),
         ]),
         isZoneB

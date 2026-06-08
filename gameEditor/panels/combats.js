@@ -24,6 +24,8 @@ import { emptyCombat, emptyCombatMove, emptyEnemyAction } from '../schema.js';
 import { onText } from '../helpers.js';
 import { EffectEditor } from '../components/EffectEditor.js';
 import { AssetInput }   from '../components/AssetInput.js';
+import { FolderedList, groupedOptions } from '../components/FolderedList.js';
+import { getState } from '../store.js';
 
 const _vars = project => ({
   stats:   project.stats.map(s => s.key).filter(Boolean),
@@ -146,7 +148,7 @@ const ExtraMoveCard = ({ move, items, stats, onChange, onDelete }) => {
       NumberInput({ label: 'Stat cost', value: Number(move.costValue) || 0, onChange: v => set({ costValue: Number(v) || 0 }) }),
       Select({
         label: 'Consumes item',
-        options: [{ value: '', label: '— none —' }, ...items.map(it => ({ value: it.id, label: it.name || it.id }))],
+        options: [{ value: '', label: '— none —' }, ...groupedOptions(items)(it => ({ value: it.id, label: it.name || it.id }))],
         value: move.costItem || '',
         onChange: onText(v => set({ costItem: v })),
       }),
@@ -155,32 +157,37 @@ const ExtraMoveCard = ({ move, items, stats, onChange, onDelete }) => {
 };
 
 const LootEditor = ({ loot, items, onChange }) => {
-  const _entries = Object.entries(loot || {});
+  const _row = it => {
+    const count = Number(loot?.[it.id] || 0);
+    return div({ style: 'display:grid; grid-template-columns: 1fr 160px 1fr; gap:8px; align-items:center; padding:4px 0' })([
+      div({})([
+        span({ style: 'font-weight:500' })([it.name || it.id]),
+        span({ style: 'margin-left:6px; font-family:ui-monospace,monospace; font-size:11px; color:var(--text-muted)' })([it.id]),
+      ]),
+      NumberInput({
+        value: count,
+        min:   0,
+        onChange: v => {
+          const n = Math.max(0, Number(v) || 0);
+          const next = { ...(loot || {}) };
+          if (n === 0) delete next[it.id]; else next[it.id] = n;
+          onChange(next);
+        },
+      }),
+      div({ style: 'color:var(--text-muted); font-size:12px' })([
+        count > 0 ? `→ inventory["${it.id}"] += ${count}` : '',
+      ]),
+    ]);
+  };
   return Stack({ gap: 6 })([
     ...(items.length === 0
       ? [div({ className: 'gef-empty' })(['Add items first to define loot.'])]
-      : items.map(it => {
-          const count = Number(loot?.[it.id] || 0);
-          return div({ style: 'display:grid; grid-template-columns: 1fr 160px 1fr; gap:8px; align-items:center; padding:4px 0' })([
-            div({})([
-              span({ style: 'font-weight:500' })([it.name || it.id]),
-              span({ style: 'margin-left:6px; font-family:ui-monospace,monospace; font-size:11px; color:var(--text-muted)' })([it.id]),
-            ]),
-            NumberInput({
-              value: count,
-              min:   0,
-              onChange: v => {
-                const n = Math.max(0, Number(v) || 0);
-                const next = { ...(loot || {}) };
-                if (n === 0) delete next[it.id]; else next[it.id] = n;
-                onChange(next);
-              },
-            }),
-            div({ style: 'color:var(--text-muted); font-size:12px' })([
-              count > 0 ? `→ inventory["${it.id}"] += ${count}` : '',
-            ]),
-          ]);
-        })),
+      : [FolderedList({
+          items,
+          panelKey:   'loot',
+          collapsed:  getState().collapsedFolders?.loot || {},
+          renderItem: _row,
+        })]),
   ]);
 };
 
@@ -206,7 +213,7 @@ const CombatList = (project, selectedId) =>
 
 const CombatEditor = (combat, project) => {
   const vars = _vars(project);
-  const roomOpts = [{ value: '', label: '— return to caller —' }, ...project.rooms.map(r => ({ value: r.id, label: r.title || r.id }))];
+  const roomOpts = [{ value: '', label: '— return to caller —' }, ...groupedOptions(project.rooms)(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}` }))];
   const set = patch => _updateCombat(combat.id, patch);
   const setEnemy = patch => _updateCombat(combat.id, c => ({ ...c, enemy: { ...c.enemy, ...patch } }));
 
@@ -259,7 +266,7 @@ const CombatEditor = (combat, project) => {
           }),
           Select({
             label: 'Linked NPC (removed from world on win)',
-            options: [{ value: '', label: '— none —' }, ...project.npcs.map(n => ({ value: n.id, label: n.name || n.id }))],
+            options: [{ value: '', label: '— none —' }, ...groupedOptions(project.npcs)(n => ({ value: n.id, label: n.name || n.id }))],
             value: combat.linkedNpcId || '',
             onChange: onText(v => set({ linkedNpcId: v })),
           }),
@@ -348,6 +355,7 @@ const CombatEditor = (combat, project) => {
             effect:   combat.onWin,
             vars,
             label:    'Effect on win (add gold, learn a skill, set a flag, …)',
+            rowKey:   `combat:${combat.id}:onWin`,
             onChange: v => set({ onWin: v }),
           }),
         ]),
@@ -377,6 +385,7 @@ const CombatEditor = (combat, project) => {
             effect:   combat.onLose,
             vars,
             label:    'Effect on lose (penalty stat change, lose a flag, …)',
+            rowKey:   `combat:${combat.id}:onLose`,
             onChange: v => set({ onLose: v }),
           }),
         ]),

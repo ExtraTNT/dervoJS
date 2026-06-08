@@ -32,7 +32,7 @@ const _bonusRow = vars => bonus => onPatch => onDelete => {
     div({ style: 'display:flex; align-items:center; gap:6px; margin-bottom:6px' })([
       span({ style: 'font-size:11px; color:var(--text-muted)' })(['+ if']),
       div({ style: 'flex:1' })([]),
-      Button({ size: 'sm', variant: 'ghost', onClick: onDelete })(['×']),
+      Button({ size: 'sm', variant: 'ghost', onClick: onDelete })(['x']),
     ]),
     ConditionEditor({
       condition: bonus.condition,

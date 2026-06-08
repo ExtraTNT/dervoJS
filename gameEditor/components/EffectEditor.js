@@ -11,13 +11,18 @@
 import { div, span, textarea } from '../../src/elements.js';
 import { Select } from '../../src/components/Select.js';
 import { TextInput } from '../../src/components/TextInput.js';
+import { NumberInput } from '../../src/components/NumberInput.js';
+import { Toggle } from '../../src/components/Toggle.js';
 import { Button } from '../../src/components/Button.js';
 import { Stack } from '../../src/components/Layout.js';
 import { onText } from '../helpers.js';
 import { effectToFn } from '../codegen.js';
 import { LootTableEditor } from './LootTableEditor.js';
 import { WeightBonusList } from './WeightBonusEditor.js';
-import { emptyLootTable, emptyEffect, emptyOneOfOption } from '../schema.js';
+import { ConditionEditor } from './ConditionEditor.js';
+import { emptyLootTable, emptyEffect, emptyOneOfOption, emptyOp, emptyOpLimit, emptyCondition } from '../schema.js';
+import { groupedOptions } from './FolderedList.js';
+import { setState, getState } from '../store.js';
 
 const MODE_OPTS = [
   { value: 'none',        label: 'no effect'                                       },
@@ -34,7 +39,7 @@ const MODE_OPTS = [
 const STAT_OPS = [
   { value: 'set', label: 'set =' },
   { value: 'add', label: 'add +' },
-  { value: 'sub', label: 'sub −' },
+  { value: 'sub', label: 'sub -' },
 ];
 const FLAG_OPS = [
   { value: 'set',    label: 'set =' },
@@ -42,7 +47,7 @@ const FLAG_OPS = [
 ];
 const INV_OPS = [
   { value: 'give', label: 'give +' },
-  { value: 'take', label: 'take −' },
+  { value: 'take', label: 'take -' },
   { value: 'set',  label: 'set =' },
 ];
 const SKILL_OPS = [
@@ -50,46 +55,150 @@ const SKILL_OPS = [
   { value: 'forget', label: 'forget' },
 ];
 
-const _emptyOp = () => ({ target: '', op: 'add', value: 0 });
-
 const _kindOf = target =>
   target.startsWith('flags.')  ? 'flag'
   : target.startsWith('inv.')    ? 'inv'
   : target.startsWith('skills.') ? 'skill'
   : 'stat';
 
-const OpRow = ({ op: o, vars, onChange, onRemove }) => {
+// True when an op carries non-default condition / min / max / etc.
+const _isAdvanced = o =>
+  (o?.condition && o.condition.mode && o.condition.mode !== 'always') ||
+  (o?.min && o.min.enabled) ||
+  (o?.max && o.max.enabled);
+
+// Tiny in-memory map of which op rows are showing their Advanced drawer.
+// Keyed by a stable id derived from the op's position inside the parent
+// Effect (the parent threads `rowKey` down). Lives on the editor store so the
+// drawer stays open across re-renders.
+const _isOpen = rowKey => !!(getState().expandedOpRows || {})[rowKey];
+const _toggleOpen = rowKey => () => setState(s => ({
+  expandedOpRows: { ...(s.expandedOpRows || {}), [rowKey]: !s.expandedOpRows?.[rowKey] },
+}));
+
+// Limit field — renders {enabled, statKey, mul, const} as
+//   [Toggle] [stat dropdown] [mul x] [+ const]
+// Disabled = no clamp; statKey === '' makes the limit a pure constant
+// (mul * 0 + const = const), so the user can either type a flat number or
+// derive from a stat.
+const _LimitField = ({ label, vars, limit, onChange }) => {
+  const cur = limit || emptyOpLimit();
+  const statOpts = [
+    { value: '', label: '— constant —' },
+    ...(vars.stats || []).map(k => ({ value: k, label: k })),
+  ];
+  return div({ style: 'border:1px solid var(--border-2); border-radius:var(--radius); padding:8px 10px' })([
+    div({ style: 'display:flex; align-items:center; gap:10px; margin-bottom:6px' })([
+      Toggle({
+        on:       !!cur.enabled,
+        onChange: v => onChange({ ...cur, enabled: v }),
+      })([`${label} clamp`]),
+      span({ style: 'flex:1' })([]),
+      ...(cur.enabled
+        ? [span({ style: 'font-family:ui-monospace,monospace; font-size:11px; color:var(--text-muted)' })([
+            `= ${Number(cur.mul) || 0} x state[${cur.statKey ? JSON.stringify(cur.statKey) : '""'}] + ${Number(cur.const) || 0}`,
+          ])]
+        : []),
+    ]),
+    ...(cur.enabled
+      ? [div({ style: 'display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px' })([
+          Select({
+            label:    'Stat',
+            options:  statOpts,
+            value:    cur.statKey || '',
+            onChange: onText(v => onChange({ ...cur, statKey: v })),
+          }),
+          NumberInput({
+            label:    'Multiplier',
+            value:    Number(cur.mul) || 0,
+            onChange: v => onChange({ ...cur, mul: Number(v) || 0 }),
+          }),
+          NumberInput({
+            label:    'Constant',
+            value:    Number(cur.const) || 0,
+            onChange: v => onChange({ ...cur, const: Number(v) || 0 }),
+          }),
+        ])]
+      : []),
+  ]);
+};
+
+const OpRow = ({ op: o, vars, rowKey, onChange, onRemove }) => {
   const kind = _kindOf(o.target);
   const targetOpts = [
     { value: '', label: '— pick —' },
     ...vars.stats.map(k => ({ value: k,            label: `stat: ${k}` })),
     ...vars.flags.map(k => ({ value: `flags.${k}`, label: `flag: ${k}` })),
-    ...(vars.items  || []).map(it => ({ value: `inv.${it.id}`,    label: `item: ${it.name}` })),
+    ...groupedOptions(vars.items || [])(it => ({ value: `inv.${it.id}`, label: `item: ${it.name}` })),
     ...(vars.skills || []).map(sk => ({ value: `skills.${sk.id}`, label: `skill: ${sk.name}` })),
   ];
   const opsForKind = kind === 'flag' ? FLAG_OPS : kind === 'inv' ? INV_OPS : kind === 'skill' ? SKILL_OPS : STAT_OPS;
   // Normalise op when switching kinds — keep "set" since both support it.
   const safeOp = opsForKind.find(x => x.value === o.op) ? o.op : opsForKind[0].value;
-  return div({ style: 'display:grid; grid-template-columns: 1fr 110px 1fr 40px; gap:8px; margin-bottom:6px' })([
-    Select({ options: targetOpts, value: o.target, onChange: onText(v => onChange({ ...o, target: v })) }),
-    Select({ options: opsForKind, value: safeOp, onChange: onText(v => onChange({ ...o, op: v })) }),
-    safeOp === 'toggle' || kind === 'skill'
-      ? div({ style: 'display:flex; align-items:center; color:var(--text-muted); font-size:12px' })(['(no value)'])
-      : kind === 'flag'
-        ? Select({
-            options: [{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }],
-            value: String(o.value),
-            onChange: onText(v => onChange({ ...o, value: v === 'true' })),
-          })
-        : TextInput({
-            value: String(o.value ?? ''),
-            onChange: onText(v => {
-              const n = Number(v);
-              onChange({ ...o, value: Number.isFinite(n) && v.trim() !== '' ? n : v });
+  // Clamps only make sense on numeric writes (stat add/sub/set, inv give/take/set).
+  const clampable = (kind === 'stat' && (safeOp === 'add' || safeOp === 'sub' || safeOp === 'set'))
+                 || (kind === 'inv'  && (safeOp === 'give' || safeOp === 'take' || safeOp === 'set'));
+  const open = _isOpen(rowKey);
+  const advFlagged = _isAdvanced(o);
+  return div({ style: 'border:1px solid transparent; border-radius:var(--radius); margin-bottom:6px' + (open || advFlagged ? '; border-color:var(--border-2); padding:6px 8px; background:var(--surface-2, transparent)' : '') })([
+    div({ style: 'display:grid; grid-template-columns: 1fr 110px 1fr 32px 32px; gap:8px; align-items:center' })([
+      Select({ options: targetOpts, value: o.target, onChange: onText(v => onChange({ ...o, target: v })) }),
+      Select({ options: opsForKind, value: safeOp, onChange: onText(v => onChange({ ...o, op: v })) }),
+      safeOp === 'toggle' || kind === 'skill'
+        ? div({ style: 'display:flex; align-items:center; color:var(--text-muted); font-size:12px' })(['(no value)'])
+        : kind === 'flag'
+          ? Select({
+              options: [{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }],
+              value: String(o.value),
+              onChange: onText(v => onChange({ ...o, value: v === 'true' })),
+            })
+          : TextInput({
+              value: String(o.value ?? ''),
+              onChange: onText(v => {
+                const n = Number(v);
+                onChange({ ...o, value: Number.isFinite(n) && v.trim() !== '' ? n : v });
+              }),
+              placeholder: 'number or string',
             }),
-            placeholder: 'number or string',
-          }),
-    Button({ variant: 'ghost', size: 'sm', onClick: onRemove })(['×']),
+      Button({
+        variant: open ? 'primary' : 'ghost', size: 'sm',
+        onClick: _toggleOpen(rowKey),
+        title:   advFlagged ? 'Advanced — condition / clamp set' : 'Advanced — condition / clamp',
+      })([advFlagged ? '⚙•' : '⚙']),
+      Button({ variant: 'ghost', size: 'sm', onClick: onRemove })(['x']),
+    ]),
+    ...(open
+      ? [div({ style: 'margin-top:8px; padding-top:8px; border-top:1px dashed var(--border-2); display:flex; flex-direction:column; gap:8px' })([
+          div({})([
+            span({ style: 'font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600; display:block; margin-bottom:4px' })([
+              'Run this op only when',
+            ]),
+            ConditionEditor({
+              condition: o.condition || emptyCondition(),
+              vars,
+              onChange:  v => onChange({ ...o, condition: v }),
+            }),
+          ]),
+          ...(clampable
+            ? [div({ style: 'display:grid; grid-template-columns: 1fr 1fr; gap:8px' })([
+                _LimitField({
+                  label:    'Min',
+                  vars,
+                  limit:    o.min || emptyOpLimit(),
+                  onChange: v => onChange({ ...o, min: v }),
+                }),
+                _LimitField({
+                  label:    'Max',
+                  vars,
+                  limit:    o.max || emptyOpLimit(),
+                  onChange: v => onChange({ ...o, max: v }),
+                }),
+              ])]
+            : [div({ style: 'font-size:11px; color:var(--text-muted)' })([
+                'Clamps apply only to numeric writes (stat add/sub/set, inv give/take/set).',
+              ])]),
+        ])]
+      : []),
   ]);
 };
 
@@ -97,7 +206,7 @@ const OpRow = ({ op: o, vars, onChange, onRemove }) => {
 // runner picks ONE option per call based on effective weights (base + applied
 // bonuses), then fires that option's Effect — which can be anything, including
 // another `oneOf` or `multi` (recursion just works).
-const _oneOfOptionRow = ({ options, index }) => vars => set => {
+const _oneOfOptionRow = ({ options, index, rowKey }) => vars => set => {
   const opt = options[index];
   const _patch = next => set({ options: options.map((o, k) => k === index ? next : o) });
   const _delete = () => set({ options: options.filter((_, k) => k !== index) });
@@ -115,7 +224,7 @@ const _oneOfOptionRow = ({ options, index }) => vars => set => {
       div({ style: 'flex:1' })([]),
       Button({ size: 'sm', variant: 'ghost', onClick: () => _move(-1), disabled: index === 0                 })(['↑']),
       Button({ size: 'sm', variant: 'ghost', onClick: () => _move( 1), disabled: index === options.length - 1 })(['↓']),
-      Button({ size: 'sm', variant: 'ghost', onClick: _delete })(['×']),
+      Button({ size: 'sm', variant: 'ghost', onClick: _delete })(['x']),
     ]),
     div({ style: 'display:grid; grid-template-columns:1fr 120px; gap:8px; margin-bottom:8px' })([
       TextInput({
@@ -141,7 +250,7 @@ const _oneOfOptionRow = ({ options, index }) => vars => set => {
       span({ style: 'font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600; display:block; margin-bottom:6px' })([
         'When this option is picked, fire',
       ]),
-      EffectEditor({ effect: opt.effect, vars, label: '', onChange: nxt => _patch({ ...opt, effect: nxt }) }),
+      EffectEditor({ effect: opt.effect, vars, label: '', rowKey: `${rowKey}.${index}`, onChange: nxt => _patch({ ...opt, effect: nxt }) }),
     ]),
   ]);
 };
@@ -155,7 +264,7 @@ const _oneOfOddsLine = options => {
   ]);
 };
 
-const _oneOfOptionsEditor = e => vars => set => {
+const _oneOfOptionsEditor = e => vars => set => rowKey => {
   const options = Array.isArray(e.options) ? e.options : [];
   const odds = _oneOfOddsLine(options);
   return Stack({ gap: 8 })([
@@ -165,7 +274,7 @@ const _oneOfOptionsEditor = e => vars => set => {
     ...(odds ? [odds] : []),
     ...(options.length === 0
       ? [div({ className: 'gef-empty' })(['No options yet. Add one below.'])]
-      : options.map((_, i) => _oneOfOptionRow({ options, index: i })(vars)(set))),
+      : options.map((_, i) => _oneOfOptionRow({ options, index: i, rowKey: `${rowKey}:oneOf` })(vars)(set))),
     Button({
       size: 'sm', variant: 'ghost',
       onClick: () => set({ options: [...options, emptyOneOfOption()] }),
@@ -177,7 +286,7 @@ const _oneOfOptionsEditor = e => vars => set => {
 // delete controls. Curried `effect => vars => set` so it composes cleanly.
 // The inner EffectEditor reference is resolved at call time (EffectEditor is
 // defined below) so this works fine with hoisted const arrows.
-const _multiStepRow = ({ steps, index }) => vars => set => {
+const _multiStepRow = ({ steps, index, rowKey }) => vars => set => {
   const step = steps[index];
   const _patch = next => set({ steps: steps.map((s, k) => k === index ? next : s) });
   const _delete = () => set({ steps: steps.filter((_, k) => k !== index) });
@@ -194,13 +303,13 @@ const _multiStepRow = ({ steps, index }) => vars => set => {
       div({ style: 'flex:1' })([]),
       Button({ size: 'sm', variant: 'ghost', onClick: () => _move(-1), disabled: index === 0                })(['↑']),
       Button({ size: 'sm', variant: 'ghost', onClick: () => _move( 1), disabled: index === steps.length - 1 })(['↓']),
-      Button({ size: 'sm', variant: 'ghost', onClick: _delete })(['×']),
+      Button({ size: 'sm', variant: 'ghost', onClick: _delete })(['x']),
     ]),
-    EffectEditor({ effect: step, vars, label: '', onChange: _patch }),
+    EffectEditor({ effect: step, vars, label: '', rowKey: `${rowKey}.${index}`, onChange: _patch }),
   ]);
 };
 
-const _multiStepsEditor = e => vars => set => {
+const _multiStepsEditor = e => vars => set => rowKey => {
   const steps = Array.isArray(e.steps) ? e.steps : [];
   return Stack({ gap: 8 })([
     span({ style: 'font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600' })([
@@ -208,7 +317,7 @@ const _multiStepsEditor = e => vars => set => {
     ]),
     ...(steps.length === 0
       ? [div({ className: 'gef-empty' })(['No steps yet. Add one below.'])]
-      : steps.map((_, i) => _multiStepRow({ steps, index: i })(vars)(set))),
+      : steps.map((_, i) => _multiStepRow({ steps, index: i, rowKey: `${rowKey}:multi` })(vars)(set))),
     Button({
       size: 'sm', variant: 'ghost',
       onClick: () => set({ steps: [...steps, emptyEffect()] }),
@@ -216,7 +325,7 @@ const _multiStepsEditor = e => vars => set => {
   ]);
 };
 
-const EffectEditor = ({ effect, onChange, vars = { stats: [], flags: [], items: [], npcs: [], combats: [] }, label = 'Effect' }) => {
+const EffectEditor = ({ effect, onChange, vars = { stats: [], flags: [], items: [], npcs: [], combats: [] }, label = 'Effect', rowKey = 'eff' }) => {
   const e = effect || { mode: 'none', ops: [], body: '', npcId: '', combatId: '' };
   const set    = patch => onChange({ ...e, ...patch });
   const setOps = ops   => onChange({ ...e, ops });
@@ -244,11 +353,12 @@ const EffectEditor = ({ effect, onChange, vars = { stats: [], flags: [], items: 
             OpRow({
               op: o,
               vars,
+              rowKey: `${rowKey}:${i}`,
               onChange: nx => setOps(e.ops.map((x, k) => k === i ? nx : x)),
               onRemove: () => setOps(e.ops.filter((_, k) => k !== i)),
             })
           ),
-          Button({ size: 'sm', variant: 'ghost', onClick: () => setOps([...(e.ops || []), _emptyOp()]) })(['+ Add op']),
+          Button({ size: 'sm', variant: 'ghost', onClick: () => setOps([...(e.ops || []), emptyOp()]) })(['+ Add op']),
         ])]
       : []),
 
@@ -287,11 +397,11 @@ const EffectEditor = ({ effect, onChange, vars = { stats: [], flags: [], items: 
       : []),
 
     ...(e.mode === 'multi'
-      ? [div({ style: 'margin-top:8px' })([_multiStepsEditor(e)(vars)(set)])]
+      ? [div({ style: 'margin-top:8px' })([_multiStepsEditor(e)(vars)(set)(rowKey)])]
       : []),
 
     ...(e.mode === 'oneOf'
-      ? [div({ style: 'margin-top:8px' })([_oneOfOptionsEditor(e)(vars)(set)])]
+      ? [div({ style: 'margin-top:8px' })([_oneOfOptionsEditor(e)(vars)(set)(rowKey)])]
       : []),
 
     ...(e.mode === 'talkTo'
@@ -300,7 +410,7 @@ const EffectEditor = ({ effect, onChange, vars = { stats: [], flags: [], items: 
             label: 'NPC',
             options: [
               { value: '', label: '— pick NPC —' },
-              ...(vars.npcs || []).map(n => ({ value: n.id, label: `${n.name || n.id} (${n.id})` })),
+              ...groupedOptions(vars.npcs || [])(n => ({ value: n.id, label: `${n.name || n.id} (${n.id})` })),
             ],
             value:    e.npcId || '',
             onChange: onText(v => set({ npcId: v })),

@@ -536,7 +536,7 @@ const _replyPageRow = ({ pages, index }) => {
     div({ style: 'display:flex; align-items:center; gap:6px; margin-bottom:6px' })([
       span({ style: 'font-weight:600; font-size:12px; color:var(--text-muted)' })([`Page ${index + 1}`]),
       div({ style: 'flex:1' })([]),
-      Button({ size: 'sm', variant: 'ghost', onClick: _delete, disabled: pages.length === 1 })(['×']),
+      Button({ size: 'sm', variant: 'ghost', onClick: _delete, disabled: pages.length === 1 })(['x']),
     ]),
     TextInput({
       label:       'Text (placeholders OK)',

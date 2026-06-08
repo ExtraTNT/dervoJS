@@ -44,12 +44,12 @@ Button({ size: 'lg' })(['Large']),`
           String(state.count),
         ]),
         div({ style: 'display:flex; gap:8px' })([
-          Button({ variant: 'secondary', size: 'sm', onClick: () => setState(s => ({ count: s.count - 1 })) })(['− 1']),
+          Button({ variant: 'secondary', size: 'sm', onClick: () => setState(s => ({ count: s.count - 1 })) })(['- 1']),
           Button({ size: 'sm',           onClick: () => setState(s => ({ count: s.count + 1 })) })(['+ 1']),
           Button({ variant: 'ghost',     size: 'sm', onClick: () => setState({ count: 0 }) })(['Reset']),
         ]),
       doc([
-        `Button({ variant: 'secondary', size: 'sm', onClick: () => setState(s => ({ count: s.count - 1 })) })(['− 1']),
+        `Button({ variant: 'secondary', size: 'sm', onClick: () => setState(s => ({ count: s.count - 1 })) })(['- 1']),
 Button({ size: 'sm',           onClick: () => setState(s => ({ count: s.count + 1 })) })(['+ 1']),
 Button({ variant: 'ghost',     size: 'sm', onClick: () => setState({ count: 0 }) })(['Reset']),`
         ]),

@@ -26,6 +26,7 @@ import {
   fileToDataUrl, compressImageDataUrl,
   isDataUrl, dataUrlMime, dataUrlByteSize, formatBytes,
 } from '../assets.js';
+import { FolderedList, FolderField, folderSuggestions } from '../components/FolderedList.js';
 
 const KIND_OPTS = [
   { value: 'all',   label: 'All kinds' },
@@ -56,7 +57,7 @@ const _processUpload = async (file, project) => {
     : raw;
   // Mime comes from the FINAL data URL, not the upload — base64ToWebP rewrites
   // the header to image/webp on success. If we stored rawMime here, the zip
-  // export would write a .png filename around the WebP bytes (4× larger than
+  // export would write a .png filename around the WebP bytes (4x larger than
   // the equivalent .png and confusing for anyone inspecting the export).
   return {
     ...emptyAsset(kind),
@@ -112,7 +113,7 @@ const _preview = asset => {
   return div({})([]);
 };
 
-const AssetCard = (asset) => {
+const AssetCard = suggestions => asset => {
   return div({ style: 'border:1px solid var(--border); border-radius:var(--radius); padding:10px; background:var(--surface); display:flex; gap:12px; align-items:center' })([
     _preview(asset),
     div({ style: 'flex:1; min-width:0' })([
@@ -135,6 +136,12 @@ const AssetCard = (asset) => {
           ]),
         ]),
       ]),
+      FolderField({
+        id:          `asset-folder-${asset.id}`,
+        value:       asset.folder,
+        onChange:    v => _updateAsset(asset.id, { folder: v }),
+        suggestions,
+      }),
     ]),
     div({ style: 'display:flex; flex-direction:column; gap:6px' })([
       Button({ size: 'sm', variant: 'ghost', onClick: () => _pickFiles(ACCEPT_MIME[asset.kind] || '', files => {
@@ -228,7 +235,12 @@ const AssetsPanel = state => {
         ]),
         ...(shown.length === 0
           ? [div({ className: 'gef-empty' })([assets.length === 0 ? 'No assets yet. Upload something above.' : 'Nothing matches this filter.'])]
-          : shown.map(AssetCard)),
+          : [FolderedList({
+              items:      shown,
+              panelKey:   'assets',
+              collapsed:  state.collapsedFolders?.assets || {},
+              renderItem: AssetCard(folderSuggestions(assets)),
+            })]),
       ]),
     ]),
   ]);

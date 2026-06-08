@@ -14,6 +14,7 @@ import { Select } from '../../src/components/Select.js';
 import { TextInput } from '../../src/components/TextInput.js';
 import { onText } from '../helpers.js';
 import { condToExpr } from '../codegen.js';
+import { groupedOptions } from './FolderedList.js';
 
 const MODE_OPTS = [
   { value: 'always',  label: 'always (no check)' },
@@ -72,7 +73,7 @@ const ConditionEditor = ({ condition, onChange, vars = { stats: [], flags: [], i
           Select({
             options: [
               { value: '', label: '— pick item —' },
-              ...vars.items.map(it => ({ value: it.id, label: `${it.name} (${it.id})` })),
+              ...groupedOptions(vars.items)(it => ({ value: it.id, label: `${it.name} (${it.id})` })),
             ],
             value:    c.itemId,
             onChange: onText(v => set({ itemId: v })),

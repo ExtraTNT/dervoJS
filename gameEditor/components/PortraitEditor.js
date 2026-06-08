@@ -25,6 +25,7 @@ import { Badge } from '../../src/components/Badge.js';
 import { emptyPortraitLayer } from '../schema.js';
 import { onText } from '../helpers.js';
 import { AssetInput } from './AssetInput.js';
+import { groupedOptions } from './FolderedList.js';
 
 const _PreviewBox = (widget, layers) => {
   // Renders the layers stacked at the configured size. defaultImage only —
@@ -88,7 +89,7 @@ const LayerCard = ({ layer, items, onChange, onDelete }) => {
                 label:    i === 0 ? 'When player has' : '',
                 options:  [
                   { value: '', label: '— pick item —' },
-                  ...items.map(it => ({ value: it.id, label: `${it.name} (${it.id})` })),
+                  ...groupedOptions(items)(it => ({ value: it.id, label: `${it.name} (${it.id})` })),
                 ],
                 value:    b.itemId,
                 onChange: onText(v => setBindings(layer.bindings.map((x, k) => k === i ? { ...x, itemId: v } : x))),
@@ -100,7 +101,7 @@ const LayerCard = ({ layer, items, onChange, onDelete }) => {
                 accept:      'image',
                 placeholder: 'https://…',
               }),
-              Button({ size: 'sm', variant: 'ghost', onClick: () => setBindings(layer.bindings.filter((_, k) => k !== i)) })(['×']),
+              Button({ size: 'sm', variant: 'ghost', onClick: () => setBindings(layer.bindings.filter((_, k) => k !== i)) })(['x']),
             ])
           )),
       Button({ size: 'sm', variant: 'ghost', onClick: () => setBindings([...layer.bindings, { itemId: items[0]?.id || '', image: '' }]) })(['+ Add binding']),

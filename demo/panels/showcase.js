@@ -5,7 +5,7 @@
  *   • createInterval         — five independent emitters, each toggleable
  *   • setState updaters      — pure (state -> state) reducers driven by bus events
  *   • keyed reconciler       — feed list reorders + animates without losing focus
- *   • focus preservation     — search input keeps cursor while feed updates 4×/s
+ *   • focus preservation     — search input keeps cursor while feed updates 4x/s
  *   • currying / templates   — emitter rows + stat tiles built via partial app.
  *   • memoization            — Badge is memoised once, reused for every event
  *   • charts                 — BarChart + SparkLine derived from the same store

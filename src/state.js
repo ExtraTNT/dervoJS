@@ -53,13 +53,20 @@ const vnodeKey = c => (c && typeof c === 'object' ? (c.props?.key ?? null) : nul
 
 const _prevProps = new WeakMap();
 
-// SVG-aware node creation 
+// SVG-aware node creation
 const _SVG_NS  = 'http://www.w3.org/2000/svg';
 const _SVG_SET = new Set([
   'svg','g','path','circle','ellipse','rect','line','polyline','polygon',
   'text','tspan','defs','use','symbol','clipPath','mask',
   'linearGradient','radialGradient','stop','title','desc',
 ]);
+
+// Props whose IDL counterpart is read-only or doesn't reflect to the HTML
+// attribute the browser actually parses. These have to go through
+// setAttribute / removeAttribute rather than direct property assignment.
+// HTMLInputElement.list is a read-only getter — without this we'd crash on
+// `node.list = id` when wiring an <input list="…"> to a <datalist>.
+const _ATTR_ONLY = new Set(['list']);
 
 const _buildNode = vnode => {
   if (typeof vnode === 'string') return document.createTextNode(vnode);
@@ -73,6 +80,7 @@ const _buildNode = vnode => {
     if (k.startsWith('on')) { node[k] = props[k]; continue; }
     if (isSvg)                        node.setAttribute(k, props[k]);
     else if (k.startsWith('data-'))   node.setAttribute(k, props[k]);     // data-* must reflect to DOM
+    else if (_ATTR_ONLY.has(k))       node.setAttribute(k, props[k]);     // read-only IDL props (input.list, …)
     else                              node[k] = props[k];
   }
   const ch = vnode.children || [];
@@ -112,6 +120,7 @@ const _patchProps = el => newProps => {
       if (typeof prev[k] === 'function')       { el[k] = null; return; }
       if (isSvg)                               { el.removeAttribute(k); return; }
       if (k.startsWith('data-'))               { el.removeAttribute(k); return; }
+      if (_ATTR_ONLY.has(k))                   { el.removeAttribute(k); return; }
       if (typeof prev[k] === 'boolean')          el[k] = false;
       else                                       el[k] = '';
     });
@@ -121,6 +130,8 @@ const _patchProps = el => newProps => {
     if (isSvg) {
       if (el.getAttribute(k) !== String(newProps[k])) el.setAttribute(k, newProps[k]);
     } else if (k.startsWith('data-')) {
+      if (el.getAttribute(k) !== String(newProps[k])) el.setAttribute(k, newProps[k]);
+    } else if (_ATTR_ONLY.has(k)) {
       if (el.getAttribute(k) !== String(newProps[k])) el.setAttribute(k, newProps[k]);
     } else {
       if (k === 'style' || el[k] !== newProps[k]) el[k] = newProps[k];

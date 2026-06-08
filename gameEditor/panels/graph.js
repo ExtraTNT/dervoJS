@@ -214,7 +214,7 @@ const _edgePath = from => to => {
   return `M ${start.x} ${start.y} Q ${cx} ${cy} ${end.x} ${end.y}`;
 };
 
-// Hexagon path sized COMBAT_W × COMBAT_H.
+// Hexagon path sized COMBAT_W x COMBAT_H.
 const _hexPath = () => {
   const w = COMBAT_W, h = COMBAT_H, o = 12;
   return `M ${o} 0 L ${w - o} 0 L ${w} ${h / 2} L ${w - o} ${h} L ${o} ${h} L 0 ${h / 2} Z`;

@@ -29,9 +29,30 @@ const _readPath = (state, path) => {
   return state[path];
 };
 
-const _writeOpToPatch = (state, op) => {
+// Per-op clamp evaluator. Returns null when the limit is off (no clamp).
+// statKey === '' makes the limit a pure constant (mul * 0 + const = const).
+const _evalOpLimit = (limit, state) =>
+  !limit || !limit.enabled
+    ? null
+    : (Number(limit.mul) || 0) * (Number(state?.[limit.statKey]) || 0) + (Number(limit.const) || 0);
+
+const _clamp = (n, lo, hi) => {
+  let out = n;
+  if (lo != null && out < lo) out = lo;
+  if (hi != null && out > hi) out = hi;
+  return out;
+};
+
+const _writeOpToPatch = (state, op, ctx) => {
   const { target, op: kind, value } = op;
   if (!target) return null;
+  // Per-op condition gate. Missing / 'always' condition lets the op through.
+  if (op.condition && op.condition.mode && op.condition.mode !== 'always') {
+    const guard = _compileCondition(op.condition);
+    // Use the live ctx so the guard sees the same shape conditions on choices do.
+    const c = ctx || { state };
+    if (!guard(c)) return null;
+  }
   if (target.startsWith('flags.')) {
     const k = target.slice(6);
     const cur = state.flags?.[k];
@@ -42,11 +63,18 @@ const _writeOpToPatch = (state, op) => {
     const k = target.slice(4);
     const cur = Number(state.inventory?.[k] || 0);
     const n = Number(value) || 0;
-    const next =
+    let next =
       kind === 'give' ? cur + n :
-      kind === 'take' ? Math.max(0, cur - n) :
+      kind === 'take' ? cur - n :
       kind === 'set'  ? n :
       cur;
+    // Implicit floor of 0 only on `take` — matches the engine's original
+    // behaviour. User min/max apply on top of it for take; for give/set,
+    // user min/max are the only clamp source.
+    const lo = _evalOpLimit(op.min, state);
+    const hi = _evalOpLimit(op.max, state);
+    const effLo = kind === 'take' ? (lo != null ? Math.max(0, lo) : 0) : lo;
+    next = _clamp(next, effLo, hi);
     const inv = { ...(state.inventory || {}) };
     if (next <= 0) delete inv[k]; else inv[k] = next;
     return { inventory: inv };
@@ -62,11 +90,17 @@ const _writeOpToPatch = (state, op) => {
   const cur = Number(state[target] || 0);
   const n = Number(value);
   const isNumeric = Number.isFinite(n);
-  const next =
+  let next =
     kind === 'set' ? (isNumeric ? n : value) :
     kind === 'add' ? cur + (isNumeric ? n : 0) :
     kind === 'sub' ? cur - (isNumeric ? n : 0) :
     cur;
+  // Clamp numeric results only — string `set` (e.g. setting a label) skips.
+  if (typeof next === 'number') {
+    const lo = _evalOpLimit(op.min, state);
+    const hi = _evalOpLimit(op.max, state);
+    next = _clamp(next, lo, hi);
+  }
   return { [target]: next };
 };
 
@@ -151,7 +185,7 @@ const _applyLootEntry = (entry, c) => {
       const n = Math.max(0, _randIntRange(entry.countMin, entry.countMax));
       if (n === 0) return null;
       c.setState(s => ({ inventory: { ...(s.inventory || {}), [entry.itemId]: (Number(s.inventory?.[entry.itemId]) || 0) + n } }));
-      return `${entry.itemId} ×${n}`;
+      return `${entry.itemId} x${n}`;
     }
     case 'stat': {
       if (!entry.statKey) return null;
@@ -329,7 +363,9 @@ const _compileEffectCore = (effect, project) => {
       c.setState(s => {
         let next = s;
         for (const op of effect.ops || []) {
-          const patch = _writeOpToPatch(next, op);
+          // Per-op condition evaluates against the IN-PROGRESS state so earlier
+          // ops in the same effect can flip a flag a later op gates on.
+          const patch = _writeOpToPatch(next, op, { ...c, state: next });
           if (patch) next = { ...next, ...patch };
         }
         return next;
@@ -652,7 +688,7 @@ const _buildInventoryRoomFn = (room, project) => ctx => {
                 ? [div({ style: 'font-size:12px; color:var(--text-muted)' })([it.description])]
                 : []),
             ]),
-            span({ style: 'font-family:ui-monospace,monospace; color:var(--text-muted); margin-right:8px' })([`×${inv[it.id]}`]),
+            span({ style: 'font-family:ui-monospace,monospace; color:var(--text-muted); margin-right:8px' })([`x${inv[it.id]}`]),
             ..._itemActions(it),
           ]))
         )]
@@ -662,7 +698,7 @@ const _buildInventoryRoomFn = (room, project) => ctx => {
           })([
             ...(it.image ? [img({ src: it.image, style: 'width:48px; height:48px; object-fit:contain; display:block; margin:0 auto 6px' })([])] : []),
             div({ style: 'font-weight:600; font-size:13px' })([it.name || it.id, ...(_kindBadge(it) ? [_kindBadge(it)] : [])]),
-            div({ style: 'font-size:11px; color:var(--text-muted); margin-top:2px' })([`${it.kind || 'misc'} · ×${inv[it.id]}`]),
+            div({ style: 'font-size:11px; color:var(--text-muted); margin-top:2px' })([`${it.kind || 'misc'} · x${inv[it.id]}`]),
             ...(cfg.showDescription && it.description
               ? [div({ style: 'font-size:11.5px; color:var(--text-muted); margin-top:4px; flex:1' })([it.description])]
               : [div({ style: 'flex:1' })([])]),
@@ -709,7 +745,7 @@ const _buildWardrobeFn = (room, project) => ctx => {
         it.name || it.id,
         ...(equippedIds.has(it.id) ? [span({ style: 'display:inline-block; padding:1px 6px; border-radius:3px; background:var(--accent); color:#fff; font-size:10px; margin-left:6px' })(['equipped'])] : []),
       ]),
-      div({ style: 'font-size:11px; color:var(--text-muted)' })([`${it.equipSlot || it.kind} · ×${inv[it.id] || 0}`]),
+      div({ style: 'font-size:11px; color:var(--text-muted)' })([`${it.equipSlot || it.kind} · x${inv[it.id] || 0}`]),
     ]),
     ...(it.kind === 'equipment' ? [button({
       type: 'button',
@@ -779,6 +815,34 @@ const _resolvePrice = (entry, item) => {
 
 const _buildShopScene = (npc, project) => {
   const stock = npc.shop?.stock || [];
+  const buyback = npc.shop?.buyback || { mode: 'none', multiplier: 0.8, items: [] };
+  // What the shop is willing to buy back, paired with the per-item multiplier.
+  // Returns `[{ item, multiplier }]` filtered to non-zero player inventory.
+  const _sellable = state => {
+    if (buyback.mode === 'none') return [];
+    const inv = state.inventory || {};
+    if (buyback.mode === 'open') {
+      return project.items
+        .filter(it => (Number(inv[it.id]) || 0) > 0)
+        .map(it => ({ item: it, multiplier: Number(buyback.multiplier) || 0.8 }));
+    }
+    // list mode — only the whitelisted items, with per-item override fallback.
+    return (buyback.items || [])
+      .map(e => {
+        const it = project.items.find(x => x.id === e.itemId);
+        if (!it) return null;
+        if ((Number(inv[it.id]) || 0) <= 0) return null;
+        const mul = e.multiplier == null ? (Number(buyback.multiplier) || 0.8) : Number(e.multiplier);
+        return { item: it, multiplier: mul };
+      })
+      .filter(Boolean);
+  };
+  const _sellPrice = (item, mul) => {
+    const itemPrice = item?.price && typeof item.price === 'object'
+      ? { stat: item.price.stat || 'gold', amount: Number(item.price.amount) || 0 }
+      : { stat: 'gold', amount: 0 };
+    return { stat: itemPrice.stat, amount: Math.floor(mul * itemPrice.amount) };
+  };
   return ctx => {
     const back = ctx.scene;
     const inv  = ctx.state.inventory || {};
@@ -800,48 +864,103 @@ const _buildShopScene = (npc, project) => {
       }));
     };
 
+    // Sell: player → shop. Player loses 1 of the item and gains
+    // floor(multiplier × item.price.amount) of the item's price stat.
+    const sell = ({ item, multiplier }) => c => {
+      const have = Number(c.state.inventory?.[item.id] || 0);
+      if (have <= 0) return;
+      const { stat, amount } = _sellPrice(item, multiplier);
+      c.setState(s => {
+        const newCount = (Number(s.inventory?.[item.id]) || 0) - 1;
+        const nextInv = { ...(s.inventory || {}) };
+        if (newCount <= 0) delete nextInv[item.id]; else nextInv[item.id] = newCount;
+        return {
+          [stat]:    (Number(s[stat]) || 0) + amount,
+          inventory: nextInv,
+        };
+      });
+    };
+
+    const sellable = _sellable(ctx.state);
+
+    // One item card: optional image, name, optional description, price + an
+    // inline action button. `gef-shop-card` is just for grid styling; the
+    // button uses dervo's `.btn` classes so theme tokens carry through.
+    const _card = ({ image, name, description, infoLine, btnLabel, btnDisabled, onClick }) =>
+      div({
+        style: 'display:flex; flex-direction:column; gap:6px; padding:10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface)',
+      })([
+        ...(image
+          ? [div({ style: 'aspect-ratio:1/1; background:var(--surface-2, rgba(0,0,0,.04)); border-radius:var(--radius); overflow:hidden; display:grid; place-items:center' })([
+              img({ src: image, alt: name, style: 'max-width:100%; max-height:100%; object-fit:contain' })([]),
+            ])]
+          : []),
+        div({ style: 'font-weight:600; font-size:13px; line-height:1.3' })([name]),
+        ...(description ? [div({ style: 'font-size:12px; color:var(--text-muted); line-height:1.4' })([description])] : []),
+        div({ style: 'font-size:12px; color:var(--text-muted); margin-top:auto' })([infoLine]),
+        button({
+          className: `btn btn-primary btn-sm${btnDisabled ? ' btn-disabled' : ''}`,
+          type:      'button',
+          disabled:  !!btnDisabled,
+          onclick:   btnDisabled ? undefined : onClick,
+          style:     'margin-top:4px',
+        })([btnLabel]),
+      ]);
+
+    const _grid = cards => div({
+      style: 'display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:12px',
+    })(cards);
+
     const stockBody = stock.length === 0
       ? [p({})(['(Nothing for sale right now.)'])]
-      : [div({ style: 'display:flex; flex-direction:column; gap:8px' })(
-          stock.map(entry => {
-            const item   = project.items.find(it => it.id === entry.itemId);
-            const name   = item?.name || entry.itemId;
-            const { stat, amount } = _resolvePrice(entry, item);
-            const rem    = remaining(entry);
-            const have   = Number(inv[entry.itemId] || 0);
-            return div({
-              style: 'display:grid; grid-template-columns: 1fr auto auto; gap:8px; align-items:center; padding:8px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface)',
-            })([
-              div({})([
-                div({ style: 'font-weight:600' })([name]),
-                ...(item?.description ? [div({ style: 'font-size:12px; color:var(--text-muted)' })([_evalText(ctx.state)(item.description)])] : []),
-                div({ style: 'font-size:12px; color:var(--text-muted); margin-top:2px' })([
-                  `Price: ${amount} ${stat} · You have: ${have}${rem === Infinity ? '' : ` · Left: ${rem}`}`,
-                ]),
-              ]),
-              span({})([]),
-              span({})([]),
-            ]);
-          })
-        )];
+      : [_grid(stock.map(entry => {
+          const item   = project.items.find(it => it.id === entry.itemId);
+          const name   = item?.name || entry.itemId;
+          const { stat, amount } = _resolvePrice(entry, item);
+          const rem    = remaining(entry);
+          const have   = Number(inv[entry.itemId] || 0);
+          const broke  = (Number(ctx.state[stat]) || 0) < amount;
+          const soldOut = rem <= 0;
+          return _card({
+            image:       item?.image || '',
+            name,
+            description: item?.description ? _evalText(ctx.state)(item.description) : '',
+            infoLine:    `${amount} ${stat} · You have: ${have}${rem === Infinity ? '' : ` · Left: ${rem}`}`,
+            btnLabel:    soldOut ? 'Sold out' : broke ? `Need ${amount} ${stat}` : `Buy (${amount} ${stat})`,
+            btnDisabled: broke || soldOut,
+            onClick:     () => buy(entry)(ctx),
+          });
+        }))];
+
+    const sellBody = sellable.length === 0
+      ? []
+      : [
+          p({ style: 'margin-top:12px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); font-weight:600' })(['Sell to shop']),
+          _grid(sellable.map(({ item, multiplier }) => {
+            const { stat, amount } = _sellPrice(item, multiplier);
+            const have = Number(inv[item.id] || 0);
+            return _card({
+              image:       item.image || '',
+              name:        item.name || item.id,
+              description: '',
+              infoLine:    `+${amount} ${stat} each · You have: ${have}`,
+              btnLabel:    have <= 0 ? 'None to sell' : `Sell (+${amount} ${stat})`,
+              btnDisabled: have <= 0,
+              onClick:     () => sell({ item, multiplier })(ctx),
+            });
+          })),
+        ];
 
     return Scene({
       title: npc.name,
       body:  [
         ...(npc.greeting ? [p({ style: 'font-style:italic; color:var(--text-muted)' })([_evalText(ctx.state)(npc.greeting)])] : []),
         ...stockBody,
+        ...sellBody,
       ],
+      // Buy / Sell live inline on the cards above. The choices list keeps the
+      // NPC's own tail choices + Goodbye so it stays uncluttered.
       choices: [
-        ...stock.map(entry => {
-          const item   = project.items.find(it => it.id === entry.itemId);
-          const { stat, amount } = _resolvePrice(entry, item);
-          const rem    = remaining(entry);
-          return {
-            label: `Buy ${item?.name || entry.itemId} (${amount} ${stat})`,
-            if: c => (Number(c.state[stat]) || 0) >= amount && rem > 0,
-            action: buy(entry),
-          };
-        }),
         ...npc.choices.map(ch => _buildChoice(ch, project, back)),
         { label: 'Goodbye', action: c => c.setState({ _scene: back }) },
       ],
@@ -1154,7 +1273,7 @@ const _renderWidget = (w, project, ctx) => {
                     return div({ style: 'border:1px solid var(--border); border-radius:var(--radius); padding:6px; background:var(--surface); text-align:center; font-size:11px' })([
                       ...(it?.image ? [img({ src: it.image, style: 'width:32px; height:32px; object-fit:contain; display:block; margin:0 auto 4px' })([])] : []),
                       div({})([it?.name || id]),
-                      div({ style: 'color:var(--text-muted)' })([`×${n}`]),
+                      div({ style: 'color:var(--text-muted)' })([`x${n}`]),
                     ]);
                   }))]
               : [div({ style: 'display:flex; flex-direction:column; gap:4px; font-size:13px' })(
@@ -1162,7 +1281,7 @@ const _renderWidget = (w, project, ctx) => {
                     const it = itemById[id];
                     return div({ style: 'display:flex; justify-content:space-between; gap:8px' })([
                       span({})([it?.name || id]),
-                      span({ style: 'font-family:ui-monospace,monospace; color:var(--text-muted)' })([`×${n}`]),
+                      span({ style: 'font-family:ui-monospace,monospace; color:var(--text-muted)' })([`x${n}`]),
                     ]);
                   }))]
             )),
@@ -1321,7 +1440,7 @@ const _buildCombatSceneFn = (combat, project) => ctx => {
         p({ style: 'font-size:16px; text-align:center; margin:0 0 8px' })([flavour]),
         ...(lootEntries.length
           ? [p({ style: 'text-align:center; color:var(--text-muted); margin:0 0 8px' })([
-              'Loot: ' + lootEntries.map(([id, n]) => `${project.items.find(it => it.id === id)?.name || id} ×${n}`).join(', '),
+              'Loot: ' + lootEntries.map(([id, n]) => `${project.items.find(it => it.id === id)?.name || id} x${n}`).join(', '),
             ])]
           : []),
       ],
@@ -1551,7 +1670,7 @@ const buildGameConfig = rawProject => {
     _shopStock:  {},
     _combat:        null,
     _reading:       null,
-    _lootLog:       [],   // last 8 "Loot: X ×2" lines from randomLoot picks
+    _lootLog:       [],   // last 8 "Loot: X x2" lines from randomLoot picks
     _messageQueue:  [],   // pending Effect.message lines — shown as Continue overlay
     _msgInit:       {},   // pre-action state snapshot for init / gain / loss scope
   };

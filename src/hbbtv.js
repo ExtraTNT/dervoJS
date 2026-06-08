@@ -411,7 +411,7 @@ const createFocusManager = ({ bus, store, stateKey = 'focus', scrollStep = 80, h
   };
 
   // Pick the nearest focusable in a direction by centre + edge geometry.
-  // Score = primary-axis distance + perpendicular penalty (×2) so a slightly
+  // Score = primary-axis distance + perpendicular penalty (x2) so a slightly
   // off-axis neighbour still wins over a far on-axis one.
   //
   // Row isolation: LEFT/RIGHT cannot cross `data-focus-row` boundaries —

@@ -10,7 +10,7 @@
  *   }
  *
  * Per-entry kinds (one award each):
- *   item    give itemId × randInt(countMin..countMax)
+ *   item    give itemId x randInt(countMin..countMax)
  *   gold    state.gold += randInt(countMin..countMax)
  *   stat    state[statKey] += randInt(statMin..statMax)
  *   flag    state.flags[flagKey] = flagValue
@@ -30,6 +30,7 @@ import { Stack, Grid } from '../../src/components/Layout.js';
 import { onText } from '../helpers.js';
 import { emptyLootEntry } from '../schema.js';
 import { WeightBonusList } from './WeightBonusEditor.js';
+import { groupedOptions } from './FolderedList.js';
 
 // Kind options — `stat` covers any currency (gold / silver / gems / etc.) so
 // there's no dedicated `gold` kind. `navigate` / `learnSkill` / `talkNpc` let
@@ -80,12 +81,12 @@ const _entryRow = vars => entries => index => onChange => {
   const onDelete = () => onChange(_removeEntry(entries)(index));
   const onMove = dir => onChange(_moveEntry(entries)(index)(dir));
 
-  const itemOpts  = [{ value: '', label: '— pick item —' }, ...(vars.items  || []).map(it => ({ value: it.id, label: it.name || it.id }))];
+  const itemOpts  = [{ value: '', label: '— pick item —' }, ...groupedOptions(vars.items  || [])(it => ({ value: it.id, label: it.name || it.id }))];
   const statOpts  = [{ value: '', label: '— pick stat —' }, ...(vars.stats  || []).map(k => ({ value: k, label: k }))];
   const flagOpts  = [{ value: '', label: '— pick flag —' }, ...(vars.flags  || []).map(k => ({ value: k, label: k }))];
-  const roomOpts  = [{ value: '', label: '— pick room —' }, ...(vars.rooms  || []).map(r => ({ value: r.id, label: r.title || r.id }))];
+  const roomOpts  = [{ value: '', label: '— pick room —' }, ...groupedOptions(vars.rooms  || [])(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}` }))];
   const skillOpts = [{ value: '', label: '— pick skill —' }, ...(vars.skills || []).map(s => ({ value: s.id, label: s.name || s.id }))];
-  const npcOpts   = [{ value: '', label: '— pick NPC —' }, ...(vars.npcs   || []).map(n => ({ value: n.id, label: n.name || n.id }))];
+  const npcOpts   = [{ value: '', label: '— pick NPC —' }, ...groupedOptions(vars.npcs   || [])(n => ({ value: n.id, label: n.name || n.id }))];
 
   return div({ style: 'border:1px solid var(--border); border-radius:var(--radius); padding:10px; background:var(--surface)' })([
     div({ style: 'display:flex; align-items:center; gap:8px; margin-bottom:8px' })([
@@ -247,7 +248,7 @@ const _probabilityLine = table => {
   const _summary = e => {
     const pct = `${((Math.max(0, Number(e.weight) || 0) / totalW) * 100).toFixed(1)}%`;
     const what =
-      e.kind === 'item'       ? `${e.itemId || '?'} × ${e.countMin}${e.countMax !== e.countMin ? `–${e.countMax}` : ''}`
+      e.kind === 'item'       ? `${e.itemId || '?'} x ${e.countMin}${e.countMax !== e.countMin ? `–${e.countMax}` : ''}`
       : e.kind === 'stat'     ? `${e.statKey || '?'} +${e.statMin}${e.statMax !== e.statMin ? `–${e.statMax}` : ''}`
       : e.kind === 'flag'     ? `flag ${e.flagKey || '?'} = ${e.flagValue}`
       : e.kind === 'navigate' ? `goto ${e.roomId  || '?'}`

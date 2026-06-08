@@ -137,7 +137,7 @@ const opsRow = e => {
  * DOM OPS (expanded detail, bottom row)
  *   visited    — how many times _patch() was entered during this frame. This
  *                counts every node the reconciler LOOKED AT, not just ones it
- *                changed. It grows with tree depth × number of children. A
+ *                changed. It grows with tree depth x number of children. A
  *                steady high number here is expected and fine; it just means
  *                you have a large tree. It does NOT mean DOM was mutated.
  *
@@ -178,7 +178,7 @@ const opsRow = e => {
  *                patch time.
  *
  * MUTATION RATE  (percentage shown after the chips)
- *   (created + replaced + removed + moved) / visited × 100 %.
+ *   (created + replaced + removed + moved) / visited x 100 %.
  *   A low rate (0–5 %) is healthy: the reconciler looked at a lot but changed
  *   little. A rate above ~30 % on a re-render that only changes one key is a
  *   signal that child nodes lack stable keys and are being rebuilt unnecessarily.

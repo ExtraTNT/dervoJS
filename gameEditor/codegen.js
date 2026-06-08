@@ -126,20 +126,31 @@ const _t = (state, text) => {
 };`;
 
 // Compile a Condition to a JS expression string that returns boolean.
-// `c` (ctx) is in scope. JS-mode expressions are emitted verbatim.
-const _condExpr = cond => {
+// `c` (ctx) is the default state source so every existing call site keeps
+// reading `c.state.*`. Per-op condition gates pass `stateExpr: 's'` so the
+// gate sees the in-progress reducer state and earlier ops can flip flags a
+// later op gates on.
+const _condExpr = (cond, stateExpr = 'c.state') => {
   if (!cond || cond.mode === 'always') return 'true';
-  if (cond.mode === 'js') return `(${cond.expr || 'true'})`;
+  if (cond.mode === 'js') {
+    // Default state source — emit the user's expression verbatim so the
+    // existing call sites (choices, weight bonuses, …) stay byte-identical.
+    if (stateExpr === 'c.state') return `(${cond.expr || 'true'})`;
+    // Per-op condition with the IN-PROGRESS state. Rebind `c.state` to the
+    // in-progress reducer state via a one-shot IIFE so the user's expression
+    // can keep using `c.state.<key>` and see earlier ops' writes.
+    return `((c => (${cond.expr || 'true'}))({ ...c, state: ${stateExpr} }))`;
+  }
   if (cond.mode === 'simple') {
     const left =
-      cond.key?.startsWith('flags.') ? `c.state.flags?.[${_q(cond.key.slice(6))}]`
-      : cond.key?.startsWith('inv.')  ? `(c.state.inventory?.[${_q(cond.key.slice(4))}] ?? 0)`
-      : `c.state[${_q(cond.key)}]`;
+      cond.key?.startsWith('flags.') ? `${stateExpr}.flags?.[${_q(cond.key.slice(6))}]`
+      : cond.key?.startsWith('inv.')  ? `(${stateExpr}.inventory?.[${_q(cond.key.slice(4))}] ?? 0)`
+      : `${stateExpr}[${_q(cond.key)}]`;
     const right = typeof cond.value === 'string' ? _q(cond.value) : (cond.value ?? 0);
     return `(${left} ${cond.op} ${right})`;
   }
   if (cond.mode === 'hasItem') {
-    const have = `(c.state.inventory?.[${_q(cond.itemId)}] ?? 0)`;
+    const have = `(${stateExpr}.inventory?.[${_q(cond.itemId)}] ?? 0)`;
     if (cond.op === 'has')     return `(${have} >= 1)`;
     if (cond.op === 'lacks')   return `(${have} <= 0)`;
     if (cond.op === 'atleast') return `(${have} >= ${Number(cond.count || 1)})`;
@@ -147,42 +158,90 @@ const _condExpr = cond => {
   return 'true';
 };
 
-// Compile a single Op (simple-mode) to a setState mutation expression.
-// Returns a STRING that fits inside setState(s => ({ <here>, ... })).
-const _opPatch = op => {
+// Emit a clamp limit as a JS expression evaluated against the in-progress `s`.
+// Returns null when the limit is off so the caller can omit the clamp branch.
+const _limitExpr = limit => {
+  if (!limit || !limit.enabled) return null;
+  const mul = Number(limit.mul) || 0;
+  const c   = Number(limit.const) || 0;
+  const k   = limit.statKey || '';
+  // statKey === '' → mul * 0 + const = pure constant. Keep the form general
+  // so the emitted code reads the same shape across enabled limits.
+  return `(${mul} * (Number(s[${_q(k)}]) || 0) + ${c})`;
+};
+
+// Wrap a numeric `nextExpr` in Math.max/min when min/max limits are enabled.
+const _wrapClamp = (nextExpr, op, { invFloor = false } = {}) => {
+  const lo = _limitExpr(op?.min);
+  const hi = _limitExpr(op?.max);
+  let out = nextExpr;
+  // Inventory takes/gives implicitly floor at 0 even without a user min.
+  const effectiveLo = invFloor && !lo ? '0' : lo;
+  if (effectiveLo != null) out = `Math.max(${effectiveLo}, ${out})`;
+  if (hi != null)          out = `Math.min(${hi}, ${out})`;
+  return out;
+};
+
+// Compile a single Op (simple-mode) to a sequence of patch keys. Returns
+// `{ key, value }` strings — caller wraps in `next = { ...next, [key]: value }`.
+// Returns null for ops that don't write (no target, toggle on missing kind, …).
+const _opPatchPair = op => {
   const { target, op: kind, value } = op || {};
   if (!target) return null;
   if (target.startsWith('flags.')) {
     const k = target.slice(6);
-    const next = kind === 'toggle' ? `!s.flags?.[${_q(k)}]` : Boolean(value);
-    return `flags: { ...(s.flags || {}), [${_q(k)}]: ${next} }`;
+    const next = kind === 'toggle' ? `!(s.flags || {})[${_q(k)}]` : Boolean(value);
+    return { key: 'flags', value: `{ ...(s.flags || {}), [${_q(k)}]: ${next} }` };
   }
   if (target.startsWith('inv.')) {
     const k = target.slice(4);
-    const cur = `(s.inventory?.[${_q(k)}] ?? 0)`;
+    const cur = `((s.inventory || {})[${_q(k)}] || 0)`;
     const n = Number(value) || 0;
-    const next =
+    const raw =
       kind === 'give' ? `${cur} + ${n}`
-      : kind === 'take' ? `Math.max(0, ${cur} - ${n})`
+      : kind === 'take' ? `${cur} - ${n}`
       : kind === 'set'  ? `${n}`
       : cur;
-    return `inventory: { ...(s.inventory || {}), [${_q(k)}]: ${next} }`;
+    // Implicit floor of 0 only on `take` — matches the engine's original
+    // behaviour and what the preview does. User min/max apply on top.
+    const clamped = _wrapClamp(raw, op, { invFloor: kind === 'take' });
+    return { key: 'inventory', value: `{ ...(s.inventory || {}), [${_q(k)}]: ${clamped} }` };
   }
   if (target.startsWith('skills.')) {
     const k = target.slice(7);
-    if (kind === 'learn')  return `skills: (s.skills || []).includes(${_q(k)}) ? (s.skills || []) : [...(s.skills || []), ${_q(k)}]`;
-    if (kind === 'forget') return `skills: (s.skills || []).filter(x => x !== ${_q(k)})`;
+    if (kind === 'learn')  return { key: 'skills', value: `(s.skills || []).includes(${_q(k)}) ? (s.skills || []) : [...(s.skills || []), ${_q(k)}]` };
+    if (kind === 'forget') return { key: 'skills', value: `(s.skills || []).filter(x => x !== ${_q(k)})` };
     return null;
   }
   const cur = `(s[${_q(target)}] ?? 0)`;
   const isNumeric = Number.isFinite(Number(value));
   const v = isNumeric ? Number(value) : _q(value);
-  const next =
+  const raw =
     kind === 'set' ? `${v}`
     : kind === 'add' ? `${cur} + ${isNumeric ? v : 0}`
     : kind === 'sub' ? `${cur} - ${isNumeric ? v : 0}`
     : cur;
-  return `[${_q(target)}]: ${next}`;
+  // Only clamp numeric writes — string `set` (e.g. label) passes through.
+  const clamped = (isNumeric || kind !== 'set') ? _wrapClamp(raw, op) : raw;
+  return { key: target, value: clamped };
+};
+
+// One op → one JS block. Always introduces `s = next` so the per-op
+// `condition` (gated on the IN-PROGRESS state) and the clamp expressions
+// (also read `s[...]`) can see each other. Later ops in the same effect see
+// earlier ops' writes via `s = next` at the next block's top.
+const _opStmt = op => {
+  const pair = _opPatchPair(op);
+  if (!pair) return null;
+  const patchKv = (pair.key === 'flags' || pair.key === 'inventory' || pair.key === 'skills')
+    ? `${pair.key}: ${pair.value}`
+    : `[${_q(pair.key)}]: ${pair.value}`;
+  const write = `next = { ...next, ${patchKv} };`;
+  const cond  = op && op.condition && op.condition.mode && op.condition.mode !== 'always';
+  // Per-op condition reads the IN-PROGRESS reducer state (`s`) so earlier
+  // ops can flip a flag a later op gates on.
+  const guarded = cond ? `if (${_condExpr(op.condition, 's')}) { ${write} }` : write;
+  return `{ const s = next; ${guarded} }`;
 };
 
 // One weight bonus: `{ guard: c=>bool, amountMode, amountFixed, amountStat }`.
@@ -239,7 +298,7 @@ const _emitRandomLoot = rawTable => {
           const n = Math.max(0, _rand(e.countMin, e.countMax));
           if (n === 0) return null;
           c.setState(s => ({ inventory: { ...(s.inventory || {}), [e.itemId]: (Number(s.inventory?.[e.itemId]) || 0) + n } }));
-          return e.itemId + ' ×' + n;
+          return e.itemId + ' x' + n;
         }
         if (e.kind === 'stat' && e.statKey) {
           const n = _rand(e.statMin, e.statMax);
@@ -301,9 +360,9 @@ const _effectFnCore = effect => {
   if (!effect || effect.mode === 'none') return null;
   if (effect.mode === 'js') return `c => { ${effect.body || ''} }`;
   if (effect.mode === 'simple') {
-    const patches = (effect.ops || []).map(_opPatch).filter(Boolean);
-    if (patches.length === 0) return null;
-    return `c => c.setState(s => ({ ${patches.join(', ')} }))`;
+    const stmts = (effect.ops || []).map(_opStmt).filter(Boolean);
+    if (stmts.length === 0) return null;
+    return `c => c.setState(start => { let next = start; ${stmts.join(' ')} return next; })`;
   }
   if (effect.mode === 'randomLoot') {
     return _emitRandomLoot(effect.table);
@@ -476,7 +535,7 @@ const _emitWardrobeRoomFn = room => project => {
           it.name || it.id,
           ...(equippedIds.has(it.id) ? [span({ style: 'display:inline-block; padding:1px 6px; border-radius:3px; background:var(--accent); color:#fff; font-size:10px; margin-left:6px' })(['equipped'])] : []),
         ]),
-        div({ style: 'font-size:11px; color:var(--text-muted)' })([(it.equipSlot || it.kind) + ' · ×' + (inv[it.id] || 0)]),
+        div({ style: 'font-size:11px; color:var(--text-muted)' })([(it.equipSlot || it.kind) + ' · x' + (inv[it.id] || 0)]),
       ]),
       ...(it.kind === 'equipment' ? [button({
         type: 'button',
@@ -593,7 +652,7 @@ const _emitInventoryRoomFn = room => project => {
                   ? [div({ style: 'font-size:12px; color:var(--text-muted)' })([it.description])]
                   : []),
               ]),
-              span({ style: 'font-family:ui-monospace,monospace; color:var(--text-muted); margin-right:8px' })(['×' + inv[it.id]]),
+              span({ style: 'font-family:ui-monospace,monospace; color:var(--text-muted); margin-right:8px' })(['x' + inv[it.id]]),
               ..._actions(it),
             ]))
           )]
@@ -601,7 +660,7 @@ const _emitInventoryRoomFn = room => project => {
             entries.map(it => div({ style: 'border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); padding:10px; display:flex; flex-direction:column; align-items:center; text-align:center' })([
               ...(it.image ? [img({ src: it.image, style: 'width:48px; height:48px; object-fit:contain; display:block; margin:0 auto 6px' })([])] : []),
               div({ style: 'font-weight:600; font-size:13px' })([it.name || it.id, ...(_badge(it) ? [_badge(it)] : [])]),
-              div({ style: 'font-size:11px; color:var(--text-muted); margin-top:2px' })([(it.kind || 'misc') + ' · ×' + inv[it.id]]),
+              div({ style: 'font-size:11px; color:var(--text-muted); margin-top:2px' })([(it.kind || 'misc') + ' · x' + inv[it.id]]),
               ...(cfg.showDescription && it.description
                 ? [div({ style: 'font-size:11.5px; color:var(--text-muted); margin-top:4px; flex:1' })([it.description])]
                 : [div({ style: 'flex:1' })([])]),
@@ -680,7 +739,7 @@ const _emitCombatSceneFn = combat => project => {
           p({ style: 'font-size:16px; text-align:center; margin:0 0 8px' })([flavour]),
           ...(lootEntries.length
             ? [p({ style: 'text-align:center; color:var(--text-muted); margin:0 0 8px' })([
-                'Loot: ' + lootEntries.map(([id, n]) => (__ITEMS[id]?.name || id) + ' ×' + n).join(', '),
+                'Loot: ' + lootEntries.map(([id, n]) => (__ITEMS[id]?.name || id) + ' x' + n).join(', '),
               ])]
             : []),
         ],
@@ -1049,17 +1108,50 @@ const _resolvePriceCodegen = (entry, item) => {
   return { stat: p.stat || 'gold', amount: Number(p.amount) || 0 };
 };
 
+// Buyback catalogue. Even in 'open' mode every project item shows up here so
+// the emitted runtime can iterate without re-reading project.items. For 'list'
+// mode only the whitelist passes through. Per-item multiplier overrides win
+// over the shop default; null falls back to the shop default at runtime.
+const _emitBuybackCatalogue = npc => project => {
+  const buyback = npc.shop?.buyback || { mode: 'none', multiplier: 0.8, items: [] };
+  if (buyback.mode === 'none') return { lit: '[]', mode: 'none', multiplier: Number(buyback.multiplier) || 0.8 };
+  const mul = Number(buyback.multiplier) || 0.8;
+  const itemFor = id => project.items.find(it => it.id === id);
+  const pricePair = item => {
+    const p = (item?.price && typeof item.price === 'object') ? item.price : { stat: 'gold', amount: 0 };
+    return { stat: p.stat || 'gold', amount: Number(p.amount) || 0 };
+  };
+  const rows = buyback.mode === 'open'
+    ? project.items.map(it => ({ item: it, multiplier: null }))
+    : (buyback.items || [])
+        .map(e => {
+          const it = itemFor(e.itemId);
+          return it ? { item: it, multiplier: e.multiplier == null ? null : Number(e.multiplier) } : null;
+        })
+        .filter(Boolean);
+  const lit = rows.map(({ item, multiplier }) => {
+    const { stat, amount } = pricePair(item);
+    const mulField = multiplier == null ? 'null' : multiplier;
+    return `{ itemId: ${_q(item.id)}, name: ${_q(item.name || item.id)}, image: ${_q(item.image || '')}, priceStat: ${_q(stat)}, priceAmount: ${amount}, multiplier: ${mulField} }`;
+  }).join(', ');
+  return { lit: `[${lit}]`, mode: buyback.mode, multiplier: mul };
+};
+
 const _emitNpcShop = npc => project => {
   const stockLit = (npc.shop?.stock || []).map(entry => {
     const item    = project.items.find(it => it.id === entry.itemId);
     const { stat, amount } = _resolvePriceCodegen(entry, item);
     const qty     = entry.quantity == null ? 'null' : entry.quantity;
-    return `{ itemId: ${_q(entry.itemId)}, name: ${_q(item?.name || entry.itemId)}, description: ${_q(item?.description || '')}, priceStat: ${_q(stat)}, priceAmount: ${amount}, quantity: ${qty} }`;
+    return `{ itemId: ${_q(entry.itemId)}, name: ${_q(item?.name || entry.itemId)}, image: ${_q(item?.image || '')}, description: ${_q(item?.description || '')}, priceStat: ${_q(stat)}, priceAmount: ${amount}, quantity: ${qty} }`;
   }).join(', ');
   const tailChoicesLit = npc.choices.map(c => _emitChoice(c)(project)).join(', ');
+  const buy = _emitBuybackCatalogue(npc)(project);
   return `ctx => {
       const back = ctx.scene;
       const stock = [${stockLit}];
+      const buyback = ${buy.lit};
+      const buybackMode = ${_q(buy.mode)};
+      const buybackDefaultMul = ${buy.multiplier};
       const inv = ctx.state.inventory || {};
       const sold = ctx.state._shopStock?.[${_q(npc.id)}] || {};
       const remain = e => e.quantity == null ? Infinity : Math.max(0, e.quantity - (sold[e.itemId] || 0));
@@ -1072,23 +1164,89 @@ const _emitNpcShop = npc => project => {
           _shopStock:    { ...(s._shopStock || {}), [${_q(npc.id)}]: { ...(s._shopStock?.[${_q(npc.id)}] || {}), [e.itemId]: (s._shopStock?.[${_q(npc.id)}]?.[e.itemId] || 0) + 1 } },
         }));
       };
+      // Sell side. Filter to items the player actually has. Per-item null
+      // multiplier falls back to the shop default. Sell stat = item's own
+      // price stat.
+      const sellable = buybackMode === 'none'
+        ? []
+        : buyback
+            .filter(b => (Number(inv[b.itemId]) || 0) > 0)
+            .map(b => ({ ...b, sellAmount: Math.floor((b.multiplier == null ? buybackDefaultMul : b.multiplier) * b.priceAmount) }));
+      const sell = b => c => {
+        const have = Number(c.state.inventory?.[b.itemId] || 0);
+        if (have <= 0) return;
+        c.setState(s => {
+          const nextCount = (Number(s.inventory?.[b.itemId]) || 0) - 1;
+          const nextInv = { ...(s.inventory || {}) };
+          if (nextCount <= 0) delete nextInv[b.itemId]; else nextInv[b.itemId] = nextCount;
+          return {
+            [b.priceStat]: (Number(s[b.priceStat]) || 0) + b.sellAmount,
+            inventory:     nextInv,
+          };
+        });
+      };
+      // Item-card grid. Image fills the top square when present; description
+      // sits under the name; price line is always last so cards align. Buy /
+      // Sell live inline on the card and disable themselves when the player
+      // can't afford / the stock is sold out / they have nothing to sell.
+      const _card = ({ image, name, description, infoLine, btnLabel, btnDisabled, onClick }) =>
+        div({ style: 'display:flex; flex-direction:column; gap:6px; padding:10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface)' })([
+          ...(image
+            ? [div({ style: 'aspect-ratio:1/1; background:var(--surface-2, rgba(0,0,0,.04)); border-radius:var(--radius); overflow:hidden; display:grid; place-items:center' })([
+                img({ src: image, alt: name, style: 'max-width:100%; max-height:100%; object-fit:contain' })([]),
+              ])]
+            : []),
+          div({ style: 'font-weight:600; font-size:13px; line-height:1.3' })([name]),
+          ...(description ? [div({ style: 'font-size:12px; color:var(--text-muted); line-height:1.4' })([description])] : []),
+          div({ style: 'font-size:12px; color:var(--text-muted); margin-top:auto' })([infoLine]),
+          button({
+            className: 'btn btn-primary btn-sm' + (btnDisabled ? ' btn-disabled' : ''),
+            type:      'button',
+            disabled:  !!btnDisabled,
+            onclick:   btnDisabled ? undefined : onClick,
+            style:     'margin-top:4px',
+          })([btnLabel]),
+        ]);
+      const _grid = cards => div({ style: 'display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:12px' })(cards);
       const body = [
         ${npc.greeting ? `p({ style: 'font-style:italic; color:var(--text-muted)' })([_t(ctx.state, ${_q(npc.greeting)})]),` : ''}
         ...(stock.length === 0
           ? [p({})(['(Nothing for sale right now.)'])]
-          : stock.map(e => div({ style: 'display:grid; grid-template-columns: 1fr; gap:4px; padding:8px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); margin-bottom:8px' })([
-              div({ style: 'font-weight:600' })([e.name]),
-              ...(e.description ? [div({ style: 'font-size:12px; color:var(--text-muted)' })([e.description])] : []),
-              div({ style: 'font-size:12px; color:var(--text-muted)' })([\`Price: \${e.priceAmount} \${e.priceStat} · You have: \${(inv[e.itemId] || 0)}\${remain(e) === Infinity ? '' : \` · Left: \${remain(e)}\`}\`]),
-            ]))
+          : [_grid(stock.map(e => {
+              const have = Number(inv[e.itemId] || 0);
+              const rem  = remain(e);
+              const broke = (Number(ctx.state[e.priceStat]) || 0) < e.priceAmount;
+              const soldOut = rem <= 0;
+              return _card({
+                image:       e.image,
+                name:        e.name,
+                description: e.description,
+                infoLine:    \`\${e.priceAmount} \${e.priceStat} · You have: \${have}\${rem === Infinity ? '' : \` · Left: \${rem}\`}\`,
+                btnLabel:    soldOut ? 'Sold out' : (broke ? \`Need \${e.priceAmount} \${e.priceStat}\` : \`Buy (\${e.priceAmount} \${e.priceStat})\`),
+                btnDisabled: broke || soldOut,
+                onClick:     () => buy(e)(ctx),
+              });
+            }))]
         ),
+        ...(sellable.length === 0 ? [] : [
+          p({ style: 'margin-top:12px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); font-weight:600' })(['Sell to shop']),
+          _grid(sellable.map(b => {
+            const have = Number(inv[b.itemId] || 0);
+            return _card({
+              image:       b.image,
+              name:        b.name,
+              description: '',
+              infoLine:    \`+\${b.sellAmount} \${b.priceStat} each · You have: \${have}\`,
+              btnLabel:    have <= 0 ? 'None to sell' : \`Sell (+\${b.sellAmount} \${b.priceStat})\`,
+              btnDisabled: have <= 0,
+              onClick:     () => sell(b)(ctx),
+            });
+          })),
+        ]),
       ];
+      // Buy / Sell are on the cards; the choices list keeps only the NPC's
+      // own tail choices + Goodbye.
       const choices = [
-        ...stock.map(e => ({
-          label: \`Buy \${e.name} (\${e.priceAmount} \${e.priceStat})\`,
-          if: c => (Number(c.state[e.priceStat]) || 0) >= e.priceAmount && remain(e) > 0,
-          action: buy(e),
-        })),
         ${tailChoicesLit}${npc.choices.length ? ',' : ''}
         { label: 'Goodbye', action: c => c.setState({ _scene: back }) },
       ];
@@ -1097,7 +1255,7 @@ const _emitNpcShop = npc => project => {
 };
 
 const emitWorld = project => `// AUTO-GENERATED by dervoJS gameEditor.
-${_extraImports(project, 'world')}import { p, div, img, video } from '../src/elements.js';
+${_extraImports(project, 'world')}import { p, div, img, video, button } from '../src/elements.js';
 import { Scene } from '../src/game.js';
 ${_TEMPLATE_HELPER}
 ${_MESSAGE_HELPERS}
@@ -1226,7 +1384,7 @@ const _renderInventory = (w, ctx) => {
                 return div({ style: 'border:1px solid var(--border); border-radius:var(--radius); padding:6px; background:var(--surface); text-align:center; font-size:11px' })([
                   ...((it && it.image) ? [img({ src: it.image, style: 'width:32px; height:32px; object-fit:contain; display:block; margin:0 auto 4px' })([])] : []),
                   div({})([(it && it.name) || id]),
-                  div({ style: 'color:var(--text-muted)' })(['×' + n]),
+                  div({ style: 'color:var(--text-muted)' })(['x' + n]),
                 ]);
               }))]
           : [div({ style: 'display:flex; flex-direction:column; gap:4px; font-size:13px' })(
@@ -1234,7 +1392,7 @@ const _renderInventory = (w, ctx) => {
                 const it = ITEMS[id];
                 return div({ style: 'display:flex; justify-content:space-between; gap:8px' })([
                   span({})([(it && it.name) || id]),
-                  span({ style: 'font-family:ui-monospace,monospace; color:var(--text-muted)' })(['×' + n]),
+                  span({ style: 'font-family:ui-monospace,monospace; color:var(--text-muted)' })(['x' + n]),
                 ]);
               }))])),
   ]);

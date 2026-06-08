@@ -158,7 +158,7 @@ const extractRect = ({ w, h }) => src => {
 /**
  * buildPipeline :: config -> state -> pixels -> pixels
  *
- * Composes flowLine -> shiftLine×N -> shiftRGB into a single transform.
+ * Composes flowLine -> shiftLinexN -> shiftRGB into a single transform.
  * Each shift-line pass fires with 50% probability; shiftRGB fires at ~35%.
  */
 const buildPipeline = ({ numShiftLines, flowCfg, enableRGB }) => state => src => {

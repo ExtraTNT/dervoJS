@@ -23,6 +23,14 @@ const CSS = `
   .gef-list-btn .gef-id { color: var(--text-muted); font-family: ui-monospace,monospace; font-size:11px; margin-left:auto; }
   .gef-list-btn.active .gef-id { color: rgba(255,255,255,.75); }
 
+  /* Folder-grouped lists (rooms / npcs / items / stories / assets). The header
+     is a button toggle; collapsed folders just omit the body below. Heading
+     stays muted so the underlying list buttons keep visual primacy. */
+  .gef-folder-header        { transition: color .12s ease, background .12s ease; border-radius: var(--radius); }
+  .gef-folder-header:hover  { background: var(--surface-2); color: var(--text); }
+  .gef-folder-header:focus  { outline: none; }
+  .gef-folder-header:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
   .gef-page {
     border:1px solid var(--border); border-radius:var(--radius);
     padding:12px; margin-bottom:12px; background: var(--surface);

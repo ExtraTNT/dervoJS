@@ -22,6 +22,7 @@ import { Button } from '../../src/components/Button.js';
 import { onText } from '../helpers.js';
 import { getState, setProject, toast } from '../store.js';
 import { emptyAsset } from '../schema.js';
+import { groupedOptions } from './FolderedList.js';
 import {
   isAssetRef, refToId, idToRef, resolveAssetRef,
   isDataUrl, dataUrlMime, dataUrlByteSize, formatBytes,
@@ -124,7 +125,7 @@ const AssetInput = ({
       Select({
         options: [
           { value: '',    label: assets.length ? '— pick from catalogue —' : '(no assets yet)' },
-          ...assets.map(a => ({ value: idToRef(a.id), label: `${a.name || a.id} · ${formatBytes(a.byteSize)}` })),
+          ...groupedOptions(assets)(a => ({ value: idToRef(a.id), label: `${a.name || a.id} · ${formatBytes(a.byteSize)}` })),
           ...(isUrl  ? [{ value: '__url__',  label: '(URL reference — keep as-is)' }] : []),
           ...(isData ? [{ value: '__data__', label: '(legacy inline upload — keep as-is)' }] : []),
         ],

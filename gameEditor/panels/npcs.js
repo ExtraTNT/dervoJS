@@ -20,18 +20,20 @@ import { div, span, h2, h3, p, button } from '../../src/elements.js';
 import { TextInput } from '../../src/components/TextInput.js';
 import { Select } from '../../src/components/Select.js';
 import { Toggle } from '../../src/components/Toggle.js';
+import { NumberInput } from '../../src/components/NumberInput.js';
 import { Button } from '../../src/components/Button.js';
 import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
 import { setProject, setState } from '../store.js';
-import { emptyNpc, emptyPage, emptyChoice, emptyShopEntry, emptyTopic } from '../schema.js';
+import { emptyNpc, emptyPage, emptyChoice, emptyShopEntry, emptyBuyback, emptyBuybackItem, emptyTopic } from '../schema.js';
 import { onText } from '../helpers.js';
 import { AssetInput } from '../components/AssetInput.js';
 import { PageEditor }     from '../components/PageEditor.js';
 import { ChoiceEditor }   from '../components/ChoiceEditor.js';
 import { EffectEditor }   from '../components/EffectEditor.js';
 import { ChoiceGenerator, openChoiceGenerator } from '../components/ChoiceGenerator.js';
+import { FolderedList, FolderField, folderSuggestions, groupedOptions } from '../components/FolderedList.js';
 import { vnode } from '../../lib/odocosjs/src/render.js';
 
 const svg     = vnode('svg');
@@ -72,24 +74,30 @@ const _toggleLocation = (npcId, roomId) => _updateNpc(npcId, n => {
   return { ...n, locations: next };
 });
 
-const NpcList = (project, selectedId) =>
+const _npcRow = selectedId => n =>
+  button({
+    className: `gef-list-btn${n.id === selectedId ? ' active' : ''}`,
+    onclick:   () => setState({ selectedNpcId: n.id, selectedTopicId: null }),
+    type:      'button',
+  })([
+    span({})([n.name || '(unnamed)']),
+    Badge({ variant: n.role === 'shop' ? 'yellow' : (n.advanced ? 'purple' : 'gray') })(
+      [n.role === 'shop' ? 'shop' : (n.advanced ? 'adv' : 'simple')]
+    ),
+    span({ className: 'gef-id' })([n.id]),
+  ]);
+
+const NpcList = (project, selectedId, collapsed = {}) =>
   Stack({ gap: 4 })([
     h2({ style: 'font-size:14px; margin:0 0 4px' })([`NPCs (${project.npcs.length})`]),
     ...(project.npcs.length === 0
       ? [div({ className: 'gef-empty' })(['No NPCs yet.'])]
-      : project.npcs.map(n =>
-          button({
-            className: `gef-list-btn${n.id === selectedId ? ' active' : ''}`,
-            onclick:   () => setState({ selectedNpcId: n.id, selectedTopicId: null }),
-            type:      'button',
-          })([
-            span({})([n.name || '(unnamed)']),
-            Badge({ variant: n.role === 'shop' ? 'yellow' : (n.advanced ? 'purple' : 'gray') })(
-              [n.role === 'shop' ? 'shop' : (n.advanced ? 'adv' : 'simple')]
-            ),
-            span({ className: 'gef-id' })([n.id]),
-          ])
-        )),
+      : [FolderedList({
+          items:      project.npcs,
+          panelKey:   'npcs',
+          collapsed,
+          renderItem: _npcRow(selectedId),
+        })]),
     Button({ size: 'sm', variant: 'ghost', onClick: _addNpc, style: 'margin-top:8px' })(['+ Add NPC']),
   ]);
 
@@ -138,7 +146,7 @@ const ShopStockEditor = (npc, project) => {
           label:    i === 0 ? 'Item' : '',
           options:  [
             { value: '', label: '— pick —' },
-            ...project.items.map(it => ({ value: it.id, label: `${it.name} (${it.id})` })),
+            ...groupedOptions(project.items)(it => ({ value: it.id, label: `${it.name} (${it.id})` })),
           ],
           value:    entry.itemId,
           onChange: onText(v => _setStock(stock.map((s, k) => k === i ? { ...s, itemId: v } : s))),
@@ -161,10 +169,109 @@ const ShopStockEditor = (npc, project) => {
           onChange: onText(v => _setStock(stock.map((s, k) => k === i ? { ...s, quantity: v === '' ? null : Math.max(0, Number(v) || 0) } : s))),
           placeholder: '∞',
         }),
-        Button({ size: 'sm', variant: 'ghost', onClick: () => _setStock(stock.filter((_, k) => k !== i)) })(['×']),
+        Button({ size: 'sm', variant: 'ghost', onClick: () => _setStock(stock.filter((_, k) => k !== i)) })(['x']),
       ]);
     }),
     Button({ size: 'sm', variant: 'ghost', onClick: () => _setStock([...stock, emptyShopEntry(project.items[0]?.id || '')]) })(['+ Add stock entry']),
+  ]);
+};
+
+const BUYBACK_MODE_OPTS = [
+  { value: 'none', label: 'none — shop only sells, no buying'   },
+  { value: 'open', label: 'open — buy anything in inventory'    },
+  { value: 'list', label: 'list — only the specified items'     },
+];
+
+// Shop buyback editor — wired to npc.shop.buyback. Mode picks behaviour;
+// multiplier is the default fraction of the item's price the shop pays
+// (0.8 → sell for 8 gold an item priced at 10). Per-item rows on `list` mode
+// can override the multiplier; blank = use the shop default.
+const ShopBuybackEditor = (npc, project) => {
+  const buyback = npc.shop?.buyback || emptyBuyback();
+  const _set = patch => _updateNpc(npc.id, n => ({
+    ...n,
+    shop: { ...(n.shop || { stock: [] }), buyback: { ...buyback, ...patch } },
+  }));
+  const _setItems = items => _set({ items });
+  const items = buyback.items || [];
+
+  // Items already in the whitelist — used so the dropdown skips them.
+  const taken = new Set(items.map(it => it.itemId).filter(Boolean));
+  const remainingOpts = project.items.filter(it => !taken.has(it.id));
+
+  return Stack({ gap: 10 })([
+    p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
+      'What the shop will ', span({ style: 'font-weight:600' })(['buy back']), ' from the player. Sell price = ',
+      span({ style: 'font-family:ui-monospace,monospace' })(['floor(multiplier × item.price.amount)']),
+      ' · paid in the item\'s own price stat.',
+    ]),
+    Grid({ cols: 2, gap: 10 })([
+      Select({
+        label:    'Mode',
+        options:  BUYBACK_MODE_OPTS,
+        value:    buyback.mode || 'none',
+        onChange: onText(v => _set({ mode: v })),
+      }),
+      NumberInput({
+        label:    'Default multiplier',
+        value:    Number(buyback.multiplier) || 0.8,
+        min:      0, max: 10, step: 0.05,
+        onChange: v => _set({ multiplier: Math.max(0, Number(v) || 0) }),
+      }),
+    ]),
+    ...(buyback.mode === 'list'
+      ? [
+          Stack({ gap: 6 })([
+            ...(items.length === 0
+              ? [div({ className: 'gef-empty' })(['No items whitelisted yet. Add one below.'])]
+              : items.map((entry, i) => {
+                  const item   = project.items.find(it => it.id === entry.itemId);
+                  const price  = item?.price && typeof item.price === 'object'
+                    ? { stat: item.price.stat || 'gold', amount: Number(item.price.amount) || 0 }
+                    : { stat: 'gold', amount: 0 };
+                  const effMul = entry.multiplier == null ? (Number(buyback.multiplier) || 0.8) : Number(entry.multiplier);
+                  const pays   = Math.floor(effMul * price.amount);
+                  const itemOptsList = [
+                    ...(item ? [{ value: item.id, label: `${item.name || item.id} (${item.id})` }] : [{ value: '', label: '— pick item —' }]),
+                    ...groupedOptions(project.items.filter(it => it.id !== entry.itemId && !taken.has(it.id)))(it => ({ value: it.id, label: `${it.name || it.id} (${it.id})` })),
+                  ];
+                  return div({ style: 'display:grid; grid-template-columns: 2fr 120px 1fr 40px; gap:8px; align-items:end' })([
+                    Select({
+                      label:    i === 0 ? 'Item' : '',
+                      options:  itemOptsList,
+                      value:    entry.itemId || '',
+                      onChange: onText(v => _setItems(items.map((it, k) => k === i ? { ...it, itemId: v } : it))),
+                    }),
+                    TextInput({
+                      label:       i === 0 ? 'Override ×' : '',
+                      value:       entry.multiplier == null ? '' : String(entry.multiplier),
+                      onChange:    onText(v => _setItems(items.map((it, k) => k === i ? { ...it, multiplier: v.trim() === '' ? null : Math.max(0, Number(v) || 0) } : it))),
+                      placeholder: String(Number(buyback.multiplier) || 0.8),
+                    }),
+                    div({ style: 'font-size:11px; color:var(--text-muted); padding-bottom:6px' })([
+                      item ? `→ pays ${pays} ${price.stat}` : '(item missing)',
+                    ]),
+                    Button({ size: 'sm', variant: 'ghost', onClick: () => _setItems(items.filter((_, k) => k !== i)) })(['x']),
+                  ]);
+                })),
+            ...(remainingOpts.length > 0
+              ? [Button({
+                  size: 'sm', variant: 'ghost',
+                  onClick: () => _setItems([...items, emptyBuybackItem(remainingOpts[0].id)]),
+                })(['+ Add item'])]
+              : [span({ style: 'font-size:11px; color:var(--text-muted)' })(['All items already whitelisted.'])]),
+          ]),
+        ]
+      : []),
+    ...(buyback.mode === 'open'
+      ? [div({ style: 'font-size:11px; color:var(--text-muted)' })([
+          'Every item in the player\'s inventory is eligible at ',
+          span({ style: 'font-family:ui-monospace,monospace' })([`× ${Number(buyback.multiplier) || 0.8}`]),
+          '. Restock-sensitive items (quests, keys, …) can be excluded by giving them ',
+          span({ style: 'font-family:ui-monospace,monospace' })(['kind: \'key\'']),
+          ' upstream if you build that convention into your game.',
+        ])]
+      : []),
   ]);
 };
 
@@ -369,6 +476,7 @@ const SingleTopicEditor = ({ topic, npc, project, vars, roomOpts, topicOpts, com
       effect:   topic.onEnter,
       vars,
       label:    'On enter (fires when the player enters this topic)',
+      rowKey:   `npc:${npc.id}:topic:${topic.id}:onEnter`,
       onChange: v => set({ onEnter: v }),
     }),
 
@@ -427,7 +535,7 @@ const SingleTopicEditor = ({ topic, npc, project, vars, roomOpts, topicOpts, com
 
 const NpcEditor = (npc, project, selectedTopicId) => {
   const vars      = _vars(project);
-  const roomOpts  = project.rooms.map(r => ({ value: r.id, label: r.title || r.id }));
+  const roomOpts  = groupedOptions(project.rooms)(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}` }));
   const topicOpts = (npc.topics || []).map(t => ({ value: t.id, label: t.name || t.id }));
   const combatOpts = (project.combats || []).map(c => ({ value: c.id, label: c.name || c.id }));
   const set = patch => _updateNpc(npc.id, patch);
@@ -531,6 +639,12 @@ const NpcEditor = (npc, project, selectedTopicId) => {
           onChange:    onText(v => set({ greeting: v })),
           placeholder: 'Eldra the merchant adjusts her wares as you pass.',
         }),
+        FolderField({
+          id:          `npc-folder-${npc.id}`,
+          value:       npc.folder,
+          onChange:    v => set({ folder: v }),
+          suggestions: folderSuggestions(project.npcs),
+        }),
       ]),
     ]),
 
@@ -542,7 +656,10 @@ const NpcEditor = (npc, project, selectedTopicId) => {
     ]),
 
     ...(npc.role === 'shop'
-      ? [Card({ title: `Stock (${(npc.shop?.stock || []).length})` })([ShopStockEditor(npc, project)])]
+      ? [
+          Card({ title: `Stock (${(npc.shop?.stock || []).length})` })([ShopStockEditor(npc, project)]),
+          Card({ title: `Buyback — what the shop buys from the player` })([ShopBuybackEditor(npc, project)]),
+        ]
       : []),
 
     // The toggle — chooses between flat (legacy) and topic tree (advanced).
@@ -671,7 +788,7 @@ const NpcsPanel = state => {
 
   return div({})([
     div({ style: 'display:grid; grid-template-columns: 280px 1fr; gap:16px; align-items:start' })([
-      div({})([NpcList(project, selected?.id)]),
+      div({})([NpcList(project, selected?.id, state.collapsedFolders?.npcs || {})]),
       div({})([
         selected
           ? NpcEditor(selected, project, selectedTopicId || null)

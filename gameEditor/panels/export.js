@@ -38,7 +38,7 @@ const _crc32 = bytes => {
 // `content` is either a string (JS sources) — encoded as UTF-8 — or a
 // Uint8Array (binary assets) — passed through verbatim. The previous
 // `TextEncoder.encode(content)` blindly stringified Uint8Array inputs to
-// `"137,80,78,…"` form, inflating binary assets ~4× and corrupting them.
+// `"137,80,78,…"` form, inflating binary assets ~4x and corrupting them.
 const _zip = files => {
   const enc = new TextEncoder();
   const entries = Object.entries(files).map(([name, content]) => {

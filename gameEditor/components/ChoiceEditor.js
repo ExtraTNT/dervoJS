@@ -126,6 +126,7 @@ const ChoiceEditor = ({
         effect:   choice.action,
         vars,
         label:    'Action when clicked',
+        rowKey:   `choice:${choice.id}`,
         onChange: v => set({ action: v }),
       }),
     ]),

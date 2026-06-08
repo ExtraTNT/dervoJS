@@ -55,7 +55,7 @@ const _play = project => {
     <span style="font-size:13px; color:var(--text-muted)">Previewing: <b style="color:var(--text)">${cfg.title}</b></span>
     <div style="flex:1"></div>
     <button id="gef-restart" style="padding:6px 12px; border:1px solid var(--border); border-radius:var(--radius); background:none; cursor:pointer; color:var(--text); font-size:13px">↻ Restart</button>
-    <button id="gef-close"   style="padding:6px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--accent); color:#fff; cursor:pointer; font-size:13px">× Close preview</button>
+    <button id="gef-close"   style="padding:6px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--accent); color:#fff; cursor:pointer; font-size:13px">x Close preview</button>
   `;
   _host = document.createElement('div');
   _host.style.cssText = 'flex:1; overflow:auto;';
@@ -102,7 +102,7 @@ const PreviewPanel = state => {
       Stack({ gap: 8 })([
         div({ style: 'display:flex; gap:8px; flex-wrap:wrap' })([
           Button({ variant: 'primary', onClick: () => _play(project) })([live ? '↻ Reload preview' : '▶ Play'  ]),
-          ...(live ? [Button({ variant: 'ghost', onClick: _close })(['× Stop'])] : []),
+          ...(live ? [Button({ variant: 'ghost', onClick: _close })(['x Stop'])] : []),
         ]),
         ...(startRoom
           ? [p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([

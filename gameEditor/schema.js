@@ -42,6 +42,31 @@ const emptyCondition = () => ({
   itemId: '', count: 1,           // hasItem
   expr: '',                       // js
 });
+
+// A numeric clamp evaluated against state at runtime. Enabled limits resolve
+// to `mul * state[statKey] + const`; statKey === '' makes it a pure constant
+// (mul * 0 + const = const). Disabled = no clamp on that side.
+//
+//   { enabled: true,  statKey: 'maxHp', mul: 1, const: 0 } → state.maxHp
+//   { enabled: true,  statKey: '',      mul: 0, const: 0 } → 0    (hard floor)
+//   { enabled: true,  statKey: 'level', mul: 2, const: 5 } → 2*level + 5
+const emptyOpLimit = () => ({ enabled: false, statKey: '', mul: 0, const: 0 });
+
+// A single op inside an Effect's simple-mode `ops` array.
+// Beyond the bare { target, op, value } shape, every op may carry an optional
+//   - condition: regular Condition object — when not 'always', the op is
+//                gated by the condition (false → skip this op, others still run)
+//   - min / max: emptyOpLimit clamps applied to the post-arithmetic value
+//                (stat add/sub/set, inv give/take/set). Skill / flag / toggle
+//                ops ignore them.
+const emptyOp = () => ({
+  target:    '',
+  op:        'add',
+  value:     0,
+  condition: emptyCondition(),
+  min:       emptyOpLimit(),
+  max:       emptyOpLimit(),
+});
 const emptyEffect = () => ({
   mode: 'none',
   ops:     [],        // simple
@@ -58,13 +83,11 @@ const emptyEffect = () => ({
   message: '',
 });
 
-const emptyOp = (target = '') => ({ target, op: 'set', value: 0 });
-
 // One row in a random table — weight + a single outcome. `kind` decides which
 // of the kind-specific fields are read. Count / stat ranges use inclusive
 // min/max; equal values give a deterministic amount.
 //
-//   item       → give itemId × randInt(countMin..countMax)
+//   item       → give itemId x randInt(countMin..countMax)
 //   stat       → state[statKey] += randInt(statMin..statMax)
 //                (use this for ANY currency — gold, silver, gems — just pick the key)
 //   flag       → state.flags[flagKey] = flagValue
@@ -162,6 +185,7 @@ const emptyItem = (id = `item_${_rid()}`) => ({
   image:       '',
   price:       emptyPrice(),    // { stat, amount }
   kind:        'misc',          // 'consumable' | 'equipment' | 'readable' | 'key' | 'misc'
+  folder:      '',              // free-form path — '' = ungrouped; e.g. 'weapons' or 'consumables/food'
   // Per-kind behaviour (each is ignored when the kind doesn't apply):
   useEffect:   emptyEffect(),   // consumable — fires on Use
   text:        '',              // readable   — rendered in the reading overlay
@@ -173,6 +197,43 @@ const emptyShopEntry = (itemId = '') => ({
   price:    null,        // null → use item.price (also a { stat, amount })
   quantity: null,        // null → infinite
 });
+
+// One whitelist entry on shop.buyback when mode === 'list'.
+//   multiplier: null → fall back to shop.buyback.multiplier (the shop default).
+//   Any number → per-item override (e.g. potions worth 0.5×, gems worth 1.2×).
+const emptyBuybackItem = (itemId = '') => ({
+  itemId,
+  multiplier: null,
+});
+
+// Shop buyback config — what the NPC will buy back from the player.
+//   mode: 'none' — shop only sells, no Sell buttons rendered
+//         'list' — only items in `items[]` are buyable; per-item multiplier optional
+//         'open' — everything in the player's inventory is buyable at `multiplier`
+//   multiplier: default fraction of item.price.amount the shop pays
+//               (0.8 → sell to shop for 8 gold an item priced at 10 gold).
+// Sell price stat = the item's own price.stat — so a sword priced in gold is
+// bought back for gold; one priced in gems for gems.
+const emptyBuyback = () => ({
+  mode:       'none',
+  multiplier: 0.8,
+  items:      [],
+});
+
+// Normalise a possibly-undefined / partial buyback config. Missing fields
+// fall back to emptyBuyback() defaults so old projects load cleanly.
+const _normaliseBuyback = b => {
+  if (!b || typeof b !== 'object') return emptyBuyback();
+  const mode = b.mode === 'list' || b.mode === 'open' ? b.mode : 'none';
+  const mul  = Number.isFinite(Number(b.multiplier)) ? Number(b.multiplier) : 0.8;
+  const items = Array.isArray(b.items)
+    ? b.items.map(it => ({
+        itemId:     it?.itemId || '',
+        multiplier: it?.multiplier == null ? null : (Number.isFinite(Number(it.multiplier)) ? Number(it.multiplier) : null),
+      }))
+    : [];
+  return { mode, multiplier: mul, items };
+};
 
 // Normalise legacy / partial price values. Accepts:
 //   number      → { stat: 'gold', amount: N }
@@ -382,6 +443,7 @@ const emptyRoom = (id = `room_${_rid()}`) => ({
   id,
   kind:             'scene',     // 'scene' | 'wardrobe' | 'inventory' | 'story'
   title:            'New Room',
+  folder:           '',          // free-form path — '' = ungrouped
   music:            '',
   onEnter:          emptyEffect(),
   onEnterCondition: emptyCondition(),    // 'always' by default — gate onEnter behind a flag/stat/js check
@@ -448,6 +510,7 @@ const emptyNpc = (id = `npc_${_rid()}`) => ({
   id,
   name:      'New NPC',
   locations: [],
+  folder:    '',                  // free-form path — '' = ungrouped
   greeting:  '',
   portrait:  '',
   role:          'dialogue',     // 'dialogue' | 'shop'
@@ -459,7 +522,7 @@ const emptyNpc = (id = `npc_${_rid()}`) => ({
   choices:       [],             // ONLY used when advanced === false (simple flat dialogue)
   topics:        [],             // ONLY used when advanced === true
   entryTopicId:  '',             // ADV: which topic to drop the player into after greeting. '' = topics[0]
-  shop:          { stock: [] },  // only used when role === 'shop'
+  shop:          { stock: [], buyback: emptyBuyback() },  // only used when role === 'shop'
 });
 
 const emptyProject = () => {
@@ -496,6 +559,7 @@ const emptyAsset = (kind = 'image') => ({
   id:       `asset_${_rid()}`,
   name:     '',
   kind,                       // 'image' | 'audio' | 'video'
+  folder:   '',               // free-form path — '' = ungrouped
   data:     '',
   mime:     '',
   byteSize: 0,
@@ -569,6 +633,7 @@ const normaliseProject = raw => {
           image:       it.image       ?? '',
           price:       _normalisePrice(it.price) || emptyPrice(),
           kind:        it.kind        ?? 'misc',
+          folder:      it.folder      ?? '',
           useEffect:   it.useEffect   || emptyEffect(),
           text:        it.text        ?? '',
           equipSlot:   it.equipSlot   ?? '',
@@ -585,6 +650,7 @@ const normaliseProject = raw => {
           id:               r.id,
           kind:             r.kind             ?? 'scene',
           title:            r.title            ?? '',
+          folder:           r.folder           ?? '',
           music:            r.music            ?? '',
           onEnter:          r.onEnter          ?? emptyEffect(),
           onEnterCondition: r.onEnterCondition ?? emptyCondition(),
@@ -614,6 +680,7 @@ const normaliseProject = raw => {
           id:           n.id,
           name:         n.name      ?? '',
           locations:    Array.isArray(n.locations) ? n.locations : [],
+          folder:       n.folder    ?? '',
           greeting:     n.greeting  ?? '',
           portrait:     n.portrait  ?? '',
           role:         n.role      ?? 'dialogue',
@@ -630,8 +697,9 @@ const normaliseProject = raw => {
                   price:    _normalisePrice(e.price),    // null → use item default
                   quantity: e.quantity == null ? null : Math.max(0, Number(e.quantity) || 0),
                 })),
+                buyback: _normaliseBuyback(n.shop.buyback),
               }
-            : { stock: [] },
+            : { stock: [], buyback: emptyBuyback() },
         }))
       : base.npcs,
     sidebar: raw.sidebar && typeof raw.sidebar === 'object'
@@ -645,6 +713,7 @@ const normaliseProject = raw => {
           id:       a.id || `asset_${_rid()}`,
           name:     a.name ?? '',
           kind:     a.kind ?? 'image',
+          folder:   a.folder ?? '',
           data:     a.data ?? '',
           mime:     a.mime ?? '',
           byteSize: Number(a.byteSize || 0),
@@ -694,9 +763,9 @@ const normaliseProject = raw => {
 export {
   _rid,
   emptyProject, normaliseProject,
-  emptyRoom, emptyWardrobeRoom, emptyInventoryRoom, emptyStoryRoom, emptyNpc, emptyItem, emptyShopEntry, emptyPrice,
+  emptyRoom, emptyWardrobeRoom, emptyInventoryRoom, emptyStoryRoom, emptyNpc, emptyItem, emptyShopEntry, emptyBuyback, emptyBuybackItem, emptyPrice,
   emptyPage, emptyChoice, emptyTopic,
-  emptyCondition, emptyEffect, emptyOp,
+  emptyCondition, emptyEffect, emptyOp, emptyOpLimit,
   emptyLootTable, emptyLootEntry, emptyWeightBonus, emptyOneOfOption,
   emptySidebar, emptyWidget, emptyPortraitLayer,
   emptyCombat, emptyCombatMove, emptyEnemyAction,

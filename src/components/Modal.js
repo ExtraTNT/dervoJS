@@ -9,7 +9,7 @@ import { button, div, h2 } from '../elements.js';
  * @param {Object}   opts
  * @param {boolean}  [opts.open=false]     - Controls visibility.
  * @param {string}   [opts.title]          - Modal heading.
- * @param {function} opts.onClose          - Called when the × button is clicked.
+ * @param {function} opts.onClose          - Called when the x button is clicked.
  * @param {vnode[]}  [opts.footer]         - Footer content, usually action buttons.
  * @returns {function} bodyChildren => vnode
  *
@@ -37,7 +37,7 @@ const Modal = ({
         div({ className: ['modal', className].filter(Boolean).join(' '), style })([
           div({ className: 'modal-header' })([
             h2({ className: 'modal-title' })([title ?? '']),
-            button({ className: 'modal-close', onclick: onClose, type: 'button' })(['×']),
+            button({ className: 'modal-close', onclick: onClose, type: 'button' })(['x']),
           ]),
           div({ className: 'modal-body' })(children),
           ...(footer ? [div({ className: 'modal-footer' })(footer)] : []),

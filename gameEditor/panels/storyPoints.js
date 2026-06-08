@@ -29,6 +29,7 @@ import { PageEditor }      from '../components/PageEditor.js';
 import { ChoiceEditor }    from '../components/ChoiceEditor.js';
 import { EffectEditor }    from '../components/EffectEditor.js';
 import { ConditionEditor } from '../components/ConditionEditor.js';
+import { FolderedList, FolderField, folderSuggestions, groupedOptions } from '../components/FolderedList.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
@@ -79,7 +80,22 @@ const _duplicateStory = id => setProject(p => {
 
 // ─── List ───────────────────────────────────────────────────────────────
 
-const StoryList = (project, selectedId) => {
+const _storyRow = selectedId => s => {
+  const hasOnEnd  = s.onEnd && s.onEnd.mode && s.onEnd.mode !== 'none';
+  const hasChoice = (s.choices || []).length > 0;
+  return button({
+    className: `gef-list-btn${s.id === selectedId ? ' active' : ''}`,
+    onclick:   () => setState({ selectedStoryId: s.id }),
+    type:      'button',
+  })([
+    span({})([s.title || '(untitled)']),
+    ...(hasChoice ? [Badge({ variant: 'blue' })([`${s.choices.length} ch`])] : []),
+    ...(hasOnEnd  ? [Badge({ variant: 'purple' })(['onEnd'])] : []),
+    span({ className: 'gef-id' })([s.id]),
+  ]);
+};
+
+const StoryList = (project, selectedId, collapsed = {}) => {
   const stories = project.rooms.filter(r => r.kind === 'story');
   return Stack({ gap: 4 })([
     h2({ style: 'font-size:14px; margin:0 0 4px' })([`Story Points (${stories.length})`]),
@@ -88,20 +104,12 @@ const StoryList = (project, selectedId) => {
     ]),
     ...(stories.length === 0
       ? [div({ className: 'gef-empty' })(['No story points yet.'])]
-      : stories.map(s => {
-          const hasOnEnd  = s.onEnd && s.onEnd.mode && s.onEnd.mode !== 'none';
-          const hasChoice = (s.choices || []).length > 0;
-          return button({
-            className: `gef-list-btn${s.id === selectedId ? ' active' : ''}`,
-            onclick:   () => setState({ selectedStoryId: s.id }),
-            type:      'button',
-          })([
-            span({})([s.title || '(untitled)']),
-            ...(hasChoice ? [Badge({ variant: 'blue' })([`${s.choices.length} ch`])] : []),
-            ...(hasOnEnd  ? [Badge({ variant: 'purple' })(['onEnd'])] : []),
-            span({ className: 'gef-id' })([s.id]),
-          ]);
-        })),
+      : [FolderedList({
+          items:      stories,
+          panelKey:   'stories',
+          collapsed,
+          renderItem: _storyRow(selectedId),
+        })]),
     Button({ size: 'sm', variant: 'ghost', onClick: _addStory, style: 'margin-top:8px' })(['+ Add story point']),
   ]);
 };
@@ -112,7 +120,7 @@ const StoryEditor = (story, project) => {
   const vars     = _vars(project);
   // Every room is a valid choice target — including other story points — so the
   // dev can chain "drink beer" → "dark-beer-storypoint" via a regular choice.
-  const roomOpts = project.rooms.map(r => ({
+  const roomOpts = groupedOptions(project.rooms)(r => ({
     value: r.id,
     label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}`,
   }));
@@ -177,6 +185,12 @@ const StoryEditor = (story, project) => {
             onChange: onText(v => set({ title: v })),
           }),
         ]),
+        FolderField({
+          id:          `story-folder-${story.id}`,
+          value:       story.folder,
+          onChange:    v => set({ folder: v }),
+          suggestions: folderSuggestions(project.rooms.filter(r => r.kind === 'story')),
+        }),
         p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
           'Pages advance via the per-page ',
           span({ style: 'font-family:ui-monospace,monospace; background:var(--surface-2); padding:1px 5px; border-radius:3px' })(['advanceLabel']),
@@ -280,7 +294,7 @@ const StoryPointsPanel = state => {
   const selected = stories.find(s => s.id === selectedStoryId) || stories[0];
 
   return div({ style: 'display:grid; grid-template-columns: 300px 1fr; gap:16px; align-items:start' })([
-    div({})([StoryList(project, selected?.id)]),
+    div({})([StoryList(project, selected?.id, state.collapsedFolders?.stories || {})]),
     div({})([
       selected
         ? StoryEditor(selected, project)

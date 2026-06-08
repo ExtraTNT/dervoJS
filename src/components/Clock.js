@@ -3,15 +3,15 @@ import Task from '../../lib/odocosjs/src/Task.js';
 
 /**
  * Formats a total seconds count as HH:MM:SS (when hours > 0) or MM:SS.
- * Handles negative values (countdown overrun) by prepending '−'.
+ * Handles negative values (countdown overrun) by prepending '-'.
  *
  * @param {number} secs  Total seconds (integer, may be negative).
- * @returns {string}     e.g. '03:07', '1:02:35', '−00:03'
+ * @returns {string}     e.g. '03:07', '1:02:35', '-00:03'
  *
  * @example
  *   formatTime(65)     // '01:05'
  *   formatTime(3661)   // '1:01:01'
- *   formatTime(-3)     // '−00:03'
+ *   formatTime(-3)     // '-00:03'
  */
 const formatTime = secs => {
   const neg  = secs < 0;
@@ -21,7 +21,7 @@ const formatTime = secs => {
   const s    = abs % 60;
   const pad  = n => String(n).padStart(2, '0');
   const body = h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-  return neg ? `−${body}` : body;
+  return neg ? `-${body}` : body;
 };
 
 /**

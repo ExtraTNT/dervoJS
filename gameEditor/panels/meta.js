@@ -14,9 +14,10 @@ import { Toggle } from '../../src/components/Toggle.js';
 import { Select } from '../../src/components/Select.js';
 import { Button } from '../../src/components/Button.js';
 import { Badge } from '../../src/components/Badge.js';
-import { setProject } from '../store.js';
+import { setProject, getState } from '../store.js';
 import { onText } from '../helpers.js';
 import { AssetInput } from '../components/AssetInput.js';
+import { FolderedList, groupedOptions } from '../components/FolderedList.js';
 
 const _setMeta = patch => setProject(pj => ({ ...pj, meta: { ...pj.meta, ...patch } }));
 
@@ -64,7 +65,7 @@ const FlagRow = (f, i) =>
   ]);
 
 const MetaPanel = project => {
-  const roomOpts = project.rooms.map(r => ({ value: r.id, label: `${r.title} (${r.id})` }));
+  const roomOpts = groupedOptions(project.rooms)(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title} (${r.id})` }));
   return Stack({ gap: 16 })([
     h2({ style: 'margin:0' })(['Project']),
 
@@ -126,28 +127,33 @@ const MetaPanel = project => {
         ]),
         ...(project.items.length === 0
           ? [div({ className: 'gef-empty' })(['Add some items in the Items tab first.'])]
-          : project.items.map(it => {
-              const count = Number(project.startingInventory?.[it.id] || 0);
-              return Grid({ cols: 3, gap: 8 })([
-                div({ style: 'display:flex; align-items:center; gap:8px' })([
-                  span({ style: 'font-weight:500' })([it.name || it.id]),
-                  span({ style: 'font-family:ui-monospace,monospace; font-size:11px; color:var(--text-muted)' })([it.id]),
-                ]),
-                NumberInput({
-                  value: count,
-                  min:   0,
-                  onChange: v => setProject(p => {
-                    const n = Math.max(0, Number(v) || 0);
-                    const inv = { ...(p.startingInventory || {}) };
-                    if (n === 0) delete inv[it.id]; else inv[it.id] = n;
-                    return { ...p, startingInventory: inv };
+          : [FolderedList({
+              items:     project.items,
+              panelKey:  'startingInventory',
+              collapsed: getState().collapsedFolders?.startingInventory || {},
+              renderItem: it => {
+                const count = Number(project.startingInventory?.[it.id] || 0);
+                return Grid({ cols: 3, gap: 8 })([
+                  div({ style: 'display:flex; align-items:center; gap:8px' })([
+                    span({ style: 'font-weight:500' })([it.name || it.id]),
+                    span({ style: 'font-family:ui-monospace,monospace; font-size:11px; color:var(--text-muted)' })([it.id]),
+                  ]),
+                  NumberInput({
+                    value: count,
+                    min:   0,
+                    onChange: v => setProject(p => {
+                      const n = Math.max(0, Number(v) || 0);
+                      const inv = { ...(p.startingInventory || {}) };
+                      if (n === 0) delete inv[it.id]; else inv[it.id] = n;
+                      return { ...p, startingInventory: inv };
+                    }),
                   }),
-                }),
-                div({ style: 'display:flex; align-items:center; color:var(--text-muted); font-size:12px' })([
-                  count > 0 ? `→ state.inventory["${it.id}"] = ${count}` : '',
-                ]),
-              ]);
-            })),
+                  div({ style: 'display:flex; align-items:center; color:var(--text-muted); font-size:12px' })([
+                    count > 0 ? `→ state.inventory["${it.id}"] = ${count}` : '',
+                  ]),
+                ]);
+              },
+            })]),
       ]),
     ]),
 

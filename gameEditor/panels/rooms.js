@@ -23,6 +23,7 @@ import { EffectEditor }    from '../components/EffectEditor.js';
 import { ConditionEditor } from '../components/ConditionEditor.js';
 import { PortraitEditor }  from '../components/PortraitEditor.js';
 import { AssetInput }      from '../components/AssetInput.js';
+import { FolderedList, FolderField, folderSuggestions, groupedOptions } from '../components/FolderedList.js';
 
 // helpers
 const _vars = project => ({
@@ -79,24 +80,32 @@ const _duplicateRoom = id => setProject(p => {
   return { ...p, rooms: [...p.rooms, copy] };
 });
 
-const RoomList = (project, selectedId) => {
+const _roomRow = (project, selectedId) => r =>
+  button({
+    className: `gef-list-btn${r.id === selectedId ? ' active' : ''}`,
+    onclick:   () => setState({ selectedRoomId: r.id }),
+    type:      'button',
+  })([
+    span({})([r.title || '(untitled)']),
+    ...(r.kind === 'wardrobe'  ? [Badge({ variant: 'purple' })(['wardrobe'])]   : []),
+    ...(r.kind === 'inventory' ? [Badge({ variant: 'blue'   })(['inventory'])]  : []),
+    ...(project.meta.start === r.id ? [Badge({ variant: 'green' })(['start'])] : []),
+    span({ className: 'gef-id' })([r.id]),
+  ]);
+
+const RoomList = (project, selectedId, collapsed = {}) => {
   // Story rooms live in the Story Points tab — keep the world-map list clean.
   const worldRooms = project.rooms.filter(r => r.kind !== 'story');
   return Stack({ gap: 4 })([
     h2({ style: 'font-size:14px; margin:0 0 4px' })([`Rooms (${worldRooms.length})`]),
-    ...worldRooms.map(r =>
-      button({
-        className: `gef-list-btn${r.id === selectedId ? ' active' : ''}`,
-        onclick:   () => setState({ selectedRoomId: r.id }),
-        type:      'button',
-      })([
-        span({})([r.title || '(untitled)']),
-        ...(r.kind === 'wardrobe'  ? [Badge({ variant: 'purple' })(['wardrobe'])]   : []),
-        ...(r.kind === 'inventory' ? [Badge({ variant: 'blue'   })(['inventory'])]  : []),
-        ...(project.meta.start === r.id ? [Badge({ variant: 'green' })(['start'])] : []),
-        span({ className: 'gef-id' })([r.id]),
-      ])
-    ),
+    ...(worldRooms.length === 0
+      ? [div({ className: 'gef-empty' })(['No rooms yet.'])]
+      : [FolderedList({
+          items:      worldRooms,
+          panelKey:   'rooms',
+          collapsed,
+          renderItem: _roomRow(project, selectedId),
+        })]),
     div({ style: 'display:flex; gap:6px; margin-top:8px; flex-wrap:wrap' })([
       Button({ size: 'sm', variant: 'ghost', onClick: _addRoom })(['+ Add room']),
       Button({ size: 'sm', variant: 'ghost', onClick: _addWardrobeRoom })(['+ Wardrobe']),
@@ -204,7 +213,7 @@ const WardrobeRoomEditor = ({ room, project, onChange }) => {
 
 const RoomEditor = (room, project) => {
   const vars = _vars(project);
-  const roomOpts = project.rooms.map(r => ({ value: r.id, label: r.title || r.id }));
+  const roomOpts = groupedOptions(project.rooms)(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}` }));
   const set = patch => _updateRoom(room.id, patch);
 
   const _setPage = (i, patch) => _updateRoom(room.id, r => ({
@@ -296,6 +305,12 @@ const RoomEditor = (room, project) => {
             })(['Start room']),
           ]),
         ]),
+        FolderField({
+          id:          `room-folder-${room.id}`,
+          value:       room.folder,
+          onChange:    v => set({ folder: v }),
+          suggestions: folderSuggestions(project.rooms.filter(r => r.kind !== 'story')),
+        }),
       ]),
     ]),
 
@@ -316,6 +331,7 @@ const RoomEditor = (room, project) => {
             effect:   room.onEnter,
             vars,
             label:    'Effect when condition passes',
+            rowKey:   `room:${room.id}:onEnter`,
             onChange: v => set({ onEnter: v }),
           }),
         ]),
@@ -392,7 +408,7 @@ const RoomsPanel = state => {
                   || worldRooms[0];
 
   return div({ style: 'display:grid; grid-template-columns: 260px 1fr; gap:16px; align-items:start' })([
-    div({})([RoomList(project, selected?.id)]),
+    div({})([RoomList(project, selected?.id, state.collapsedFolders?.rooms || {})]),
     div({})([
       selected
         ? RoomEditor(selected, project)

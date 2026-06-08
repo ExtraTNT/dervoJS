@@ -19,6 +19,7 @@ import { setProject, setState } from '../store.js';
 import { emptySkill } from '../schema.js';
 import { onText } from '../helpers.js';
 import { AssetInput } from '../components/AssetInput.js';
+import { groupedOptions } from '../components/FolderedList.js';
 
 const KIND_OPTS = [
   { value: 'attack', label: 'Attack' },
@@ -98,7 +99,7 @@ const SkillEditor = (skill, project) => {
           }),
           Select({
             label:    'Consumes item (optional)',
-            options:  [{ value: '', label: '— none —' }, ...project.items.map(it => ({ value: it.id, label: it.name || it.id }))],
+            options:  [{ value: '', label: '— none —' }, ...groupedOptions(project.items)(it => ({ value: it.id, label: it.name || it.id }))],
             value:    skill.costItem || '',
             onChange: onText(v => set({ costItem: v })),
           }),
@@ -106,7 +107,7 @@ const SkillEditor = (skill, project) => {
         Grid({ cols: 2, gap: 10 })([
           Select({
             label:    'Requires item (optional)',
-            options:  [{ value: '', label: '— none —' }, ...project.items.map(it => ({ value: it.id, label: it.name || it.id }))],
+            options:  [{ value: '', label: '— none —' }, ...groupedOptions(project.items)(it => ({ value: it.id, label: it.name || it.id }))],
             value:    skill.requireItem || '',
             onChange: onText(v => set({ requireItem: v })),
           }),
@@ -135,7 +136,7 @@ const SkillEditor = (skill, project) => {
     Card({ title: 'Damage scaling' })([
       Stack({ gap: 8 })([
         p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
-          'Final damage = base + (state.', span({ style: 'font-family:ui-monospace,monospace' })(['stat']), ' × multiplier) + random(0..N). ',
+          'Final damage = base + (state.', span({ style: 'font-family:ui-monospace,monospace' })(['stat']), ' x multiplier) + random(0..N). ',
           'Leave the stat blank for a flat damage. Random 0 disables variance.',
         ]),
         Grid({ cols: 3, gap: 10 })([

@@ -53,7 +53,7 @@ const NumberInput = ({
         disabled: disabled || value <= min,
         onclick: decrement,
         'aria-label': 'Decrement',
-      })(['−']),
+      })(['-']),
       input({
         id,
         type: 'number',

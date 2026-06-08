@@ -26,6 +26,7 @@ import { setProject, setState } from '../store.js';
 import { emptyWidget } from '../schema.js';
 import { onText, onCheck } from '../helpers.js';
 import { PortraitEditor } from '../components/PortraitEditor.js';
+import { groupedOptions } from '../components/FolderedList.js';
 
 const WIDGET_OPTS = [
   { value: 'title',     label: 'Title block'        },
@@ -116,7 +117,7 @@ const RoomLinkWidgetEditor = ({ widget, project }) =>
     }),
     Select({
       label:    'Target room',
-      options:  [{ value: '', label: '— pick room —' }, ...project.rooms.map(r => ({ value: r.id, label: `${r.title || r.id} (${r.id})` }))],
+      options:  [{ value: '', label: '— pick room —' }, ...groupedOptions(project.rooms)(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id} (${r.id})` }))],
       value:    widget.roomId,
       onChange: onText(v => _setWidget(widget.id, { roomId: v })),
     }),
