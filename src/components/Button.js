@@ -34,7 +34,7 @@ const Button = ({
     onclick: onClick,
     disabled,
     type,
-    title: toolTip,
+    ...(toolTip ? { title: toolTip } : {}),
   })(children);
 
 export { Button };
