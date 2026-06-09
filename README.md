@@ -700,8 +700,8 @@ dervoJS uses `Observable` for its store, `createNode` for initial DOM constructi
 ## License
 
 GPLv3
-See [./LICENSE](./LICENSE) for the license
-See [lib/odocosjs/LICENSE](lib/odocosjs/LICENSE) for the odocosJS base library.
+- See [./LICENSE](./LICENSE) for the license
+- See [lib/odocosjs/LICENSE](lib/odocosjs/LICENSE) for the odocosJS base library.
 
 Using the library as a library inside of your website without making it GPLv3 would technically violate the license.
 As this falls under normal use, I and other maintainer of this library shall not enforce it.
