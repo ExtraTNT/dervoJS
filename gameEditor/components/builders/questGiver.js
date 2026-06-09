@@ -597,9 +597,9 @@ const _ensureQuestLog = project => {
   next = ensureSidebarWidget(w => w.type === 'roomLink' && w.roomId === 'quest_log')({
     id:     _rid(),
     type:   'roomLink',
-    label:  '📜 Quests',
+    label:  'Quests',
     roomId: 'quest_log',
-    icon:   '',
+    icon:   '📜',
   })(next);
   return next;
 };
