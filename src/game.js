@@ -124,6 +124,8 @@ const createGame = ({
   npcs     = {},
   sidebar,
   topBar,
+  music,                       // ctx => url|'' — invoked on every state change; engine swaps the bgm <audio> src when the URL changes
+  musicVolume = 0.5,           // 0..1, applied once on element creation
   debug    = true,
   notFound = _defaultNotFound,
   saveKey,
@@ -145,7 +147,70 @@ const createGame = ({
   const store    = createStore(_initial);
   const { getState, setState } = store;
 
-  //  save / load via odocosJS's localObjectStorage 
+  //  background music
+  // One lazily-created <audio> element per game instance, swapped via
+  // store.subscribe whenever music(ctx) returns a different URL than last
+  // render. Empty / falsy URLs pause + clear the src so we never leak the
+  // last room's track into a quiet area. Browsers block autoplay until the
+  // page sees a user gesture — we catch the rejected play() and retry on
+  // the first click/keydown that lands.
+  let _bgmEl       = null;
+  let _bgmLastUrl  = null;
+  let _bgmPending  = false;
+  let _bgmRetry    = null;         // hoisted ref so destroy() can removeEventListener it
+  const _ensureBgmEl = () => {
+    if (_bgmEl) return _bgmEl;
+    _bgmEl = document.createElement('audio');
+    _bgmEl.loop    = true;
+    _bgmEl.preload = 'auto';
+    _bgmEl.volume  = Math.max(0, Math.min(1, Number(musicVolume) || 0));
+    _bgmEl.style.display = 'none';
+    document.body.appendChild(_bgmEl);
+    _bgmRetry = () => {
+      if (!_bgmPending || !_bgmEl?.src) return;
+      _bgmEl.play().then(() => { _bgmPending = false; }).catch(() => {});
+    };
+    window.addEventListener('pointerdown', _bgmRetry);
+    window.addEventListener('keydown',     _bgmRetry);
+    return _bgmEl;
+  };
+  // Pull the audio element back out of the DOM, kill its src so the network
+  // request stops, and drop the global listeners we wired up in _ensureBgmEl.
+  // Called from the mount handle's destroy() so closing the preview panel
+  // (or any other mount/unmount cycle) doesn't leave a ghost <audio> playing.
+  const _teardownBgm = () => {
+    if (_bgmEl) {
+      try { _bgmEl.pause(); }            catch (_) {}
+      try { _bgmEl.removeAttribute('src'); _bgmEl.load(); } catch (_) {}
+      if (_bgmEl.parentNode) _bgmEl.parentNode.removeChild(_bgmEl);
+    }
+    if (_bgmRetry) {
+      window.removeEventListener('pointerdown', _bgmRetry);
+      window.removeEventListener('keydown',     _bgmRetry);
+    }
+    _bgmEl = null;
+    _bgmRetry = null;
+    _bgmLastUrl = null;
+    _bgmPending = false;
+  };
+  const _updateBgm = () => {
+    if (typeof music !== 'function') return;
+    let url = '';
+    try { url = music(_ctx(getState())) || ''; } catch (_) { url = ''; }
+    if (url === _bgmLastUrl) return;
+    _bgmLastUrl = url;
+    const el = _ensureBgmEl();
+    if (!url) { el.pause(); el.removeAttribute('src'); return; }
+    el.src = url;
+    el.load();
+    el.play().catch(() => { _bgmPending = true; });
+  };
+  // Run on every state change AND once on next tick so the first scene's
+  // music starts as soon as the player interacts. The lazy ctx reference
+  // means we wait for `_ctx` to be defined (it's declared further down).
+  store.subscribe(() => { _updateBgm(); });
+
+  //  save / load via odocosJS's localObjectStorage
   // One namespace per game (overridable). Each slot is a separate localStorage key.
   const _ns = saveKey || `dervo-game:${title}`;
   const _slotKey = (slot = 'default') => `${_ns}:${slot}`;
@@ -270,7 +335,13 @@ const createGame = ({
   ];
 
   return {
-    mount: root => mount(store)(root)(view),
+    mount: root => {
+      const result = mount(store)(root)(view);
+      // Kick the initial bgm track AFTER the first paint so the audio
+      // element lands on the body alongside the rendered scene.
+      _updateBgm();
+      return result;
+    },
     store, getState, setState,
     goto, back, restart,
     save, load, hasSave, clearSave, listSlots,
