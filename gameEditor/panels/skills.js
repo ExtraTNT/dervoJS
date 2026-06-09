@@ -16,6 +16,7 @@ import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
 import { setProject, setState } from '../store.js';
+import { confirmAction } from '../components/ConfirmDialog.js';
 import { emptySkill } from '../schema.js';
 import { onText } from '../helpers.js';
 import { AssetInput } from '../components/AssetInput.js';
@@ -260,12 +261,13 @@ const SkillEditor = (skill, project) => {
     ]),
 
     Card({ title: 'Danger zone' })([
-      Button({ size: 'sm', variant: 'danger', onClick: () => {
-        if (confirm(`Delete skill "${skill.name || skill.id}"? It will be removed from starting skills too.`)) {
-          _deleteSkill(skill.id);
-          setState({ selectedSkillId: null });
-        }
-      } })(['Delete skill']),
+      Button({ size: 'sm', variant: 'danger', onClick: () => confirmAction({
+        title:        'Delete skill',
+        message:      `Delete skill "${skill.name || skill.id}"? It will be removed from starting skills too.`,
+        confirmLabel: 'Delete',
+        danger:       true,
+        onConfirm:    () => { _deleteSkill(skill.id); setState({ selectedSkillId: null }); },
+      }) })(['Delete skill']),
     ]),
   ]);
 };

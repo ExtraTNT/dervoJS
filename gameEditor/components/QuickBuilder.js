@@ -1,7 +1,7 @@
 /**
  * QuickBuilder — wizard that scaffolds a base project from a few inputs.
  *
- * Opens from the topbar (🚀 New from template). Four MultiStep stages:
+ * Opens from the topbar (New from template). Four MultiStep stages:
  *   1. Meta          — title + intro line
  *   2. Stats         — player stats (key + initial), pre-seeded with hp / gold
  *   3. Items         — list of item NAMES (ids derived from names)
@@ -245,6 +245,7 @@ const _StepStats = ({ values, setValue }) => {
           label:    i === 0 ? 'Initial' : '',
           value:    Number(s.initial) || 0,
           onChange: v => setValue('stats', _patchRow(stats)(i)({ initial: Number(v) || 0 })),
+          style:    'justify-self:start',
         }),
         div({ style: 'display:flex; align-items:end' })([
           Button({ size: 'sm', variant: 'ghost', onClick: () => setValue('stats', _delRow(stats)(i)) })(['Remove']),
@@ -344,16 +345,29 @@ const QuickBuilder = state => {
   const values = qb.values || defaultValues();
   const idx    = qb.idx || 0;
 
+  const _validateMeta  = v => (!v.title || !v.title.trim())
+    ? 'Give the project a title.'
+    : null;
+  const _validateStats = v => {
+    const rows = (v.stats || []).filter(s => s.key && s.key.trim());
+    if (rows.length === 0) return 'Add at least one stat (use hp / gold as a starting point).';
+    return null;
+  };
+  const _validateItems = v => {
+    const rows = (v.items || []).filter(i => i.name && i.name.trim());
+    if (rows.length === 0) return 'Add at least one item — the shop needs something to stock.';
+    return null;
+  };
   const steps = [
-    { title: 'Meta',   render: _StepMeta },
-    { title: 'Stats',  render: _StepStats },
-    { title: 'Items',  render: _StepItems },
+    { title: 'Meta',   render: _StepMeta,   validate: _validateMeta  },
+    { title: 'Stats',  render: _StepStats,  validate: _validateStats },
+    { title: 'Items',  render: _StepItems,  validate: _validateItems },
     { title: 'Review', render: _StepReview },
   ];
 
   return [FloatingPanel({
     id:       'gef-quickbuilder',
-    title:    '🚀 Quick Builder — scaffold a base project',
+    title:    'Quick Builder — scaffold a base project',
     open:     true,
     onClose:  _close,
     initialX: 120,
@@ -369,6 +383,7 @@ const QuickBuilder = state => {
         values,
         setValues: _setValues,
         onDone:    _onDone,
+        showValidation: true,
       })([]),
     ]),
   ])];

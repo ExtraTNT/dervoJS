@@ -197,7 +197,7 @@ const _BuilderTab = () => div({})([
       _kbd('exitCombat'), ' — leave the NPC, start picked combat.',
     ]),
     _row('Bulk generator', [
-      'The ', _kbd('✨ Generate from list…'), ' button on each topic opens a modal that maps over a source list. Sources: ',
+      'The ', _kbd('Generate from list…'), ' button on each topic opens a modal that maps over a source list. Sources: ',
       _kbd('items'), ' / ', _kbd('npcs'), ' / ', _kbd('rooms'), ' / ', _kbd('flags'), ' / ', _kbd('skills'), ' / ', _kbd('combats'), ' / ',
       _kbd('custom (comma-separated list)'),
       '. Placeholders ', _kbd('{name}'), ', ', _kbd('{id}'), ', ', _kbd('{value}'),
@@ -277,11 +277,79 @@ const _BuilderTab = () => div({})([
     _row('Bulk-item lists', ['Flat editors that iterate ALL items (Starting Inventory in Project, deterministic Loot in Combats) also pass through ', _kbd('FolderedList'), '. They use their own ', _kbd('panelKey'), ' (', _kbd('startingInventory'), ' / ', _kbd('loot'), ') so collapse state doesn\'t bleed into the main Items tab.']),
   ),
 
-  _section('🚀 Quick Builder (topbar)',
-    _row('What',         ['Four-step MultiStep wizard that scaffolds a base project from a few inputs: title + intro line, player stats, and item names. Click ', _kbd('🚀 New from template'), ' in the topbar.']),
+  _section('Quick Builder (topbar)',
+    _row('What',         ['Four-step MultiStep wizard that scaffolds a base project from a few inputs: title + intro line, player stats, and item names. Click ', _kbd('New from template'), ' in the topbar.']),
     _row('What it makes',['Five rooms (', _kbd('intro · home · wardrobe · shop · inventory'), '), one shopkeeper NPC (role ', _kbd('shop'), ', located in ', _kbd('shop'), ') stocking every item, ', _kbd('hp'), ' / ', _kbd('gold'), ' guaranteed in stats, items priced at 10 gold each in the ', _kbd('shop'), ' folder, story-intro room as ', _kbd('meta.start'), ', and a sidebar (', _kbd('title · stats · inventory · 🎒 Bag'), ' roomLink) so the inventory room is reachable from anywhere. The inventory room\'s "Back" choice fires ', _kbd('c.back()'), ' so the player returns to whichever room they came from (shop, wardrobe, …) instead of being teleported home.']),
     _row('Non-destructive', ['Builds into a NEW slot (slot name on the Review step, falls back to a slug of the title). Your current slot stays put — switch back via the sidebar slots list any time.']),
     _row('Tweak later',  ['Everything the wizard produces is editable — items default to ', _kbd('kind: misc'), ', rooms are plain scenes, the wardrobe is empty (no layers / bindings). Use the relevant tabs to flesh out details.']),
+  ),
+
+  _section('Add component (topbar)',
+    _row('What',          ['Additive sibling to the Quick Builder — drops a pre-built mini-component into the ', span({ style: 'font-weight:600' })(['current']), ' project (no slot switch). Click ', _kbd('Add component'), ' in the topbar, pick from the chooser, walk a small MultiStep, hit Finish.']),
+    _row('📜 Quest Giver',[
+      'Multi-quest wizard. Step 1 — give the quests to a brand-new NPC OR pick an existing dialogue NPC (advanced is appended to in place; simple gets converted: pages stay as greeting, existing flat choices become a ',
+      _kbd('Talk'), ' topic, a ', _kbd('Menu'), ' topic becomes the new entry with ',
+      _kbd('Talk · Quests · Goodbye'),
+      '). Step 2 — add one card per quest. Step 3 — Review.',
+    ]),
+    _row('Quest goal types', [
+      _kbd('fetch'), ' — completion = ', _kbd('hasItem ≥ N'),
+      ' (pick existing or create a new ', _kbd('kind:key'), ' item). ',
+      _kbd('fight'), ' — pick a combat; builder injects ', _kbd('flags.combat_<combatId>_won = true'),
+      ' into the combat\'s ', _kbd('onWin'), ' (idempotent — wraps non-simple onWin into a ', _kbd('multi'),
+      ' so existing logic is preserved). Completion = the injected flag. ',
+      _kbd('flag'), ' — pick existing or create a brand-new flag (e.g. ',
+      _kbd('tower_gate_up'), '). New flags are declared in ', _kbd('project.flags'), ' with initial ',
+      _kbd('false'), ' — wire ', _kbd('flags.<key> = …'), ' from anywhere (lever switch, room onEnter, combat onWin, …) and the quest is ready to turn in.',
+    ]),
+    _row('Pickup gate (when the offer choice shows up)', [
+      _kbd('always'), ' (default) — offer visible as soon as the player talks to the giver and the quest isn\'t already started. ',
+      _kbd('afterFlag'), ' — only after a chosen flag matches a chosen value (also supports "create new flag" so you can gate on flags that don\'t exist yet — e.g. ',
+      _kbd('met_the_king'), '). Use a previous quest\'s ', _kbd('q_<id>_done'),
+      ' to chain quests. ', _kbd('afterStat'), ' — numeric comparison on a stat. Operators: ',
+      _kbd('≥ > = ≠ ≤ <'), '. Compiles to ', _kbd('(Number(c.state[stat]) || 0) <op> <value>'),
+      '. Use for level / reputation / karma gates. ', _kbd('js'),
+      ' — author\'s own predicate. The "not-started" check is always AND-ed in so the offer auto-hides once accepted.',
+    ]),
+    _row('Step validation',[
+      'Every wizard step has its own validator. The MultiStep ',
+      _kbd('Next'), ' button blocks (and shows a one-line reason inline) until the current step\'s required fields are filled. ',
+      _kbd('Prev'), ' is never blocked, so you can hop back and tweak earlier inputs without losing later ones. Same for Quick Builder / Locked Door / Tavern.',
+    ]),
+    _row('NPC wiring (shared across runs)', [
+      'Each NPC has a stable ', _kbd('topic_quests_<npcId>'), ' topic that\'s reused on re-run — adding more quests later just appends three sub-topics + three menu choices per new quest. A "Talk about your work" change-choice is injected once on the entry topic (existing NPCs) so the player can reach the Quests menu without losing the rest of the conversation.',
+    ]),
+    _row('Quest Log',[
+      'Auto-creates ', _kbd('quest_log'), ' room with a ', _kbd('← Back'),
+      ' choice that pops history + a ', _kbd('📜 Quests'),
+      ' sidebar link the first time. Every quest appends two display rows (',
+      _kbd('✓ <title>'), ' gated on done, ', _kbd('• <title> (active)'),
+      ' gated on started && !done). Re-running adds more rows; never duplicates the room itself.',
+    ]),
+    _row('🔒 Locked Door',[
+      'Adds a ', _kbd('hasItem'), '-gated Choice on a "from" room that navigates to a "to" room. Pick an existing key item or create a new one (auto-tagged ',
+      _kbd('kind: key'), ', folder ', _kbd('keys'),
+      '). Toggle "Consume key on use" to flip the door into a single-shot trigger (one ', _kbd('inv.<key> take 1'),
+      ' op on the action).',
+    ]),
+    _row('🍺 Tavern + Healer',[
+      'New scene room + barkeep NPC located there. Barkeep is ',
+      _kbd('advanced'), ' mode with a single ', _kbd('menu'), ' topic — every service is a ',
+      _kbd('flow: stay'), ' choice so the player can keep ordering after each action (a flat-mode NPC would exit on the first ',
+      _kbd('to:\'\''), '). Goodbye is ', _kbd('flow: exitBack'), '. Rest Choice subtracts the chosen currency and adds a generous ',
+      _kbd('+9999'), ' to each refill stat, clamped to the matching "max" stat (uses the per-op ',
+      _kbd('max'), ' clamp — ', _kbd('hp'), ' → ', _kbd('maxHp'), ', ', _kbd('mp'), ' → ', _kbd('maxMp'),
+      ' picked up automatically). Drinks are one Choice each (cost + stat bump, negative for debuffs). Optional Cures clear flags at a price. The tavern room itself gets a ',
+      _kbd('Step outside'), ' / ', _kbd('Leave the tavern'), ' choice that pops history (', _kbd('c.back()'),
+      ') so the player returns to wherever they came from. Optional entry choice on a connecting room can also be added.',
+    ]),
+    _row('Naming + collisions',['New entity ids derive from name slugs and dedupe (', _kbd('item_iron_key_2'),
+      ', etc.) so re-running a builder never overwrites earlier work. Quest flags do the same — adding two quests with the same title falls through to ', _kbd('q_<title>_2_started'),
+      '.']),
+    _row('Adding more',  ['New builders go in ', _kbd('gameEditor/components/builders/<id>.js'), ' exporting ', _kbd('{ id, icon, name, description, defaults, steps, build }'),
+      ' and get listed in ', _kbd('ComponentBuilder.js'), '. Use the shared helpers in ', _kbd('_helpers.js'), ' (', _kbd('uniqueId'), ', ',
+      _kbd('ensureFlag'), ', ', _kbd('ensureSidebarWidget'), ', …).',
+    ]),
   ),
 
   _section('Sidebar tab',
@@ -606,7 +674,7 @@ return div({ style: 'border:1px solid var(--border); height:14px' })([
 
 const _RecipesTab = () => div({})([
   p({ style: 'margin:0 0 12px; color:var(--text-muted); font-size:13px' })([
-    'Copy-paste starting points. Drop the snippets into the appropriate "JS" textarea and edit to taste.',
+    'Some standard patterns to use in your game.',
   ]),
 
   _section('"Open phone" anywhere',
@@ -630,7 +698,7 @@ const _RecipesTab = () => div({})([
 
   _section('Bulk-generate "Take X" buttons for every consumable',
     p({ style: 'margin:0 0 6px; font-size:12.5px' })([
-      'Topic editor → ', _kbd('✨ Generate from list…'),
+      'Topic editor → ', _kbd('Generate from list…'),
       '. Source: ', _kbd('Items'), '. Filter: ', _kbd('consumable'),
       '. Label: ', _kbd('Take {name}'), '. Flow: ', _kbd('stay'),
       '. Effect: simple, ', _kbd('inv.{id}'), ' / ', _kbd('give'), ' / ', _kbd('1'),

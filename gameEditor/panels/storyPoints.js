@@ -23,6 +23,7 @@ import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
 import { setProject, setState } from '../store.js';
+import { confirmAction } from '../components/ConfirmDialog.js';
 import { emptyStoryRoom, emptyPage, emptyChoice } from '../schema.js';
 import { onText } from '../helpers.js';
 import { PageEditor }      from '../components/PageEditor.js';
@@ -277,12 +278,13 @@ const StoryEditor = (story, project) => {
     Card({ title: 'Actions' })([
       div({ style: 'display:flex; gap:8px; flex-wrap:wrap' })([
         Button({ size: 'sm', variant: 'ghost', onClick: () => _duplicateStory(story.id) })(['Duplicate']),
-        Button({ size: 'sm', variant: 'danger', onClick: () => {
-          if (confirm(`Delete story point "${story.title || story.id}"?`)) {
-            _deleteStory(story.id);
-            setState({ selectedStoryId: null });
-          }
-        } })(['Delete']),
+        Button({ size: 'sm', variant: 'danger', onClick: () => confirmAction({
+          title:        'Delete story point',
+          message:      `Delete story point "${story.title || story.id}"?`,
+          confirmLabel: 'Delete',
+          danger:       true,
+          onConfirm:    () => { _deleteStory(story.id); setState({ selectedStoryId: null }); },
+        }) })(['Delete']),
       ]),
     ]),
   ]);

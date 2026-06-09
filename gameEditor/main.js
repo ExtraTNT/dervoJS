@@ -31,6 +31,8 @@ import { ThemePanel }   from './panels/theme.js';
 import { StoryPointsPanel } from './panels/storyPoints.js';
 import { StateExplorer }    from './components/StateExplorer.js';
 import { QuickBuilder, openQuickBuilder } from './components/QuickBuilder.js';
+import { ComponentBuilder, openComponentBuilder } from './components/ComponentBuilder.js';
+import { ConfirmDialog, confirmAction } from './components/ConfirmDialog.js';
 
 // Boot with persisted editor theme; per-project token overrides are applied
 // via the subscribe hook below so they also re-apply on slot switch.
@@ -122,8 +124,9 @@ const _topBar = s =>
       onClick: () => setState({ stateExplorerOpen: !s.stateExplorerOpen }),
       title:   'State explorer — what ${…} can reference',
     })(['📊 State']),
-    Button({ variant: 'ghost', size: 'sm', onClick: () => setState({ cheatsheetOpen: !s.cheatsheetOpen }) })(['? Cheat sheet']),
-    Button({ variant: 'ghost', size: 'sm', onClick: openQuickBuilder, title: 'Scaffold a base project from a few inputs' })(['🚀 New from template']),
+    Button({ variant: 'ghost', size: 'sm', onClick: () => setState({ cheatsheetOpen: !s.cheatsheetOpen }) })(['Cheat sheet']),
+    Button({ variant: 'ghost', size: 'sm', onClick: openQuickBuilder, title: 'Scaffold a base project from a few inputs' })(['New from template']),
+    Button({ variant: 'ghost', size: 'sm', onClick: openComponentBuilder, title: 'Add a pre-built component (quest giver, locked door, tavern, …) into the current project' })(['Add component']),
     Button({ variant: 'ghost', size: 'sm', onClick: persist })(['💾 Save']),
   ]);
 
@@ -147,7 +150,13 @@ const _sidebar = s => {
           ...(slots.length > 1
             ? [span({
                 style: 'margin-left:auto; opacity:.7',
-                onclick: e => { e.stopPropagation(); if (confirm(`Delete slot "${slot}"?`)) removeSlot(slot); },
+                onclick: e => { e.stopPropagation(); confirmAction({
+                  title:        'Delete slot',
+                  message:      `Delete slot "${slot}"? Its saved project will be removed from localStorage.`,
+                  confirmLabel: 'Delete',
+                  danger:       true,
+                  onConfirm:    () => removeSlot(slot),
+                }); },
                 title: 'Delete slot',
               })(['x'])]
             : []),
@@ -217,6 +226,8 @@ const view = s => [
   ..._toast(s.toast),
   ...CheatSheet(s),
   ...QuickBuilder(s),
+  ...ComponentBuilder(s),
+  ...ConfirmDialog(s),
   StateExplorer(s),
   //TODO: add debugger for development
 ];

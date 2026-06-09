@@ -789,8 +789,13 @@ const _buildChoice = (ch, project, fromRoomId) => {
       // (e.g. randomLoot picked a `navigate` entry, or an enterCombat/talkTo
       // effect), we YIELD and skip the choice's default `to:`. This lets the
       // action's effect dynamically override the destination.
+      // NOTE: read the snapshot from `c.getState()._scene` rather than
+      // `c.scene`. For dialogue contexts, the engine patches `c.scene` to the
+      // calling-room id (see _resolveScene in src/game.js), so comparing it
+      // against the post-effect canonical `_scene` would always read as
+      // "changed" and trigger a spurious yield.
       _startAction(c);
-      const before = c.scene;
+      const before = c.getState()._scene;
       effect(c);
       if (c.getState()._scene !== before) return;
       if (!ch.to) return;
@@ -1030,7 +1035,10 @@ const _buildSimpleNpcChoice = (ch, project, back) => {
     if:    c => guard(c),
     action: c => {
       _startAction(c);
-      const before = c.scene;
+      // See note in _buildChoice — `c.scene` is patched to the calling-room
+      // id inside dialogue contexts, so we read the canonical scene id from
+      // state instead.
+      const before = c.getState()._scene;
       effect(c);
       if (c.getState()._scene !== before) return;   // effect navigated; yield
       if (!ch.to) { c.setState({ _scene: back }); return; }
@@ -1155,7 +1163,11 @@ const _buildTopicChoice = (ch, npc, topic, allTopics, project, back) => {
     if:    c => guard(c),
     action: c => {
       _startAction(c);
-      const before = c.scene;
+      // Snapshot the canonical scene id (NOT `c.scene` — that's patched to
+      // the calling-room id in dialogue contexts and would always read as
+      // "different" once the player is talking to an NPC, swallowing every
+      // flow:'exitBack' / 'change' / etc. action).
+      const before = c.getState()._scene;
       effect(c);
       // If the effect already navigated (randomLoot navigate, enterCombat,
       // talkTo, etc.) we yield to it and skip the choice's flow-based nav.

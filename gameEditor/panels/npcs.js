@@ -26,6 +26,7 @@ import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
 import { setProject, setState } from '../store.js';
+import { confirmAction } from '../components/ConfirmDialog.js';
 import { emptyNpc, emptyPage, emptyChoice, emptyShopEntry, emptyBuyback, emptyBuybackItem, emptyTopic } from '../schema.js';
 import { onText } from '../helpers.js';
 import { AssetInput } from '../components/AssetInput.js';
@@ -460,9 +461,13 @@ const SingleTopicEditor = ({ topic, npc, project, vars, roomOpts, topicOpts, com
       h3({ style: 'margin:0; font-size:14px' })([`Editing topic: ${topic.name || topic.id}`]),
       span({ style: 'font-family:ui-monospace,monospace; font-size:11px; color:var(--text-muted)' })([`#${topic.id.slice(-5)}`]),
       div({ style: 'flex:1' })([]),
-      Button({ size: 'sm', variant: 'danger', onClick: () => {
-        if (confirm(`Delete topic "${topic.name || topic.id}"?`)) onDelete();
-      } })(['Delete topic']),
+      Button({ size: 'sm', variant: 'danger', onClick: () => confirmAction({
+        title:        'Delete topic',
+        message:      `Delete topic "${topic.name || topic.id}"?`,
+        confirmLabel: 'Delete',
+        danger:       true,
+        onConfirm:    onDelete,
+      }) })(['Delete topic']),
     ]),
 
     TextInput({
@@ -524,7 +529,7 @@ const SingleTopicEditor = ({ topic, npc, project, vars, roomOpts, topicOpts, com
             }))),
         div({ style: 'display:flex; gap:8px; flex-wrap:wrap' })([
           Button({ size: 'sm', variant: 'ghost', onClick: _addChoice })(['+ Add choice']),
-          Button({ size: 'sm', variant: 'ghost', onClick: openChoiceGenerator(npc.id)(topic.id), title: 'Map over a list and generate N choices in bulk' })(['✨ Generate from list…']),
+          Button({ size: 'sm', variant: 'ghost', onClick: openChoiceGenerator(npc.id)(topic.id), title: 'Map over a list and generate N choices in bulk' })(['Generate from list…']),
         ]),
       ]),
     ]),
@@ -621,7 +626,7 @@ const NpcEditor = (npc, project, selectedTopicId) => {
         ]),
         Grid({ cols: 2, gap: 10 })([
           Select({
-            label:    'Role',
+            label:    'Role (see add components for quest giver / inkeeper)',
             options:  ROLE_OPTS,
             value:    npc.role,
             onChange: onText(v => set({ role: v })),
@@ -772,12 +777,13 @@ const NpcEditor = (npc, project, selectedTopicId) => {
     ] : []),
 
     Card({ title: 'Danger zone' })([
-      Button({ size: 'sm', variant: 'danger', onClick: () => {
-        if (confirm(`Delete NPC "${npc.name || npc.id}"?`)) {
-          _deleteNpc(npc.id);
-          setState({ selectedNpcId: null, selectedTopicId: null });
-        }
-      } })(['Delete NPC']),
+      Button({ size: 'sm', variant: 'danger', onClick: () => confirmAction({
+        title:        'Delete NPC',
+        message:      `Delete NPC "${npc.name || npc.id}"?`,
+        confirmLabel: 'Delete',
+        danger:       true,
+        onConfirm:    () => { _deleteNpc(npc.id); setState({ selectedNpcId: null, selectedTopicId: null }); },
+      }) })(['Delete NPC']),
     ]),
   ]);
 };

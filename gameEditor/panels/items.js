@@ -13,6 +13,7 @@ import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
 import { setProject, setState } from '../store.js';
+import { confirmAction } from '../components/ConfirmDialog.js';
 import { emptyItem } from '../schema.js';
 import { onText } from '../helpers.js';
 import { EffectEditor } from '../components/EffectEditor.js';
@@ -204,12 +205,13 @@ const ItemEditor = (item, project) => {
     ]),
 
     Card({ title: 'Danger zone' })([
-      Button({ size: 'sm', variant: 'danger', onClick: () => {
-        if (confirm(`Delete item "${item.name || item.id}"? It will be removed from any NPC shop stock.`)) {
-          _deleteItem(item.id);
-          setState({ selectedItemId: null });
-        }
-      } })(['Delete item']),
+      Button({ size: 'sm', variant: 'danger', onClick: () => confirmAction({
+        title:        'Delete item',
+        message:      `Delete item "${item.name || item.id}"? It will be removed from any NPC shop stock.`,
+        confirmLabel: 'Delete',
+        danger:       true,
+        onConfirm:    () => { _deleteItem(item.id); setState({ selectedItemId: null }); },
+      }) })(['Delete item']),
     ]),
   ]);
 };

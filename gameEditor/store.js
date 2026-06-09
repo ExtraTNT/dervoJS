@@ -77,9 +77,17 @@ const store = createStore({
   // current step in the MultiStep; `values` is the in-progress form snapshot.
   // See components/QuickBuilder.js.
   quickBuilder: { open: false, idx: 0, values: null },
+  // Add component wizard state. `activeId` switches between the chooser
+  // (null) and a specific builder; `idx` / `values` mirror QuickBuilder.
+  // See components/ComponentBuilder.js.
+  componentBuilder: { open: false, activeId: null, idx: 0, values: null },
   // Per-op Advanced drawer state in the EffectEditor. Keyed by a path-style
   // rowKey produced by the editor (effect → step → op index). Editor-only.
   expandedOpRows: {},
+  // Centered confirmation modal — replaces window.confirm() throughout the
+  // editor so deletes and other irreversible actions get a themable prompt.
+  // See components/ConfirmDialog.js + confirmAction() helper.
+  confirmDialog: { open: false, title: '', message: '', confirmLabel: 'Confirm', cancelLabel: 'Cancel', danger: false, onConfirm: null },
   // Light/dark mode for the editor chrome — editor preference, persisted
   // separately from any project.
   theme:            loadTheme(),

@@ -20,6 +20,7 @@ import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
 import { setProject, setState, toast } from '../store.js';
+import { confirmAction } from '../components/ConfirmDialog.js';
 import { emptyAsset } from '../schema.js';
 import { onText } from '../helpers.js';
 import {
@@ -150,9 +151,13 @@ const AssetCard = suggestions => asset => {
           toast(`Replaced ${asset.name || asset.id}.`);
         });
       }) })(['↻ Re-upload']),
-      Button({ size: 'sm', variant: 'ghost', onClick: () => {
-        if (confirm(`Delete asset "${asset.name || asset.id}"? References elsewhere will break.`)) _deleteAsset(asset.id);
-      } })(['Delete']),
+      Button({ size: 'sm', variant: 'ghost', onClick: () => confirmAction({
+        title:        'Delete asset',
+        message:      `Delete asset "${asset.name || asset.id}"? References elsewhere will break.`,
+        confirmLabel: 'Delete',
+        danger:       true,
+        onConfirm:    () => _deleteAsset(asset.id),
+      }) })(['Delete']),
     ]),
   ]);
 };

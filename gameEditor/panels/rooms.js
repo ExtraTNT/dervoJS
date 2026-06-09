@@ -15,6 +15,7 @@ import { Badge } from '../../src/components/Badge.js';
 import { Checkbox } from '../../src/components/Checkbox.js';
 import { Select } from '../../src/components/Select.js';
 import { setProject, setState } from '../store.js';
+import { confirmAction } from '../components/ConfirmDialog.js';
 import { emptyRoom, emptyWardrobeRoom, emptyInventoryRoom, emptyPage, emptyChoice } from '../schema.js';
 import { onText, onCheck } from '../helpers.js';
 import { PageEditor }     from '../components/PageEditor.js';
@@ -387,12 +388,13 @@ const RoomEditor = (room, project) => {
     Card({ title: 'Danger zone' })([
       div({ style: 'display:flex; gap:8px' })([
         Button({ size: 'sm', variant: 'ghost', onClick: () => _duplicateRoom(room.id) })(['Duplicate']),
-        Button({ size: 'sm', variant: 'danger', onClick: () => {
-          if (confirm(`Delete room "${room.title || room.id}"? Choices linking here will be cleared.`)) {
-            _deleteRoom(room.id);
-            setState({ selectedRoomId: null });
-          }
-        } })(['Delete room']),
+        Button({ size: 'sm', variant: 'danger', onClick: () => confirmAction({
+          title:        'Delete room',
+          message:      `Delete room "${room.title || room.id}"? Choices linking here will be cleared.`,
+          confirmLabel: 'Delete',
+          danger:       true,
+          onConfirm:    () => { _deleteRoom(room.id); setState({ selectedRoomId: null }); },
+        }) })(['Delete room']),
       ]),
     ]),
   ]);

@@ -19,6 +19,7 @@ import {
 } from '../../src/index.js';
 import { createGame } from '../../src/game.js';
 import { setState, setProject, getState } from '../store.js';
+import { confirmAction } from '../components/ConfirmDialog.js';
 import { buildGameConfig } from '../preview.js';
 
 const _defaults = theme => (theme === 'dark' ? tokens.dark : tokens.light);
@@ -358,7 +359,13 @@ const _customCssCard = state => {
       div({ style: 'display:flex; gap:8px; justify-content:flex-end' })([
         button({
           type: 'button',
-          onclick: () => { if (confirm('Clear this project\'s custom CSS?')) _setCss(''); },
+          onclick: () => confirmAction({
+            title:        'Clear custom CSS',
+            message:      'Clear this project\'s custom CSS?',
+            confirmLabel: 'Clear',
+            danger:       true,
+            onConfirm:    () => _setCss(''),
+          }),
           style: 'padding:5px 12px; font-size:12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text-muted); cursor:pointer',
         })(['Clear']),
       ]),
@@ -406,7 +413,13 @@ const ThemePanel = state => {
               type: 'button',
               disabled: !hasChanges,
               style: `padding:6px 14px; font-size:13px; border-radius:var(--radius); border:1px solid var(--border); cursor:${hasChanges ? 'pointer' : 'not-allowed'}; background:var(--surface-2); color:${hasChanges ? 'var(--danger)' : 'var(--text-muted)'}; opacity:${hasChanges ? 1 : 0.5}`,
-              onclick: () => { if (hasChanges && confirm('Reset every token override on this project?')) _resetAllOverrides(); },
+              onclick: () => { if (!hasChanges) return; confirmAction({
+                title:        'Reset all token overrides',
+                message:      'Reset every token override on this project? The palette returns to the dervo defaults.',
+                confirmLabel: 'Reset all',
+                danger:       true,
+                onConfirm:    _resetAllOverrides,
+              }); },
             })(['↺ Reset all']),
           ]),
         ]),

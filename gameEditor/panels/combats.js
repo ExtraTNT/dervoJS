@@ -26,6 +26,7 @@ import { EffectEditor } from '../components/EffectEditor.js';
 import { AssetInput }   from '../components/AssetInput.js';
 import { FolderedList, groupedOptions } from '../components/FolderedList.js';
 import { getState } from '../store.js';
+import { confirmAction } from '../components/ConfirmDialog.js';
 
 const _vars = project => ({
   stats:   project.stats.map(s => s.key).filter(Boolean),
@@ -400,12 +401,13 @@ const CombatEditor = (combat, project) => {
     ]),
 
     Card({ title: 'Danger zone' })([
-      Button({ size: 'sm', variant: 'danger', onClick: () => {
-        if (confirm(`Delete combat "${combat.name || combat.id}"?`)) {
-          _deleteCombat(combat.id);
-          setState({ selectedCombatId: null });
-        }
-      } })(['Delete combat']),
+      Button({ size: 'sm', variant: 'danger', onClick: () => confirmAction({
+        title:        'Delete combat',
+        message:      `Delete combat "${combat.name || combat.id}"?`,
+        confirmLabel: 'Delete',
+        danger:       true,
+        onConfirm:    () => { _deleteCombat(combat.id); setState({ selectedCombatId: null }); },
+      }) })(['Delete combat']),
     ]),
   ]);
 };
