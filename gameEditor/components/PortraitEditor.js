@@ -26,10 +26,15 @@ import { emptyPortraitLayer } from '../schema.js';
 import { onText } from '../helpers.js';
 import { AssetInput } from './AssetInput.js';
 import { groupedOptions } from './FolderedList.js';
+import { resolveAssetRef } from '../assets.js';
 
-const _PreviewBox = (widget, layers) => {
-  // Renders the layers stacked at the configured size. defaultImage only —
-  // bindings are item-driven and shown via badges in the editor.
+// Layer.defaultImage can be either a plain URL, an inline `data:` URL, or an
+// `asset:<id>` ref. Browsers can't render `asset:...` as an <img src> — we
+// need to resolve it against the project's asset catalogue first. Asset
+// data bytes might be hydrating from IDB (the marker → '' branch in
+// resolveAssetRef), in which case we get back '' and show the empty-layer
+// placeholder until the next render picks up the real URL.
+const _PreviewBox = (widget, layers, project) => {
   const w = Number(widget.width)  || 220;
   const h = Number(widget.height) || 280;
   return div({
@@ -37,11 +42,12 @@ const _PreviewBox = (widget, layers) => {
   })(
     layers.length === 0
       ? [div({ style: 'display:grid; place-items:center; height:100%; color:var(--text-muted); font-size:13px' })(['(no layers)'])]
-      : layers.map(l =>
-          l.defaultImage
-            ? img({ src: l.defaultImage, style: 'position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none' })([])
-            : div({ style: 'position:absolute; inset:0; display:grid; place-items:center; color:var(--text-muted); font-size:11px' })([`(empty: ${l.name})`])
-        )
+      : layers.map(l => {
+          const src = resolveAssetRef(project, l.defaultImage);
+          return src
+            ? img({ src, style: 'position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none' })([])
+            : div({ style: 'position:absolute; inset:0; display:grid; place-items:center; color:var(--text-muted); font-size:11px' })([`(empty: ${l.name})`]);
+        })
   );
 };
 
@@ -109,12 +115,13 @@ const LayerCard = ({ layer, items, onChange, onDelete }) => {
   ]);
 };
 
-const PortraitEditor = ({ widget, items, onChange }) => {
+const PortraitEditor = ({ widget, items, project, onChange }) => {
   const set = patch => onChange({ ...widget, ...patch });
   const setLayers = layers => onChange({ ...widget, layers });
 
   const dragItems = (widget.layers || []).map(l => ({ ...l, id: l.id }));
 
+  console.log(widget);
   return Stack({ gap: 12 })([
     Card({ title: 'Portrait size' })([
       Grid({ cols: 2, gap: 10 })([
@@ -125,7 +132,7 @@ const PortraitEditor = ({ widget, items, onChange }) => {
 
     Card({ title: 'Preview (default images only)' })([
       div({ style: 'display:flex; justify-content:center' })([
-        _PreviewBox(widget, widget.layers || []),
+        _PreviewBox(widget, widget.layers || [], project),
       ]),
       p({ style: 'margin:8px 0 0; font-size:12px; color:var(--text-muted); text-align:center' })([
         'In-game, inventory bindings override the default per layer.',

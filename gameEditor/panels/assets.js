@@ -19,7 +19,7 @@ import { Button } from '../../src/components/Button.js';
 import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
-import { setProject, setState, toast } from '../store.js';
+import { setProject, setState, toast, putAssetBlob, dropAssetBlob, IDB_MARKER } from '../store.js';
 import { confirmAction } from '../components/ConfirmDialog.js';
 import { emptyAsset } from '../schema.js';
 import { onText } from '../helpers.js';
@@ -73,6 +73,17 @@ const _processUpload = async (file, project) => {
 
 const _addAssetsFromFiles = async (files, project) => {
   const processed = await Promise.all([...files].map(f => _processUpload(f, project)));
+  // Push every blob to IDB BEFORE setProject. That way the synchronous strip
+  // in saveProject can replace each asset.data with a marker and localStorage
+  // never sees the raw bytes — which is the whole point: a multi-MB audio
+  // upload would have blown the localStorage quota otherwise.
+  try {
+    await Promise.all(processed.map(a => putAssetBlob(a.id, a.data)));
+  } catch (e) {
+    console.error('[assets] IDB save failed', e);
+    toast(`Asset save failed: ${e.message}`, 'error');
+    return;
+  }
   setProject(p => ({ ...p, assets: [...(p.assets || []), ...processed] }));
   toast(`Uploaded ${processed.length} asset${processed.length === 1 ? '' : 's'}.`);
 };
@@ -89,10 +100,12 @@ const _updateAsset = (id, patch) => setProject(p => ({
   assets: p.assets.map(a => a.id === id ? { ...a, ...patch } : a),
 }));
 
-const _deleteAsset = id => setProject(p => ({
-  ...p,
-  assets: p.assets.filter(a => a.id !== id),
-}));
+const _deleteAsset = id => {
+  // Best-effort blob purge — failure is non-fatal (orphan blobs are cheap
+  // and clearSlot will sweep them when the slot itself is removed).
+  dropAssetBlob(id).catch(e => console.warn('[assets] IDB delete failed', e));
+  setProject(p => ({ ...p, assets: p.assets.filter(a => a.id !== id) }));
+};
 
 const _setDefaults = patch => setProject(p => ({
   ...p,
@@ -101,6 +114,7 @@ const _setDefaults = patch => setProject(p => ({
 
 const _preview = asset => {
   const src = asset.data;
+  if (src === IDB_MARKER) return div({ style: 'width:96px; height:72px; border:1px dashed var(--border); border-radius:var(--radius); display:grid; place-items:center; color:var(--text-muted); font-size:11px' })(['(loading…)']);
   if (!src) return div({ style: 'width:96px; height:72px; border:1px dashed var(--border); border-radius:var(--radius); display:grid; place-items:center; color:var(--text-muted); font-size:11px' })(['(no data)']);
   if (asset.kind === 'image') {
     return img({ src, style: 'width:96px; height:72px; object-fit:contain; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface)' })([]);
@@ -146,7 +160,10 @@ const AssetCard = suggestions => asset => {
     ]),
     div({ style: 'display:flex; flex-direction:column; gap:6px' })([
       Button({ size: 'sm', variant: 'ghost', onClick: () => _pickFiles(ACCEPT_MIME[asset.kind] || '', files => {
-        _processUpload(files[0], { assetDefaults: { imageQuality: asset.quality ?? 0.8, imageMaxDim: asset.maxDim ?? 1080 } }).then(updated => {
+        _processUpload(files[0], { assetDefaults: { imageQuality: asset.quality ?? 0.8, imageMaxDim: asset.maxDim ?? 1080 } }).then(async updated => {
+          // Refresh the blob too — same asset id, just new bytes.
+          try { await putAssetBlob(asset.id, updated.data); }
+          catch (e) { console.error('[assets] IDB save failed', e); toast(`Save failed: ${e.message}`, 'error'); return; }
           _updateAsset(asset.id, { data: updated.data, mime: updated.mime, byteSize: updated.byteSize, quality: updated.quality, maxDim: updated.maxDim });
           toast(`Replaced ${asset.name || asset.id}.`);
         });

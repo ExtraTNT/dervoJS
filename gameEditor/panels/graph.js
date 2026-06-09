@@ -371,7 +371,7 @@ const GraphPanel = state => {
     rect({
       width: NODE_W, height: NODE_H, rx: 10,
       fill: 'var(--surface)',
-      stroke: n.isStart ? 'var(--accent)' : 'var(--border)',
+      stroke: n.isStart ? 'var(--clr-green-700)' : 'var(--border)',
       'stroke-width': n.isStart ? 2 : 1.2,
     })([]),
     text({
@@ -385,7 +385,7 @@ const GraphPanel = state => {
     ...(n.isStart
       ? [text({
           x: 8, y: 13, 'text-anchor': 'start',
-          style: 'font-size:9px; font-weight:700; fill:var(--accent); letter-spacing:.05em; pointer-events:none',
+          style: 'font-size:9px; font-weight:700; fill:var(--clr-green-700); letter-spacing:.05em; pointer-events:none',
         })(['START'])]
       : []),
     ...(n.kind === 'wardrobe' || n.kind === 'inventory'
@@ -474,7 +474,7 @@ const GraphPanel = state => {
 
     Card({ title: 'Legend' })([
       div({ style: 'display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px 16px; font-size:13px; color:var(--text-muted)' })([
-        div({})([Badge({ variant: 'green' })(['start']), span({ style: 'margin-left:6px' })(['accent-bordered start room'])]),
+        div({})([Badge({ variant: 'green' })(['start']), span({ style: 'margin-left:6px' })(['start room'])]),
         div({})([Badge({ variant: 'blue'  })(['room → room']), span({ style: 'margin-left:6px' })(['choice exit (curved)'])]),
         div({})([span({ style: 'color:var(--text-subtle); font-weight:600' })(['◯ NPC']), span({ style: 'margin-left:6px' })(['NPC (dashed = roams to other rooms)'])]),
         div({})([span({ style: 'color:var(--danger); font-weight:600' })(['⬢ Combat']), span({ style: 'margin-left:6px' })(['encounter'])]),

@@ -22,7 +22,10 @@ let _handle  = null;   // { destroy } returned by game.mount
 
 const _close = () => {
   if (_handle && typeof _handle.destroy === 'function') {
-    try { _handle.destroy(); } catch (_) {}
+    try { _handle.destroy(); }
+    catch (err) {
+      console.warn('unable to destroy old handler: ', err);
+    }
   }
   _handle = null;
   if (_overlay && _overlay.parentNode) _overlay.parentNode.removeChild(_overlay);
@@ -54,6 +57,7 @@ const _play = project => {
   bar.innerHTML = `
     <span style="font-size:13px; color:var(--text-muted)">Previewing: <b style="color:var(--text)">${cfg.title}</b></span>
     <div style="flex:1"></div>
+    <span style="font-size:13px; color:var(--text-muted)">Scroll is not a bug in your game, but a result of this top bar.</span>
     <button id="gef-restart" style="padding:6px 12px; border:1px solid var(--border); border-radius:var(--radius); background:none; cursor:pointer; color:var(--text); font-size:13px">↻ Restart</button>
     <button id="gef-close"   style="padding:6px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--accent); color:#fff; cursor:pointer; font-size:13px">x Close preview</button>
   `;

@@ -118,7 +118,10 @@ const resolveAssetRef = (project, ref) => {
   if (!isAssetRef(ref)) return ref;
   const id = refToId(ref);
   const a = (project?.assets || []).find(x => x.id === id);
-  return a?.data || '';
+  // Treat the IDB hydration marker (see assetBlobs.js) as "no data yet" so
+  // <img>/<audio> tags don't try to load the literal string `__idb__`.
+  if (!a?.data || a.data === '__idb__') return '';
+  return a.data;
 };
 
 // Same shape, but returns an empty array of *all* refs in a project for the

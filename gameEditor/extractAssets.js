@@ -183,7 +183,14 @@ const extractAssets = project => {
 
 const resolveAssetsForPreview = project => {
   if (!project) return project;
-  const byId = Object.fromEntries((project.assets || []).map(a => [a.id, a.data || '']));
+  // Skip IDB-hydration markers (__idb__) — they're not real data URLs and
+  // would render as broken <img>/<audio>/<video>. Empty string here means
+  // "show placeholder / play nothing" until hydration completes and a
+  // fresh resolveAssetsForPreview pass picks up the real bytes.
+  const byId = Object.fromEntries((project.assets || []).map(a => {
+    const d = a.data || '';
+    return [a.id, d === '__idb__' ? '' : d];
+  }));
   const walk = val => {
     if (!val) return val;
     if (isAssetRef(val)) return byId[refToId(val)] || '';

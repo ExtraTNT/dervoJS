@@ -1693,6 +1693,22 @@ const buildGameConfig = rawProject => {
   // they left off. To force a reset every talk, set idx to 0 below via an
   // npcResetOnTalk effect — left as a v2 polish.
 
+  // Background music resolver — picks the active room's `music` field, with
+  // fall-back to `meta.defaultMusic`. Asset refs are already resolved by
+  // resolveAssetsForPreview upstream so `room.music` is a usable URL string
+  // here. Dialogue scenes (`_dialogue:<npcId>:<returnTo>`) use the calling
+  // room's track so the music doesn't cut out the moment the player talks
+  // to an NPC; combat scenes (`_combat:<id>`) read `state._combat.returnTo`.
+  const _defaultMusic = project.meta.defaultMusic || '';
+  const _musicByRoom = Object.fromEntries(project.rooms.map(r => [r.id, r.music || '']));
+  const music = ctx => {
+    let id = ctx.scene;
+    if (typeof id === 'string' && id.startsWith('_combat:')) id = ctx.state._combat?.returnTo || id;
+    // _dialogue:* is already collapsed to the returnTo by game.js (it patches
+    // ctx.scene), so no special-case here.
+    return _musicByRoom[id] || _defaultMusic;
+  };
+
   const sb = project.sidebar || { enabled: false, widgets: [] };
   return {
     title:   project.meta.title || 'Untitled RPG',
@@ -1700,6 +1716,7 @@ const buildGameConfig = rawProject => {
     state:   initial,
     scenes,
     npcs,
+    music,
     sidebar: sb.enabled && sb.widgets.length ? _renderSidebar(project) : undefined,
     debug:   true,   // floating State Debugger / RenderProfiler / ListenersDebugger panel in the preview
   };

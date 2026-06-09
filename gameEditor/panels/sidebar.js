@@ -174,6 +174,7 @@ const WidgetCard = (widget, project) =>
       ...(widget.type === 'portrait'  ? [PortraitEditor({
             widget,
             items:    project.items,
+            project,
             onChange: next => _setWidget(widget.id, () => next),
           })] : []),
     ]),

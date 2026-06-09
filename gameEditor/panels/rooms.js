@@ -200,6 +200,7 @@ const WardrobeRoomEditor = ({ room, project, onChange }) => {
         PortraitEditor({
           widget:   { layers: wb.layers || [], width: wb.portraitWidth, height: wb.portraitHeight },
           items:    project.items,
+          project,
           onChange: next => onChange({
             ...wb,
             layers:         next.layers,
