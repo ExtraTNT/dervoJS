@@ -340,7 +340,16 @@ const createGame = ({
       // Kick the initial bgm track AFTER the first paint so the audio
       // element lands on the body alongside the rendered scene.
       _updateBgm();
-      return result;
+      const originalDestroy = result?.destroy;
+      return {
+        ...result,
+        destroy: () => {
+          _teardownBgm();
+          if (typeof originalDestroy === 'function') {
+            try { originalDestroy(); } catch (_) {}
+          }
+        },
+      };
     },
     store, getState, setState,
     goto, back, restart,

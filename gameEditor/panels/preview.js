@@ -140,9 +140,6 @@ const PreviewPanel = state => {
           'JS-mode conditions and effects evaluate inside ', span({ style: 'font-family:ui-monospace,monospace' })(['Function(\'c\', body)']), '. ',
           'The exported source from the Export tab uses the same semantics but as static JS.',
         ]),
-        p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
-          'Tip: open the editor in two tabs to edit in one and re-Play in the other.',
-        ]),
       ]),
     ]),
   ]);
