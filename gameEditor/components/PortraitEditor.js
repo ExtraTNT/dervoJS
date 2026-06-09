@@ -121,7 +121,6 @@ const PortraitEditor = ({ widget, items, project, onChange }) => {
 
   const dragItems = (widget.layers || []).map(l => ({ ...l, id: l.id }));
 
-  console.log(widget);
   return Stack({ gap: 12 })([
     Card({ title: 'Portrait size' })([
       Grid({ cols: 2, gap: 10 })([
