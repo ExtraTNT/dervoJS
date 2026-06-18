@@ -1,5 +1,5 @@
 /**
- * Page 4 — 4x4 grid of focusable cards (left) + scrollable picks log (right).
+ * Page 4 - 4x4 grid of focusable cards (left) + scrollable picks log (right).
  */
 
 import { div, p, Card, FocusGrid } from '../../src/index.js';

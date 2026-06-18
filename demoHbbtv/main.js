@@ -5,7 +5,7 @@
  *   bus    →  focus manager  (arrows / OK / BACK)
  *   bus    →  activation dispatcher (tab/subtab/row/cell ids → state)
  *   bus    →  router  (numeric + colour-button shortcuts, except colours
- *                       that conflict with games — see router.js)
+ *                       that conflict with games - see router.js)
  *   bus    →  onKeyCombo '991' → toggle the floating profiler
  *
  * The profiler itself is the standard dervoJS combo of FloatingPanel +
@@ -58,7 +58,7 @@ bus.on('activated', ({ id }) => {
 //   debug combo: 9-9-1 within 1s toggles the floating profiler 
 onKeyCombo(bus, '991', toggleProfiler);
 
-//   direct-jump shortcuts (colour buttons only — numerics intentionally off) 
+//   direct-jump shortcuts (colour buttons only - numerics intentionally off) 
 wireRouter(bus, fm);
 
 //   initial focus: the active tab 

@@ -1,5 +1,5 @@
 /**
- * Graph panel — SVG overview of rooms, NPCs, and combats.
+ * Graph panel - SVG overview of rooms, NPCs, and combats.
  *
  * Three node families with consistent visual language:
  *   - Rooms   : rectangles, room→room arrows for choice exits
@@ -15,7 +15,7 @@
  * Visual rules:
  *   - Every colour resolves to a CSS variable (--success, --warning, --danger,
  *     --accent, --text, --text-muted, --border) so light/dark themes "just work"
- *   - Edges attach to the node's BORDER, not its centre — arrow tips land on
+ *   - Edges attach to the node's BORDER, not its centre - arrow tips land on
  *     the rectangle edge, not buried inside the shape
  *   - Curves bow toward the inter-row axis so parallel edges don't overlap
  */
@@ -44,13 +44,13 @@ const NODE_H = 60;
 const COL_GAP = 110;
 const ROW_GAP = 200;
 
-const NPC_W = 124;
+const NPC_W = 132;
 const NPC_H = 34;
 
 const COMBAT_W = 132;
 const COMBAT_H = 40;
 
-// ─── Media detection — curried per source ─────────────────────────────────
+// ─── Media detection - curried per source ─────────────────────────────────
 
 const _hasMedia = ref => typeof ref === 'string' && ref.length > 0;
 
@@ -90,7 +90,7 @@ const _combatMedia = c => {
   return flags;
 };
 
-// Media badges — coloured pill with letter, anchored bottom-right of a node.
+// Media badges - coloured pill with letter, anchored bottom-right of a node.
 // All three colours are theme tokens (info/purple/success) so dark mode works.
 const _mediaBadges = flags => baseX => baseY => {
   const items = [];
@@ -114,10 +114,16 @@ const _mediaBadges = flags => baseX => baseY => {
 
 // ─── Layout: BFS from start room, row-major fill ─────────────────────────
 
+// Rooms with `kind:'story'` or the opt-out `hideOnMap` flag never render on
+// the graph - story rooms are narrative-only scenes that the player can't
+// walk to, and the flag lets authors hide hub / dream / void rooms too.
+const _isMapped = r => r && r.kind !== 'story' && !r.hideOnMap;
+
 const _layout = project => {
-  const startId = project.meta.start || project.rooms[0]?.id;
-  const byId    = Object.fromEntries(project.rooms.map(r => [r.id, r]));
-  const queue   = startId && byId[startId] ? [startId] : [];
+  const mapped  = project.rooms.filter(_isMapped);
+  const byId    = Object.fromEntries(mapped.map(r => [r.id, r]));
+  const startId = byId[project.meta.start] ? project.meta.start : mapped[0]?.id;
+  const queue   = startId ? [startId] : [];
   const seen    = new Set(queue);
   const order   = [];
   while (queue.length) {
@@ -130,7 +136,9 @@ const _layout = project => {
       }
     }
   }
-  for (const r of project.rooms) if (!seen.has(r.id)) order.push(r.id);
+  // Mapped orphans still appear (just unconnected), so the author can spot
+  // rooms that became unreachable. Story / hideOnMap rooms stay out entirely.
+  for (const r of mapped) if (!seen.has(r.id)) order.push(r.id);
 
   const cols = Math.min(4, Math.max(1, order.length));
   return order.map((id, i) => ({
@@ -203,7 +211,7 @@ const _edgePath = from => to => {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const len = Math.max(1, Math.hypot(dx, dy));
-  // Perpendicular offset for the control point — small for short edges, larger
+  // Perpendicular offset for the control point - small for short edges, larger
   // for long edges so the bow is always visible without crossing through nodes.
   const bow = Math.min(64, len * 0.18);
   const mx = (start.x + end.x) / 2;
@@ -235,27 +243,45 @@ const GraphPanel = state => {
   const nodes = _layout(project);
   const byId  = Object.fromEntries(nodes.map(n => [n.id, n]));
 
-  // NPC nodes anchored under their first location.
-  const npcNodes = [];
+  // NPC nodes anchored under their first location. NPCs sharing an anchor
+  // wrap into a small grid (NPCS_PER_ROW columns) instead of stretching
+  // horizontally forever - without this, 4+ NPCs on one room would bleed
+  // across the next column's rooms and overlap their NPCs.
+  const NPCS_PER_ROW   = 2;
+  const NPC_COL_STEP   = NPC_W + 14;
+  const NPC_ROW_STEP   = NPC_H + 10;
+  const npcNodes       = [];
+  const npcCountByAnchor = {};
   for (const n of project.npcs || []) {
     if (n.locations.length === 0) continue;
     const first = byId[n.locations[0]];
     if (!first) continue;
-    const sibs = npcNodes.filter(x => x.anchor === first.id).length;
+    const idx = npcCountByAnchor[first.id] || 0;
+    npcCountByAnchor[first.id] = idx + 1;
+    const col = idx % NPCS_PER_ROW;
+    const row = Math.floor(idx / NPCS_PER_ROW);
     npcNodes.push({
       id:     n.id,
       name:   n.name || n.id,
       role:   n.role,
       media:  _npcMedia(n),
       anchor: first.id,
-      x:      first.x + sibs * (NPC_W + 14),
-      y:      first.y + NODE_H + 28,
+      x:      first.x + col * NPC_COL_STEP,
+      y:      first.y + NODE_H + 28 + row * NPC_ROW_STEP,
       w:      NPC_W, h: NPC_H,
       locs:   n.locations,
     });
   }
+  // Per-anchor NPC row count so combats land below the WHOLE NPC stack,
+  // not just one row's worth.
+  const npcRowsByAnchor = {};
+  for (const aid of Object.keys(npcCountByAnchor)) {
+    npcRowsByAnchor[aid] = Math.ceil(npcCountByAnchor[aid] / NPCS_PER_ROW);
+  }
 
-  // Combat nodes — anchored under the first trigger room.
+  // Combat nodes - anchored under the first trigger room, BELOW any NPCs
+  // already piled under that room (so multi-NPC rooms don't paint combats
+  // on top of their cast).
   const triggers           = _findCombatTriggers(project);
   const triggersByCombat   = {};
   for (const t of triggers) (triggersByCombat[t.combatId] ||= []).push(t);
@@ -268,14 +294,20 @@ const GraphPanel = state => {
       : (byId[project.meta.start || project.rooms[0]?.id]);
     if (!anchorRoom) continue;
     const sameAnchor = combatNodes.filter(c => c.anchor === anchorRoom.id).length;
+    const npcRowsHere = npcRowsByAnchor[anchorRoom.id] || 0;
+    // Same horizontal-then-wrap policy as NPCs, so combats don't bleed into
+    // neighbour columns either.
+    const combatCol = sameAnchor % 2;
+    const combatRow = Math.floor(sameAnchor / 2);
     combatNodes.push({
       id:        cb.id,
       name:      cb.name || cb.id,
       enemyName: cb.enemy?.name || '',
       anchor:    anchorRoom.id,
       media:     _combatMedia(cb),
-      x:         anchorRoom.x + 14 + sameAnchor * (COMBAT_W + 24),
-      y:         anchorRoom.y + NODE_H + 28 + NPC_H + 22,
+      x:         anchorRoom.x + 14 + combatCol * (COMBAT_W + 24),
+      y:         anchorRoom.y + NODE_H + 28 + (npcRowsHere * NPC_ROW_STEP) + 12
+                 + combatRow * (COMBAT_H + 14),
       w:         COMBAT_W, h: COMBAT_H,
       winRoom:   cb.winRoom  || null,
       loseRoom:  cb.loseRoom || null,
@@ -315,15 +347,19 @@ const GraphPanel = state => {
     if (cn.loseRoom && byId[cn.loseRoom]) combatOutcomeEdges.push({ kind: 'lose', from: cn, to: byId[cn.loseRoom] });
   }
 
-  // Canvas size.
-  const cols   = Math.min(4, nodes.length);
-  const rows   = Math.ceil(nodes.length / cols);
-  const width  = cols * (NODE_W + COL_GAP) + 30;
-  const height = rows * (NODE_H + ROW_GAP) + 140;
+  // Canvas size - derived from the actual extents of every drawn node so
+  // NPCs / combats that overflow past their anchor room still get viewport
+  // space. Without this, rooms in the rightmost column with many NPCs would
+  // get clipped off the right edge of the SVG.
+  const _maxRight  = (m, n) => Math.max(m, n.x + (n.w || NODE_W));
+  const _maxBottom = (m, n) => Math.max(m, n.y + (n.h || NODE_H));
+  const allDrawn   = [...nodes, ...npcNodes, ...combatNodes];
+  const width      = allDrawn.reduce(_maxRight,  0) + 30;
+  const height     = allDrawn.reduce(_maxBottom, 0) + 60;
 
   // ─── Render ──────────────────────────────────────────────────────────
 
-  // Arrow markers — each tied to a CSS variable so themes can recolour at will.
+  // Arrow markers - each tied to a CSS variable so themes can recolour at will.
   const _arrowMarker = id => fill => marker({
     id, viewBox: '0 0 10 10', refX: 9, refY: 5,
     markerWidth: 8, markerHeight: 8, orient: 'auto-start-reverse',

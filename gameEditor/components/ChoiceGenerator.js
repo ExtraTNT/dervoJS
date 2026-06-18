@@ -1,5 +1,5 @@
 /**
- * ChoiceGenerator — modal that maps over a list and produces N choices.
+ * ChoiceGenerator - modal that maps over a list and produces N choices.
  *
  * Pick a source (items / npcs / rooms / flags / skills / combats / custom list),
  * an optional filter, a label template with placeholders, a flow, and an Effect
@@ -7,8 +7,8 @@
  * and appends the resulting Choices to the calling topic's choice list.
  *
  * Two parts:
- *   - `generateChoices` — PURE function: form → project → bindings → Choice[]
- *   - `ChoiceGenerator` — modal component, reads its form state from
+ *   - `generateChoices` - PURE function: form → project → bindings → Choice[]
+ *   - `ChoiceGenerator` - modal component, reads its form state from
  *      state.generator (kept in the store so it survives re-renders).
  *
  * Curried throughout; no multi-arg helpers.
@@ -52,7 +52,7 @@ const _bindingsFromSkills = project => () => (project.skills || [])
 const _bindingsFromCombats = project => () => (project.combats || [])
   .map(c => ({ name: c.name || c.id, id: c.id, value: c.name || c.id }));
 
-// Custom list — parsed from a comma-separated string. Each `v` becomes a
+// Custom list - parsed from a comma-separated string. Each `v` becomes a
 // binding where {name}, {id}, and {value} all bind to v.
 const _bindingsFromCustom = raw => () => String(raw || '')
   .split(',')
@@ -187,7 +187,7 @@ const _buildChoice = form => binding => {
 };
 
 // Per-page builder for the reply topic. Text is templated; image is the
-// statically picked asset ref/URL from the AssetInput — used as-is so the
+// statically picked asset ref/URL from the AssetInput - used as-is so the
 // catalogue preview the user saw maps to what the player gets.
 const _buildReplyPage = binding => pg => ({
   ...emptyPage(),
@@ -196,7 +196,7 @@ const _buildReplyPage = binding => pg => ({
   advanceLabel: pg.advanceLabel || 'More',
 });
 
-// Dialogue mode — one binding → { topic, choice }. The new topic holds the
+// Dialogue mode - one binding → { topic, choice }. The new topic holds the
 // reply pages and an auto Back button; the choice points to the new topic via
 // flow:'change'. Drop both into the NPC at apply time.
 const _buildDialoguePair = form => binding => {
@@ -249,7 +249,7 @@ const _pageOf = text => [{ text, image: '', advanceLabel: 'More' }];
 
 const _defaultsForSource = source => {
   switch (source) {
-    case 'items':   return { filter: 'consumable', labelTemplate: 'Take {name}',    flow: 'stay',       targetTemplate: '',     effectMode: 'simple', opTarget: 'inv.{id}',    opKind: 'give',   opValue: '1', topicNameTemplate: 'About {name}', pages: _pageOf('{name} — a fine choice.') };
+    case 'items':   return { filter: 'consumable', labelTemplate: 'Take {name}',    flow: 'stay',       targetTemplate: '',     effectMode: 'simple', opTarget: 'inv.{id}',    opKind: 'give',   opValue: '1', topicNameTemplate: 'About {name}', pages: _pageOf('{name} - a fine choice.') };
     case 'npcs':    return { filter: '*',          labelTemplate: 'Talk to {name}', flow: 'stay',       targetTemplate: '',     effectMode: 'js',     jsBody:   'c.talkTo("{id}", c.scene);', topicNameTemplate: 'About {name}', pages: _pageOf('Yeah, {name} is nice.') };
     case 'rooms':   return { filter: '*',          labelTemplate: 'Go to {name}',   flow: 'exitRoom',   targetTemplate: '{id}', effectMode: 'none',                          topicNameTemplate: 'About {name}', pages: _pageOf('{name} is just down the road.') };
     case 'flags':   return { filter: '',           labelTemplate: 'Toggle {id}',    flow: 'stay',       targetTemplate: '',     effectMode: 'simple', opTarget: 'flags.{id}',  opKind: 'toggle', opValue: '',  topicNameTemplate: 'About {id}',   pages: _pageOf('') };
@@ -273,7 +273,7 @@ const emptyGeneratorForm = () => ({
   opKind:         'give',
   opValue:        '1',
   jsBody:         '',
-  // Dialogue-mode fields — pages: [{ text, image, advanceLabel? }]
+  // Dialogue-mode fields - pages: [{ text, image, advanceLabel? }]
   topicNameTemplate: 'About {name}',
   pages:             [{ text: 'Yeah, {name} is nice.', image: '', advanceLabel: 'More' }],
   backLabel:         'Back',
@@ -282,7 +282,7 @@ const emptyGeneratorForm = () => ({
   excludeIds:        '',
   limit:             '',
   conditionJs:       '',
-  ignoreSelf:        true,        // npcs source only — auto-omit the speaking NPC
+  ignoreSelf:        true,        // npcs source only - auto-omit the speaking NPC
 });
 
 // ─── Editor wiring ─────────────────────────────────────────────────────
@@ -389,13 +389,13 @@ const OP_KIND_OPTS = [
 ];
 
 const EFFECT_MODE_OPTS = [
-  { value: 'none',   label: 'none — no effect, just nav' },
+  { value: 'none',   label: 'none - no effect, just nav' },
   { value: 'simple', label: 'simple op (target/op/value)' },
   { value: 'js',     label: 'JS body'                     },
 ];
 
 const _placeholdersHint = source => source === 'custom'
-  ? 'Placeholders: {value} (or {name} / {id} — all bound to the same string).'
+  ? 'Placeholders: {value} (or {name} / {id} - all bound to the same string).'
   : 'Placeholders: {name}, {id}.';
 
 // Preview is computed per mode: choices mode → just labels; dialogues mode →
@@ -433,7 +433,7 @@ const _preview = form => project => form.mode === 'dialogues'
   ? _previewDialoguesMode(form)(project)
   : _previewChoicesMode(form)(project);
 
-// Form field rendering — broken into per-section helpers so the JSX is flat.
+// Form field rendering - broken into per-section helpers so the JSX is flat.
 const _sourceFields = form => {
   const opts = _filterOptions(form.source);
   return Stack({ gap: 8 })([
@@ -461,7 +461,7 @@ const _sourceFields = form => {
           placeholder: '1, 2, 3, 4',
         })]
       : []),
-    // Ignore-self shortcut. Only meaningful for the NPCs source — keeps Mara
+    // Ignore-self shortcut. Only meaningful for the NPCs source - keeps Mara
     // from getting a "Talk about Mara" choice on her own topics.
     ...(form.source === 'npcs'
       ? [Toggle({
@@ -524,7 +524,7 @@ const _effectFields = form => Stack({ gap: 8 })([
 ]);
 
 // One reply-page row: compact TextInput + AssetInput + a Delete button.
-// `pages` is the full array and `index` is this row's position — we lift the
+// `pages` is the full array and `index` is this row's position - we lift the
 // onChange of the full array up so the parent owns immutability.
 const _replyPageRow = ({ pages, index }) => {
   const page = pages[index];
@@ -574,7 +574,7 @@ const _dialogueFields = form => {
     }),
     div({})([
       span({ style: 'font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px' })([
-        `Reply pages (${pages.length}) — advances via "More"; final page leads to the Back button`,
+        `Reply pages (${pages.length}) - advances via "More"; final page leads to the Back button`,
       ]),
       Stack({ gap: 6 })([
         ...pages.map((_, i) => _replyPageRow({ pages, index: i })),
@@ -593,7 +593,7 @@ const _dialogueFields = form => {
   ]);
 };
 
-// Advanced filters — apply on top of source/filter to narrow the list.
+// Advanced filters - apply on top of source/filter to narrow the list.
 const _advancedFields = form => Stack({ gap: 8 })([
   p({ style: 'margin:0; font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600' })(['Advanced']),
   Grid({ cols: 3, gap: 8 })([
@@ -633,7 +633,7 @@ const ChoiceGenerator = state => {
   const topic     = npc && (npc.topics || []).find(t => t.id === gen.topicId);
   const heading   = (npc && topic) ? `${npc.name || npc.id} · ${topic.name || topic.id}` : 'Topic';
 
-  // Count for the Generate button — drives disable + label.
+  // Count for the Generate button - drives disable + label.
   const count = gen.mode === 'dialogues'
     ? generateDialogues(gen)(project).choices.length
     : generateChoices(gen)(project).length;

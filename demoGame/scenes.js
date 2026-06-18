@@ -2,7 +2,7 @@
  * Scenes for the demo game. Composes engine helpers (Scene, Choice,
  * NpcChoices, NpcLine, withTick) and pre-built widgets (Inventory, Shop).
  *
- * Combat lives in combat.js — its scene id is 'combat'.
+ * Combat lives in combat.js - its scene id is 'combat'.
  */
 
 import {
@@ -107,7 +107,7 @@ export const scenes = {
   forestPath: ctx => Scene({
     title: 'Forest Path',
     body: [
-      p({})(['Sun-dappled leaves overhead. Birds — and other things — chatter in the canopy.']),
+      p({})(['Sun-dappled leaves overhead. Birds - and other things - chatter in the canopy.']),
       ...NpcLine(ctx),
       ...(!ctx.state.flags.caveKey ? [p({})(['Something glints between the roots of an old oak…'])] : []),
     ],
@@ -132,7 +132,7 @@ export const scenes = {
     body: [
       p({})(['The river roars beneath rotted planks.']),
       ctx.state.flags.bridgeOpen
-        ? Alert({ variant: 'success' })(['The bridge is yours to cross — the troll is gone.'])
+        ? Alert({ variant: 'success' })(['The bridge is yours to cross - the troll is gone.'])
         : Alert({ variant: 'warning' })(['A massive troll bars the way, club in hand.']),
     ],
     choices: [
@@ -178,7 +178,7 @@ export const scenes = {
       title: 'Dark Cave',
       body: [
         p({})(['Calm air. Whatever lived here is gone.']),
-        Badge({ variant: 'green' })(['Boss slain — you may walk freely.']),
+        Badge({ variant: 'green' })(['Boss slain - you may walk freely.']),
       ],
       choices: [{ label: 'Back', to: 'hermitHut' }],
     })(ctx);
@@ -202,7 +202,7 @@ export const scenes = {
     })(ctx);
   },
 
-  // Pre-built scene shapes — one line each.
+  // Pre-built scene shapes - one line each.
   shop:     ctx => Shop({      ctx, items: ITEMS, returnTo: 'town' }),
   wardrobe: ctx => Inventory({ ctx, items: ITEMS, returnTo: 'town', slots: ['hat', 'shirt', 'pants', 'weapon'], title: 'Wardrobe' }),
 

@@ -1,12 +1,12 @@
 /**
- * dervoJS — HbbTV / TV-remote widgets.
+ * dervoJS - HbbTV / TV-remote widgets.
  *
  * *Unstyled*. Each component only contributes the markup the focus
  * manager needs (`data-focus` etc.) plus the minimum structural CSS the
  * widget needs to function (flex/grid direction, overflow when scrollable).
  * No padding, no borders, no background-colors, no focus halo by default.
  *
- * Visual treatment is the app's job — hook into the classnames each widget
+ * Visual treatment is the app's job - hook into the classnames each widget
  * stamps, or pass `style` / `activeStyle` as needed.
  *
  *   Class                  Applied to
@@ -36,7 +36,7 @@ import { div } from '../elements.js';
  * @param {string}  opts.id
  * @param {Object}  opts.focus              state.focus
  * @param {'x'|'y'|'xy'} [opts.scroll]      scrollable axis
- * @param {string}  [opts.row]              row strip this focusable belongs to —
+ * @param {string}  [opts.row]              row strip this focusable belongs to -
  *                                          LEFT/RIGHT navigation is confined to
  *                                          focusables in the same row (UP/DOWN
  *                                          still cross rows freely). Pass on
@@ -55,7 +55,7 @@ const Focusable = ({
 } = {}) => children => {
   const isFocused = focus?.id === id;
 
-  // Only the structural bits — no decoration.
+  // Only the structural bits - no decoration.
   const scrollStyle = scroll
     ? (scroll.includes('y') ? 'overflow-y:auto;' : '')
     + (scroll.includes('x') ? 'overflow-x:auto;' : '')
@@ -175,7 +175,7 @@ const FocusScroll = ({
 // TabBar
 
 /**
- * Horizontal strip of focusable tabs. No styling — hook .tab / .tab-active
+ * Horizontal strip of focusable tabs. No styling - hook .tab / .tab-active
  * (or pass `tabClassName` / `tabStyle`) to dress them.
  *
  * @param {Object} opts

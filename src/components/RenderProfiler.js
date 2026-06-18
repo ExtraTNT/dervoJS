@@ -57,7 +57,7 @@ const keysRow = e => {
     .concat(span({ className: 'rp-ops-lbl', style: 'margin-right:4px; flex-shrink:0' })(['changed keys']))
     .concat(keys.length > 0
       ? keys.map(k => Button({ className: 'rp-badge', onClick: () => console.log(k(snd)), toolTip: "click to log value" })([k(fst)]))
-      : [span({ style: 'color:var(--text-muted)' })(['—'])]
+      : [span({ style: 'color:var(--text-muted)' })(['-'])]
     )
   );
 };
@@ -90,7 +90,7 @@ const opsRow = e => {
     span({
       className: 'rp-ops-rate',
       title: `${total} DOM mutations out of ${visited} nodes visited` +
-             (skipped > 0 ? ` — ${skipped} memoized subtree(s) skipped (${skipPct}% of work avoided)` : ''),
+             (skipped > 0 ? ` - ${skipped} memoized subtree(s) skipped (${skipPct}% of work avoided)` : ''),
     })([`${rate}% mutation rate${skipped > 0 ? ` · ${skipPct}% skipped` : ''}`]),
   ]);
 };
@@ -102,17 +102,17 @@ const opsRow = e => {
  * e.g. when the debug panel is closed.
  *
  * @param {Object}   opts
- * @param {function} opts.setState  Store setState — used to force re-renders.
+ * @param {function} opts.setState  Store setState - used to force re-renders.
  *
  *  How to read the profiler 
  *
  * STAT CHIPS (top row)
- *   last   — total ms for the most recent frame.
- *   avg    — mean over the visible window (up to 50 frames).
- *   max    — worst frame recorded.
- *   p95    — 95th-percentile: 95 % of frames were at or below this value.
+ *   last   - total ms for the most recent frame.
+ *   avg    - mean over the visible window (up to 50 frames).
+ *   max    - worst frame recorded.
+ *   p95    - 95th-percentile: 95 % of frames were at or below this value.
  *            More useful than max for spotting systemic slowness vs one-off spikes.
- *   frames — how many frames are in the ring buffer (max 100).
+ *   frames - how many frames are in the ring buffer (max 100).
  *   Values shown in red are over the 16.67 ms budget (i.e. they caused a dropped frame).
  *
  * SPARKLINE BARS
@@ -120,59 +120,59 @@ const opsRow = e => {
  *   Red bars exceeded 16.67 ms. Click any bar to expand its detail below the chart.
  *
  * TIMING BREAKDOWN (expanded detail, top section)
- *   compute — time spent calling view(state) to produce the new vnode tree.
+ *   compute - time spent calling view(state) to produce the new vnode tree.
  *             High compute usually means expensive render logic (heavy map/filter,
  *             string building, etc.). The view function itself is the hotspot.
- *   patch   — time spent walking the old DOM and the new vnode tree together,
+ *   patch   - time spent walking the old DOM and the new vnode tree together,
  *             diffing and applying changes. High patch usually means a large tree
  *             or many DOM mutations. Check the ops counts below to diagnose.
  *
  * CHANGED KEYS (expanded detail, middle row)
  *   The state keys whose values were !== compared to the previous frame.
- *   "—" means no key changed, which happens on the initial render or on a
+ *   "-" means no key changed, which happens on the initial render or on a
  *   setState({}) force-refresh used to redraw the profiler itself.
  *   If you see a key changing every single frame, something is creating a new
  *   object/array on every setState even when the logical value is the same.
  *
  * DOM OPS (expanded detail, bottom row)
- *   visited    — how many times _patch() was entered during this frame. This
+ *   visited    - how many times _patch() was entered during this frame. This
  *                counts every node the reconciler LOOKED AT, not just ones it
  *                changed. It grows with tree depth x number of children. A
  *                steady high number here is expected and fine; it just means
  *                you have a large tree. It does NOT mean DOM was mutated.
  *
- *   skipped    — subtrees the reconciler short-circuited via the memo flag
+ *   skipped    - subtrees the reconciler short-circuited via the memo flag
  *                (props.memo + ===-stable vnode reference, usually produced
  *                by memoize() / memoLeaf() / memoComponent() + freeze()).
  *                Each skip avoids a full O(subtree-size) walk. High skipped
  *                with low visited = memoization is doing its job.
  *
- *   created    — new DOM nodes appended (appendChild). Happens when the new
+ *   created    - new DOM nodes appended (appendChild). Happens when the new
  *                vnode list is longer than the old DOM, or when a keyed node
  *                appears for the first time.
  *
- *   replaced   — existing DOM nodes swapped out (replaceChild). Happens when
+ *   replaced   - existing DOM nodes swapped out (replaceChild). Happens when
  *                the tag changes (e.g. div -> span), or when a text node is
  *                replaced by an element or vice-versa. Replacements are
  *                expensive because the old subtree is thrown away entirely.
  *                High replaces usually indicate keyed lists with mismatched
  *                or missing keys, or conditional rendering that switches tags.
  *
- *   removed    — DOM nodes deleted (removeChild). Happens when the new vnode
+ *   removed    - DOM nodes deleted (removeChild). Happens when the new vnode
  *                list is shorter than the old DOM, or when a keyed node
  *                disappears. Normal during list filtering.
  *
- *   moved      — existing DOM nodes repositioned (insertBefore on a node
+ *   moved      - existing DOM nodes repositioned (insertBefore on a node
  *                already in the tree). The key-based reconciler reorders keyed
  *                children with insertBefore rather than destroying them. High
  *                moves with low created/replaced = good: keying is working,
  *                DOM nodes are being reused, just repositioned.
  *
- *   propSets   — number of elements that went through prop-diffing. Every
+ *   propSets   - number of elements that went through prop-diffing. Every
  *                element with the same tag gets its props compared every frame.
  *                This is O(elements in tree), not O(changed props). Normal.
  *
- *   textEdits  — text node nodeValue changes. Each one is a direct DOM write.
+ *   textEdits  - text node nodeValue changes. Each one is a direct DOM write.
  *                High textEdits = many interpolated strings in your view
  *                changing each frame. Usually fine, but worth noting alongside
  *                patch time.
@@ -208,7 +208,7 @@ const RenderProfiler = ({ setState = () => {}, active = true } = {}) => {
   // auto-detach: if the frame counter hasn't advanced since last render,
   //   we're still alive; if it HAS advanced but we weren't called, we won't
   //   reach here anyway. Track the frame we last ran at so that calling
-  //   disableProfiler from the FloatingPanel onClose is enough — but also
+  //   disableProfiler from the FloatingPanel onClose is enough - but also
   //   register our "I'm alive" stamp so cleanup is possible from outside.
   _ui.lastSeenFrame = getProfilerFrame();
 
@@ -279,7 +279,7 @@ const RenderProfiler = ({ setState = () => {}, active = true } = {}) => {
     expanded
       ? div({ className: 'rp-chart-detail' })([
           span({ className: 'rp-cd-frame', style: 'font-size:11px; color:var(--text-muted); display:block; margin-bottom:6px' })([
-            `#${expanded.frame}  ${expanded.ts}  —  total ${fmt(expanded.totalMs)}ms`,
+            `#${expanded.frame}  ${expanded.ts}  -  total ${fmt(expanded.totalMs)}ms`,
           ]),
           frameDetail(expanded),
         ])

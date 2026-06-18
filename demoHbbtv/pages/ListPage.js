@@ -1,5 +1,5 @@
 /**
- * Page 3 — long scrollable list (left) + scrollable picks log (right).
+ * Page 3 - long scrollable list (left) + scrollable picks log (right).
  * Both sides reachable via spatial nav from the tab bar above.
  */
 
@@ -16,7 +16,7 @@ const _twoUp = 'display:grid; grid-template-columns:1fr 1fr; gap:14px; min-heigh
 export const ListPage = state =>
   div({ style: _twoUp })([
     Card({ title: 'Scrollable list' })([
-      // Plain scroll container — individual rows are focusable, the
+      // Plain scroll container - individual rows are focusable, the
       // manager keeps the focused row visible via scrollIntoView.
       div({ style: 'max-height:420px; overflow-y:auto; padding:6px; border:1px solid var(--border); border-radius:8px' })([
         FocusList({

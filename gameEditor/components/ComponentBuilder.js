@@ -1,10 +1,10 @@
 /**
- * ComponentBuilder — additive wizards that scaffold common scene-NPC-item
+ * ComponentBuilder - additive wizards that scaffold common scene-NPC-item
  * combinations into the CURRENT project (no slot switch).
  *
  * Topbar "Add component" opens a floating panel. The panel has two states:
- *   - chooser (componentBuilder.activeId === null) — grid of available builders
- *   - wizard  (componentBuilder.activeId === '<id>') — that builder's MultiStep
+ *   - chooser (componentBuilder.activeId === null) - grid of available builders
+ *   - wizard  (componentBuilder.activeId === '<id>') - that builder's MultiStep
  *
  * Each builder lives in components/builders/<id>.js and exports
  *   { id, icon, name, description, defaults(project), steps[], build(project, values) }
@@ -23,8 +23,11 @@ import { setState, setProject, toast, getState } from '../store.js';
 import { questGiver } from './builders/questGiver.js';
 import { lockedDoor } from './builders/lockedDoor.js';
 import { tavern }     from './builders/tavern.js';
+import { randomNpcs } from './builders/randomNpcs.js';
+import { mapBuilder } from './builders/mapBuilder.js';
+import { crafting }   from './builders/crafting.js';
 
-const BUILDERS = [questGiver, lockedDoor, tavern];
+const BUILDERS = [mapBuilder, questGiver, lockedDoor, tavern, crafting, randomNpcs];
 const _byId    = id => BUILDERS.find(b => b.id === id);
 
 // ── store wiring ─────────────────────────────────────────────────────────────
@@ -76,7 +79,7 @@ const _ChooserCard = b => button({
 
 const _Chooser = () => Stack({ gap: 12 })([
   p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
-    'Pick a component to scaffold into the current project. Each one is a small MultiStep wizard and lands additively — your existing rooms / NPCs / items stay put.',
+    'Pick a component to scaffold into the current project. Each one is a small MultiStep wizard and lands additively - your existing rooms / NPCs / items stay put.',
   ]),
   div({ style: 'display:flex; flex-direction:column; gap:10px' })(BUILDERS.map(_ChooserCard)),
 ]);
@@ -123,7 +126,7 @@ const _Wizard = (builder, idx, values) => {
       onDone:   _onDone(builder),
       // Render the validator's error message inline so the user sees WHY the
       // Prev/Next click was blocked. Validation already runs every render via
-      // checkValidation() inside MultiStep — this just unhides the message.
+      // checkValidation() inside MultiStep - this just unhides the message.
       showValidation: true,
     })([]),
   ]);
@@ -139,7 +142,7 @@ const ComponentBuilder = state => {
     id:       'gef-componentbuilder',
     title:    builder
       ? `${builder.icon || '🧩'} ${builder.name}`
-      : 'Add component — pick a scaffold to drop in',
+      : 'Add component - pick a scaffold to drop in',
     open:     true,
     onClose:  _close,
     initialX: 140,

@@ -1,13 +1,13 @@
 /**
- * Page 1 — visual mirror of the remote.
+ * Page 1 - visual mirror of the remote.
  *
  * Has two sub-pages selected via a sub-tab bar (TabBar with idPrefix='subtab-'):
  *
- *   pad    — visual pads + key buffer
- *   codes  — keycode debugging table (raw event vs decoded name)
+ *   pad    - visual pads + key buffer
+ *   codes  - keycode debugging table (raw event vs decoded name)
  *
  * Sub-tab activation is dispatched by main.js via the 'activated' bus
- * event — the prefix tells the dispatcher which slice of state to update.
+ * event - the prefix tells the dispatcher which slice of state to update.
  */
 
 import { div, Card, TabBar }                   from '../../src/index.js';
@@ -44,7 +44,7 @@ export const RemotePage = state => {
   const sub  = state.subPages?.remote || 'pad';
   const view = SUB_VIEWS[sub] || _padView;
   return div({ style: 'display:flex; flex-direction:column; gap:8px; min-height:0' })([
-    // row:'subnav' isolates LEFT/RIGHT to sub-tabs — UP still reaches the
+    // row:'subnav' isolates LEFT/RIGHT to sub-tabs - UP still reaches the
     // top tabs (row='nav'), DOWN still reaches the content area.
     TabBar({
       tabs:    SUB_TABS,

@@ -1,17 +1,17 @@
 /**
- * QuickBuilder — wizard that scaffolds a base project from a few inputs.
+ * QuickBuilder - wizard that scaffolds a base project from a few inputs.
  *
  * Opens from the topbar (New from template). Four MultiStep stages:
- *   1. Meta          — title + intro line
- *   2. Stats         — player stats (key + initial), pre-seeded with hp / gold
- *   3. Items         — list of item NAMES (ids derived from names)
- *   4. Review        — slot name + summary, Finish creates the project
+ *   1. Meta          - title + intro line
+ *   2. Stats         - player stats (key + initial), pre-seeded with hp / gold
+ *   3. Items         - list of item NAMES (ids derived from names)
+ *   4. Review        - slot name + summary, Finish creates the project
  *
  * The built project has:
- *   - intro    (start scene room — story introduction → "Begin" → home)
- *   - home     (scene room — choices to wardrobe and shop)
- *   - wardrobe (wardrobe room — "Back home")
- *   - shop     (scene room — "Back home", hosts the shopkeeper NPC)
+ *   - intro    (start scene room - story introduction → "Begin" → home)
+ *   - home     (scene room - choices to wardrobe and shop)
+ *   - wardrobe (wardrobe room - "Back home")
+ *   - shop     (scene room - "Back home", hosts the shopkeeper NPC)
  *   - shopkeeper NPC (role:'shop', locations:['shop'], stock = all items)
  *
  * Curried where possible; pure builder so it can be unit-tested independently.
@@ -72,7 +72,7 @@ const defaultValues = () => ({
 const buildBaseProject = (raw) => {
   const v = { ...defaultValues(), ...(raw || {}) };
 
-  // Items — id derived from name, deduped against itself.
+  // Items - id derived from name, deduped against itself.
   const itemIds = new Set();
   const items = (v.items || [])
     .map(it => (it && it.name ? it.name.trim() : ''))
@@ -88,7 +88,7 @@ const buildBaseProject = (raw) => {
       return it;
     });
 
-  // Stats — sanitise keys, drop empties, ensure unique. Always keep at least hp.
+  // Stats - sanitise keys, drop empties, ensure unique. Always keep at least hp.
   const statKeys = new Set();
   const stats = (v.stats || [])
     .map(s => ({
@@ -139,7 +139,7 @@ const buildBaseProject = (raw) => {
   shopBack.to    = 'home';
   shop.choices = [shopBack];
 
-  // Inventory room — paper-doll's plain counterpart. Reached via the sidebar
+  // Inventory room - paper-doll's plain counterpart. Reached via the sidebar
   // 🎒 Bag roomLink so the player can open it from anywhere; the "Back"
   // choice pops c.history so it returns to wherever they came from (shop,
   // wardrobe, home, …). Falls back to home if history is somehow empty.
@@ -162,7 +162,7 @@ const buildBaseProject = (raw) => {
   keeper.name      = 'Shopkeeper';
   keeper.role      = 'shop';
   keeper.locations = ['shop'];
-  keeper.greeting  = 'Welcome. Have a look — best prices in town.';
+  keeper.greeting  = 'Welcome. Have a look - best prices in town.';
   keeper.shop = {
     stock: items.map(it => ({ ...emptyShopEntry(it.id), price: null, quantity: null })),
   };
@@ -230,7 +230,7 @@ const _StepStats = ({ values, setValue }) => {
   const stats = values.stats || [];
   return Stack({ gap: 10 })([
     p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
-      'Player stats. Each becomes ', span({ style: 'font-family:ui-monospace,monospace' })(['state.<key>']),
+      'Player stats. Each becomes ', span({ className: 'dv-mono' })(['state.<key>']),
       ' at runtime. Keys are auto-sanitised (lowercase, _).',
     ]),
     ...stats.map((s, i) =>
@@ -262,7 +262,7 @@ const _StepItems = ({ values, setValue }) => {
   const items = values.items || [];
   return Stack({ gap: 10 })([
     p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
-      'Name each item — that\'s all you need. The wizard derives ids and stocks the shopkeeper with the full list at 10 gold each. Tune kinds, prices, and per-item details later in the Items tab.',
+      'Name each item - that\'s all you need. The wizard derives ids and stocks the shopkeeper with the full list at 10 gold each. Tune kinds, prices, and per-item details later in the Items tab.',
     ]),
     ...items.map((it, i) =>
       div({ style: 'display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:end' })([
@@ -287,7 +287,7 @@ const _StepReview = ({ values, setValue }) => {
   const suggestedSlot = values.slotName || _slug(values.title) || `template_${Date.now().toString(36).slice(-4)}`;
   return Stack({ gap: 12 })([
     p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
-      'Pick a slot name. The new project will be created as a fresh slot — your current project stays untouched.',
+      'Pick a slot name. The new project will be created as a fresh slot - your current project stays untouched.',
     ]),
     TextInput({
       label:       'Slot name',
@@ -300,7 +300,7 @@ const _StepReview = ({ values, setValue }) => {
         div({})(['Title: ', span({ style: 'font-weight:600' })([values.title || '(unset)'])]),
         div({})([`Stats: ${statCount} (hp / gold guaranteed)`]),
         div({})([`Items: ${itemCount}`]),
-        div({})(['Rooms: ', span({ style: 'font-family:ui-monospace,monospace' })(['intro · home · wardrobe · shop · inventory'])]),
+        div({})(['Rooms: ', span({ className: 'dv-mono' })(['intro · home · wardrobe · shop · inventory'])]),
         div({})(['NPCs: 1 shopkeeper (stocks every item)']),
         div({})(['Sidebar: title · stats · inventory · 🎒 Bag button → inventory room']),
       ]),
@@ -355,7 +355,7 @@ const QuickBuilder = state => {
   };
   const _validateItems = v => {
     const rows = (v.items || []).filter(i => i.name && i.name.trim());
-    if (rows.length === 0) return 'Add at least one item — the shop needs something to stock.';
+    if (rows.length === 0) return 'Add at least one item - the shop needs something to stock.';
     return null;
   };
   const steps = [
@@ -367,7 +367,7 @@ const QuickBuilder = state => {
 
   return [FloatingPanel({
     id:       'gef-quickbuilder',
-    title:    'Quick Builder — scaffold a base project',
+    title:    'Quick Builder - scaffold a base project',
     open:     true,
     onClose:  _close,
     initialX: 120,

@@ -4,18 +4,18 @@ import { doc } from '../components/doc.js';
 
 export const pageLayoutDemoPanel = state =>
   div({})([
-    Card({ title: 'PageLayout — you\'re looking at it' })([
+    Card({ title: 'PageLayout - you\'re looking at it' })([
       p({ style: 'margin-top:0; font-size:13px; color:var(--text-muted)' })([
         'The entire demo is rendered inside a ',
         strong({})(['PageLayout']),
-        ' — top bar, toggleable sidebar, scrollable main area, and footer. ',
+        ' - top bar, toggleable sidebar, scrollable main area, and footer. ',
         'Toggle the sidebar with ☰ up top.',
       ]),
       div({ style: 'margin-top:16px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; font-size:12px; color:var(--text-muted)' })([
         div({ style: 'padding:8px; text-align:center; background:var(--surface); border-bottom:1px solid var(--border)' })(['topBar (sticky)']),
         div({ style: 'display:flex; min-height:72px' })([
           div({ style: 'width:100px; padding:8px 4px; text-align:center; border-right:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center' })(['sidebar\n(toggleable)']),
-          div({ style: 'flex:1; padding:8px; text-align:center; background:var(--bg); display:flex; align-items:center; justify-content:center' })(['main — flex:1, overflow-y:auto']),
+          div({ style: 'flex:1; padding:8px; text-align:center; background:var(--bg); display:flex; align-items:center; justify-content:center' })(['main - flex:1, overflow-y:auto']),
           div({ style: 'width:100px; padding:8px 4px; text-align:center; border-left:1px solid var(--border); background:var(--surface-2); display:flex; align-items:center; justify-content:center' })(['rightBar\n(optional)']),
         ]),
         div({ style: 'padding:8px; text-align:center; background:var(--surface-2); border-top:1px solid var(--border)' })(['footer']),

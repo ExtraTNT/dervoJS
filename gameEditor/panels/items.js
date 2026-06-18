@@ -1,5 +1,5 @@
 /**
- * Items panel — catalogue of items. Two columns: list on the left, editor on
+ * Items panel - catalogue of items. Two columns: list on the left, editor on
  * the right. Items are referenced from NPC shops and from Choice
  * conditions/effects (hasItem, give/take).
  */
@@ -12,10 +12,10 @@ import { Button } from '../../src/components/Button.js';
 import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
-import { setProject, setState } from '../store.js';
+import { setProject, setState, updateById } from '../store.js';
 import { confirmAction } from '../components/ConfirmDialog.js';
 import { emptyItem } from '../schema.js';
-import { onText } from '../helpers.js';
+import { onText, projectVars, updateAt, removeAt, swapAt } from '../helpers.js';
 import { EffectEditor } from '../components/EffectEditor.js';
 import { AssetInput }   from '../components/AssetInput.js';
 import { FolderedList, FolderField, folderSuggestions } from '../components/FolderedList.js';
@@ -28,20 +28,9 @@ const KIND_OPTS = [
   { value: 'key',        label: 'Key item'      },
 ];
 
-const _vars = project => ({
-  stats:   project.stats.map(s => s.key).filter(Boolean),
-  flags:   project.flags.map(f => f.key).filter(Boolean),
-  items:   project.items,
-  skills:  project.skills || [],
-  npcs:    project.npcs   || [],
-  rooms:   project.rooms,
-  combats: project.combats || [],
-});
+const _vars = projectVars;
 
-const _updateItem = (id, patch) => setProject(p => ({
-  ...p,
-  items: p.items.map(it => it.id === id ? { ...it, ...patch } : it),
-}));
+const _updateItem = updateById('items');
 
 const _addItem = () => setProject(p => {
   const it = emptyItem();
@@ -70,7 +59,7 @@ const ItemRow = (it, selectedId) =>
   ]);
 
 const ItemEditor = (item, project) => {
-  const set = patch => _updateItem(item.id, patch);
+  const set = _updateItem(item.id);
   return Stack({ gap: 14 })([
     Card({ title: 'Item' })([
       Stack({ gap: 10 })([
@@ -110,7 +99,7 @@ const ItemEditor = (item, project) => {
         Grid({ cols: 2, gap: 10 })([
           Select({
             label:    'Default price · currency stat',
-            options:  [{ value: '', label: '— pick stat —' }, ...project.stats.map(s => ({ value: s.key, label: s.key }))],
+            options:  [{ value: '', label: '- pick stat -' }, ...project.stats.filter(s => (s.type || 'number') === 'number').map(s => ({ value: s.key, label: s.key }))],
             value:    item.price?.stat || 'gold',
             onChange: onText(v => set({ price: { ...(item.price || {}), stat: v || 'gold', amount: Number(item.price?.amount) || 0 } })),
           }),
@@ -146,7 +135,7 @@ const ItemEditor = (item, project) => {
     ...(item.kind === 'consumable'
       ? [Card({ title: 'On use (consumable)' })([
           Stack({ gap: 8 })([
-            p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
+            p({ className: 'gef-hint' })([
               'Fires when the player clicks Use in an inventory room. The item is decremented by 1 automatically; you don\'t need to add an inv.take op.',
             ]),
             EffectEditor({
@@ -163,8 +152,8 @@ const ItemEditor = (item, project) => {
     ...(item.kind === 'readable'
       ? [Card({ title: 'Reading content' })([
           Stack({ gap: 8 })([
-            p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
-              'Shown when the player clicks Read in an inventory room. Plain text — line breaks preserved. ',
+            p({ className: 'gef-hint' })([
+              'Shown when the player clicks Read in an inventory room. Plain text - line breaks preserved. ',
               'For multi-page books just split into paragraphs; the reader is one scrollable view.',
             ]),
             textarea({
@@ -188,9 +177,9 @@ const ItemEditor = (item, project) => {
               onChange:    onText(v => set({ equipSlot: v.replace(/[^a-zA-Z0-9_]/g, '_') })),
               placeholder: 'weapon · armor · head · ring',
             }),
-            p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
+            p({ className: 'gef-hint' })([
               'Equipping replaces whatever was in this slot. Lives at ',
-              span({ style: 'font-family:ui-monospace,monospace' })(['state.equipped[slot] = itemId']),
+              span({ className: 'dv-mono' })(['state.equipped[slot] = itemId']),
               '. Portrait layer bindings see equipped items first, then anything else in inventory.',
             ]),
           ]),
@@ -198,8 +187,8 @@ const ItemEditor = (item, project) => {
       : []),
 
     Card({ title: 'Usage' })([
-      p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
-        'Reference this item from any Choice Action — pick "Item" as the target, then "give" or "take". ',
+      p({ className: 'gef-hint gef-hint-13' })([
+        'Reference this item from any Choice Action - pick "Item" as the target, then "give" or "take". ',
         'NPCs with role "shop" can sell it from their stock. Inventory rooms surface Use / Read / Equip buttons based on kind.',
       ]),
     ]),

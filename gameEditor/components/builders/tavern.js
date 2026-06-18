@@ -1,14 +1,14 @@
 /**
- * tavern builder — scaffolds:
+ * tavern builder - scaffolds:
  *   - A scene room (the tavern).
  *   - A simple-mode dialogue NPC (barkeep) located in the tavern with one
  *     Choice per service:
- *       Rest    — pay N currency → refill chosen stats (clamped to a "max"
+ *       Rest    - pay N currency → refill chosen stats (clamped to a "max"
  *                 stat each, e.g. hp → maxHp; per-op clamp from the new
  *                 EffectEditor).
- *       Drinks  — pay N currency → +/- some stat. One choice per drink.
- *       Cure    — (optional healer mode) pay N currency → clear a flag.
- *       Goodbye — exit.
+ *       Drinks  - pay N currency → +/- some stat. One choice per drink.
+ *       Cure    - (optional healer mode) pay N currency → clear a flag.
+ *       Goodbye - exit.
  *   - Optional Choice on a connecting room to reach the tavern.
  *
  * Stats that can be "filled to a max stat" are auto-detected (any pair where
@@ -29,10 +29,11 @@ import {
   emptyNpc, emptyChoice, emptyPage, emptyEffect, emptyCondition, emptyRoom, emptyTopic,
   _rid,
 } from '../../schema.js';
-import { slug, uniqueId, ensureFlag, idsOf, flagKeys } from './_helpers.js';
+import { slug, uniqueId, ensureFlag, idsOf, flagKeys } from '../../helpers.js';
 
 const defaults = project => {
-  const statKeys = project.stats.map(s => s.key);
+  // Tavern spends/refills currency and stat amounts - numeric stats only.
+  const statKeys = project.stats.filter(s => (s.type || 'number') === 'number').map(s => s.key);
   const currency = statKeys.includes('gold') ? 'gold' : (statKeys[0] || '');
   // Pre-seed a rest entry for every (hp, maxHp)-like pair we can spot.
   // Falls back to a single hp row if maxHp isn't there.
@@ -56,7 +57,7 @@ const defaults = project => {
 };
 
 const _restRow = (values, setValue, project, i) => {
-  const statOpts = [{ value: '', label: '— pick stat —' }, ...project.stats.map(s => ({ value: s.key, label: s.key }))];
+  const statOpts = [{ value: '', label: '- pick stat -' }, ...project.stats.filter(s => (s.type || 'number') === 'number').map(s => ({ value: s.key, label: s.key }))];
   const row = values.restRows[i];
   const patchRow = patch => setValue('restRows', values.restRows.map((r, k) => k === i ? { ...r, ...patch } : r));
   const removeRow = () => setValue('restRows', values.restRows.filter((_, k) => k !== i));
@@ -69,7 +70,7 @@ const _restRow = (values, setValue, project, i) => {
     }),
     Select({
       label: i === 0 ? 'Capped to (optional)' : '',
-      options: [{ value: '', label: '(no cap)' }, ...project.stats.map(s => ({ value: s.key, label: s.key }))],
+      options: [{ value: '', label: '(no cap)' }, ...project.stats.filter(s => (s.type || 'number') === 'number').map(s => ({ value: s.key, label: s.key }))],
       value: row.maxStat || '',
       onChange: onText(v => patchRow({ maxStat: v })),
     }),
@@ -80,7 +81,7 @@ const _restRow = (values, setValue, project, i) => {
 };
 
 const _drinkRow = (values, setValue, project, i) => {
-  const statOpts = [{ value: '', label: '— pick stat —' }, ...project.stats.map(s => ({ value: s.key, label: s.key }))];
+  const statOpts = [{ value: '', label: '- pick stat -' }, ...project.stats.filter(s => (s.type || 'number') === 'number').map(s => ({ value: s.key, label: s.key }))];
   const row = values.drinks[i];
   const patchRow = patch => setValue('drinks', values.drinks.map((r, k) => k === i ? { ...r, ...patch } : r));
   const removeRow = () => setValue('drinks', values.drinks.filter((_, k) => k !== i));
@@ -116,7 +117,7 @@ const _drinkRow = (values, setValue, project, i) => {
 };
 
 const _cureRow = (values, setValue, project, i) => {
-  const flagOpts = [{ value: '', label: '— pick flag —' }, ...project.flags.map(f => ({ value: f.key, label: f.key }))];
+  const flagOpts = [{ value: '', label: '- pick flag -' }, ...project.flags.map(f => ({ value: f.key, label: f.key }))];
   const row = values.cures[i];
   const patchRow = patch => setValue('cures', values.cures.map((r, k) => k === i ? { ...r, ...patch } : r));
   const removeRow = () => setValue('cures', values.cures.filter((_, k) => k !== i));
@@ -207,7 +208,7 @@ const steps = [
         ]),
         Select({
           label: 'Add an entry choice on…',
-          options: [{ value: '', label: '— none (wire manually later) —' }, ...rooms.map(r => ({ value: r.id, label: r.title || r.id }))],
+          options: [{ value: '', label: '- none (wire manually later) -' }, ...rooms.map(r => ({ value: r.id, label: r.title || r.id }))],
           value: values.connectFrom || '',
           onChange: onText(v => setValue('connectFrom', v)),
         }),
@@ -221,16 +222,19 @@ const steps = [
       p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
         'Resting pays ', span({ style: 'font-weight:600' })([`${values.restCost} ${values.currencyStat || '?'}`]),
         ' and tops up each stat below. The "capped to" stat applies a runtime ',
-        span({ style: 'font-family:ui-monospace,monospace' })(['max']),
-        ' clamp (', span({ style: 'font-family:ui-monospace,monospace' })(['mul=1, statKey=maxX']),
+        span({ className: 'dv-mono' })(['max']),
+        ' clamp (', span({ className: 'dv-mono' })(['mul=1, statKey=maxX']),
         ') so it never overshoots.',
       ]),
       Grid({ cols: 2, gap: 8 })([
         Select({
           label: 'Currency stat',
-          options: project.stats.length
-            ? project.stats.map(s => ({ value: s.key, label: s.key }))
-            : [{ value: '', label: '(no stats yet)' }],
+          options: (() => {
+            const numStats = project.stats.filter(s => (s.type || 'number') === 'number');
+            return numStats.length
+              ? numStats.map(s => ({ value: s.key, label: s.key }))
+              : [{ value: '', label: '(no numeric stats yet)' }];
+          })(),
           value: values.currencyStat || '',
           onChange: onText(v => setValue('currencyStat', v)),
         }),
@@ -254,7 +258,7 @@ const steps = [
     validate: _validateDrinks,
     render: ({ values, setValue, project }) => Stack({ gap: 10 })([
       p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
-        'Each drink is one Choice on the barkeep — pays the cost in the same currency, bumps a stat by the listed amount. Use negative amounts for debuffs.',
+        'Each drink is one Choice on the barkeep - pays the cost in the same currency, bumps a stat by the listed amount. Use negative amounts for debuffs.',
       ]),
       ...(values.drinks || []).map((_, i) => _drinkRow(values, setValue, project, i)),
       Button({
@@ -327,7 +331,7 @@ const _flagOp = (key, value) => ({
   max: { enabled: false, statKey: '', mul: 0, const: 0 },
 });
 
-// Helpers below produce `flow: 'stay'` topic choices — clicking fires the
+// Helpers below produce `flow: 'stay'` topic choices - clicking fires the
 // effect and re-renders the SAME topic, so the player can keep ordering /
 // resting without leaving the NPC. Goodbye uses `flow: 'exitBack'` to return
 // to the tavern room.
@@ -419,7 +423,7 @@ const build = (project, values) => {
     action: {
       ...emptyEffect(),
       mode: 'js',
-      // Pop history when there is any (the common case — player walked in
+      // Pop history when there is any (the common case - player walked in
       // from somewhere). Fall back to the connecting room if specified, else
       // just stay put rather than crash.
       body: values.connectFrom
@@ -436,7 +440,7 @@ const build = (project, values) => {
   };
   next = { ...next, rooms: [...next.rooms, tavern] };
 
-  // ── 2. Barkeep NPC — advanced-mode dialogue with a single "menu" topic
+  // ── 2. Barkeep NPC - advanced-mode dialogue with a single "menu" topic
   // whose choices use flow:'stay' so the player can keep ordering after each
   // action. Goodbye uses flow:'exitBack' to return to the tavern room. ──
   const currency = values.currencyStat || 'gold';

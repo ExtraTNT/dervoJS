@@ -1,7 +1,7 @@
 import { div, h3 } from '../elements.js';
 
 /**
- * Card component — bordered surface with optional header and footer.
+ * Card component - bordered surface with optional header and footer.
  *
  * @param {Object}  opts
  * @param {string}  [opts.title]         - Optional title rendered in the card header.

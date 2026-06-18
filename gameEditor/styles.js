@@ -1,7 +1,7 @@
 /**
- * Editor-specific styles. Layered on top of the library's initStyles().
- * Stick to dervo's CSS custom properties (--accent, --border, --surface,
- * --text, --text-muted, --radius) so theme switching works.
+ * Editor-specific CSS, layered on top of initStyles(). Uses dervo CSS
+ * variables (--accent, --border, --surface, --text, --text-muted,
+ * --radius) so theme switching works.
  */
 
 const CSS = `
@@ -23,9 +23,7 @@ const CSS = `
   .gef-list-btn .gef-id { color: var(--text-muted); font-family: ui-monospace,monospace; font-size:11px; margin-left:auto; }
   .gef-list-btn.active .gef-id { color: rgba(255,255,255,.75); }
 
-  /* Folder-grouped lists (rooms / npcs / items / stories / assets). The header
-     is a button toggle; collapsed folders just omit the body below. Heading
-     stays muted so the underlying list buttons keep visual primacy. */
+  /* Folder-grouped lists. Header doubles as a collapse toggle. */
   .gef-folder-header        { transition: color .12s ease, background .12s ease; border-radius: var(--radius); }
   .gef-folder-header:hover  { background: var(--surface-2); color: var(--text); }
   .gef-folder-header:focus  { outline: none; }
@@ -70,7 +68,7 @@ const CSS = `
   }
   .gef-toast-error { background: var(--danger); color: #fff; }
 
-  /* Graph — styling now lives in panels/graph.js per-element so light/dark and
+  /* Graph - styling now lives in panels/graph.js per-element so light/dark and
      theme overrides apply directly via CSS custom properties. The CSS here is
      just the SVG canvas chrome + hover state on the selected room. */
   .gef-graph svg { display:block; background: var(--bg); border-radius:var(--radius); border:1px solid var(--border); }
@@ -99,12 +97,16 @@ const CSS = `
   }
   .gef-file-tab.active { background: var(--accent); color:#fff; border-color: var(--accent); }
 
-  /* NumberInput inside the editor — keep the library's natural size (matching
-     the demo) instead of letting the grid cell stretch it. Without this, the
-     wrap defaults to inline-flex but grid's justify-self:stretch overrides
-     that. width:max-content pins it; max-width:100% caps overflow in narrow
-     cells; align-self:end keeps it baseline-aligned with neighbouring fields. */
+  /* Pin NumberInput to its natural width inside Grid cells. width:max-content
+     beats Grid's justify-self:stretch; align-self:end aligns with siblings. */
   .gef-root .number-input-wrap { width:max-content; max-width:100%; align-self:end; }
+
+  /* Editor utility classes. dv-mono and dv-muted live in dervo.css. */
+  .gef-kbd-label { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600; }
+  .gef-hint      { margin:0; font-size:12px; color:var(--text-muted); }
+  .gef-hint-13   { font-size:13px; }
+  .gef-surface-card { border:1px solid var(--border); border-radius:var(--radius); padding:10px; background:var(--surface); }
+  .gef-row-end   { display:flex; align-items:flex-end; }
 `;
 
 const initEditorStyles = () => {

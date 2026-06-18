@@ -85,8 +85,8 @@ const _mouth = pct =>
 //  the character 
 
 /**
- * @param {Object} equipped  { hat, shirt, pants, weapon } — item ids or null
- * @param {Object} [stats]   { HP, maxHP } — drives expression / colour
+ * @param {Object} equipped  { hat, shirt, pants, weapon } - item ids or null
+ * @param {Object} [stats]   { HP, maxHP } - drives expression / colour
  */
 export const Character = (equipped, stats = {}) => {
   const hat    = ITEMS[equipped.hat];

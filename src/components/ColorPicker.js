@@ -9,7 +9,7 @@ const DEFAULT_SWATCHES = [
 ];
 
 /**
- * ColorPicker — hex input + native color wheel + swatch palette.
+ * ColorPicker - hex input + native color wheel + swatch palette.
  *
  * @param {Object}    opts
  * @param {string}    [opts.id]

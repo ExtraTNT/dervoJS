@@ -1,5 +1,5 @@
 /**
- * Demo state. Pure data — anything that talks to HbbTV or DOM lives elsewhere.
+ * Demo state. Pure data - anything that talks to HbbTV or DOM lives elsewhere.
  * Components read state; the bus -> store wiring in main.js writes it.
  */
 
@@ -14,7 +14,7 @@ export const store = createStore({
   buffer:       [],                    // [{ key, code, which, keyStr, ts }] newest first, cap 30
   events:       [],                    // [{ name, text, ts }] newest first, cap 24
   focus:        { id: null },          // managed by createFocusManager
-  picks:        [],                    // [{ from, item, ts }] — log for the demo pages
+  picks:        [],                    // [{ from, item, ts }] - log for the demo pages
   profilerOpen: false,                 // floating debug panel toggle (combo: 9-9-1)
 });
 
@@ -29,7 +29,7 @@ export const setSubPage    = (page, sub)           => setState(s => ({
 }));
 export const toggleProfiler = () => setState(s => ({ profilerOpen: !s.profilerOpen }));
 
-// Buffer now stores raw event fields too — for the keycode debugging table.
+// Buffer now stores raw event fields too - for the keycode debugging table.
 export const pushKey = (key, raw) => setState(s => ({
   lastKey: key,
   buffer:  [{

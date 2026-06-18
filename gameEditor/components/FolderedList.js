@@ -1,5 +1,5 @@
 /**
- * FolderedList — group a flat list of entities by their `folder` field and
+ * FolderedList - group a flat list of entities by their `folder` field and
  * render each group under a collapsible header.
  *
  * Curried so call sites read top-to-bottom:
@@ -11,7 +11,7 @@
  * group ('') pinned at the top under "(no folder)".
  *
  * Collapsed state lives in `state.collapsedFolders[panelKey] = { [folder]: true }`
- * — call sites pass the slice in via `collapsed`. Toggling writes via setState
+ * - call sites pass the slice in via `collapsed`. Toggling writes via setState
  * so it persists across re-renders.
  */
 
@@ -97,7 +97,7 @@ const folderSuggestions = items => {
 };
 
 // Free-form folder text input with a native datalist of folder names already
-// used elsewhere in the same entity list — gives the user one-tap autocomplete
+// used elsewhere in the same entity list - gives the user one-tap autocomplete
 // without forcing a "create folder" workflow.
 //
 //   FolderField({
@@ -135,8 +135,8 @@ const FolderField = ({ id, value = '', onChange, suggestions = [], placeholder =
 //
 // Entries with `folder: ''` stay as flat leading leaves so a small project
 // never sees the optgroup ceremony. Mix the result with a placeholder leaf
-// at the top (e.g. `{ value: '', label: '— pick room —' }`) just like before
-// — Select handles flat + grouped entries side-by-side.
+// at the top (e.g. `{ value: '', label: '- pick room -' }`) just like before
+// - Select handles flat + grouped entries side-by-side.
 const groupedOptions = items => toOption => {
   const groups = new Map();
   for (const it of items) {

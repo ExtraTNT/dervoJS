@@ -80,7 +80,7 @@ const groupCard = (group, effective, overrides) =>
 
 // Generate initStyles snippet 
 const makeSnippet = overrides => {
-  if (!Object.keys(overrides).length) return '// No changes yet — edit a token above first.';
+  if (!Object.keys(overrides).length) return '// No changes yet - edit a token above first.';
   const inner = Object.entries(overrides).map(([k, v]) => `    '${k}': '${v}',`).join('\n');
   return `initStyles({\n  colors: {\n${inner}\n  },\n});`;
 };
@@ -181,7 +181,7 @@ export const themePanel = state => {
 
     // Live preview card 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'Live Preview — all components react instantly' })([
+      Card({ title: 'Live Preview - all components react instantly' })([
         Stack({ gap: 20 })([
 
           // Buttons

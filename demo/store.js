@@ -58,7 +58,7 @@ export const store = createStore({
   tableColFilters: {},
   builtinFilter: '',
   docsFilter: '',
-  // drag-list demo — "keep / delete" review pattern
+  // drag-list demo - "keep / delete" review pattern
   dragKeep: [
     { id: 'dk1', label: 'Homepage redesign' },
     { id: 'dk2', label: 'Fix login bug' },
@@ -73,7 +73,7 @@ export const store = createStore({
   sliderC: 30,
   progress: 60,
   progressRunning: false,
-  // media panel — seed changes on every visit so images refresh
+  // media panel - seed changes on every visit so images refresh
   mediaSeed: Date.now(),
   // video stream state (getUserMedia)
   stream:      null,
@@ -118,7 +118,7 @@ export const store = createStore({
     zoneBPings:  0,
     showHelp:    false,
   },
-  // showcase — bus-driven live telemetry dashboard
+  // showcase - bus-driven live telemetry dashboard
   showcase: {
     feed:     [],       // [{ id, ts, type, msg }]  newest first, capped
     counters: { click: 0, login: 0, error: 0, metric: 0, message: 0 },
@@ -130,9 +130,9 @@ export const store = createStore({
     selected: null,     // hovered/selected type from the bar chart
     matrixN:    6,         // edge length of the n³ template grid (n*n*n cells)
     matrixHue:  'rainbow', // color theme for the grid
-    matrixMemo: true,      // memoize cells/planes/root — A/B against the raw pipeline
+    matrixMemo: true,      // memoize cells/planes/root - A/B against the raw pipeline
     matrixTick: 0,         // bumped to force a recompute when the user clicks "re-render"
-    sampling:   false,     // 1Hz rate sampler — off by default to keep the profiler clean
+    sampling:   false,     // 1Hz rate sampler - off by default to keep the profiler clean
   },
 });
 

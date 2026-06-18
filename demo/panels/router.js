@@ -59,7 +59,7 @@ export const routerPanel = state => {
             ]),
         ]),
     ]),
-    Card({ title: 'createRouter — hash mode with :param and wildcard' })([
+    Card({ title: 'createRouter - hash mode with :param and wildcard' })([
       p({ style: 'margin:0 0 12px; font-size:13px; color:var(--text-muted)' })([
         'Routes are matched in order. Named segments (',
         code({ style: 'font-family:monospace; font-size:12px; background:var(--surface-2); padding:1px 4px; border-radius:3px' })([':id']),

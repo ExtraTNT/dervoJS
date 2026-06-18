@@ -1,5 +1,5 @@
 /**
- * Skills panel — catalogue of skills the player can learn.
+ * Skills panel - catalogue of skills the player can learn.
  *
  * state.skills is an array of skill ids the player currently knows. Effects
  * give/take skills via `skills.<id>` ops (learn / forget). Combat scenes
@@ -15,7 +15,7 @@ import { Button } from '../../src/components/Button.js';
 import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
-import { setProject, setState } from '../store.js';
+import { setProject, setState, updateById } from '../store.js';
 import { confirmAction } from '../components/ConfirmDialog.js';
 import { emptySkill } from '../schema.js';
 import { onText } from '../helpers.js';
@@ -29,10 +29,7 @@ const KIND_OPTS = [
   { value: 'item',   label: 'Item-tied' },
 ];
 
-const _updateSkill = (id, patch) => setProject(p => ({
-  ...p,
-  skills: p.skills.map(s => s.id === id ? { ...s, ...patch } : s),
-}));
+const _updateSkill = updateById('skills');
 
 const _addSkill = () => setProject(p => ({ ...p, skills: [...p.skills, emptySkill()] }));
 
@@ -43,7 +40,7 @@ const _deleteSkill = id => setProject(p => ({
 }));
 
 const SkillEditor = (skill, project) => {
-  const set = patch => _updateSkill(skill.id, patch);
+  const set = _updateSkill(skill.id);
   return Stack({ gap: 14 })([
     Card({ title: 'Skill' })([
       Stack({ gap: 10 })([
@@ -89,7 +86,7 @@ const SkillEditor = (skill, project) => {
         Grid({ cols: 3, gap: 10 })([
           Select({
             label:    'Costs stat (optional)',
-            options:  [{ value: '', label: '— none —' }, ...project.stats.map(s => ({ value: s.key, label: s.key }))],
+            options:  [{ value: '', label: '- none -' }, ...project.stats.filter(s => (s.type || 'number') === 'number').map(s => ({ value: s.key, label: s.key }))],
             value:    skill.costStat || '',
             onChange: onText(v => set({ costStat: v })),
           }),
@@ -100,7 +97,7 @@ const SkillEditor = (skill, project) => {
           }),
           Select({
             label:    'Consumes item (optional)',
-            options:  [{ value: '', label: '— none —' }, ...groupedOptions(project.items)(it => ({ value: it.id, label: it.name || it.id }))],
+            options:  [{ value: '', label: '- none -' }, ...groupedOptions(project.items)(it => ({ value: it.id, label: it.name || it.id }))],
             value:    skill.costItem || '',
             onChange: onText(v => set({ costItem: v })),
           }),
@@ -108,7 +105,7 @@ const SkillEditor = (skill, project) => {
         Grid({ cols: 2, gap: 10 })([
           Select({
             label:    'Requires item (optional)',
-            options:  [{ value: '', label: '— none —' }, ...groupedOptions(project.items)(it => ({ value: it.id, label: it.name || it.id }))],
+            options:  [{ value: '', label: '- none -' }, ...groupedOptions(project.items)(it => ({ value: it.id, label: it.name || it.id }))],
             value:    skill.requireItem || '',
             onChange: onText(v => set({ requireItem: v })),
           }),
@@ -136,14 +133,14 @@ const SkillEditor = (skill, project) => {
 
     Card({ title: 'Damage scaling' })([
       Stack({ gap: 8 })([
-        p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
-          'Final damage = base + (state.', span({ style: 'font-family:ui-monospace,monospace' })(['stat']), ' x multiplier) + random(0..N). ',
+        p({ className: 'gef-hint' })([
+          'Final damage = base + (state.', span({ className: 'dv-mono' })(['stat']), ' x multiplier) + random(0..N). ',
           'Leave the stat blank for a flat damage. Random 0 disables variance.',
         ]),
         Grid({ cols: 3, gap: 10 })([
           Select({
             label:    'Scales with stat',
-            options:  [{ value: '', label: '— none —' }, ...project.stats.map(s => ({ value: s.key, label: s.key }))],
+            options:  [{ value: '', label: '- none -' }, ...project.stats.filter(s => (s.type || 'number') === 'number').map(s => ({ value: s.key, label: s.key }))],
             value:    skill.damageStat || '',
             onChange: onText(v => set({ damageStat: v })),
           }),
@@ -166,7 +163,7 @@ const SkillEditor = (skill, project) => {
           Grid({ cols: 3, gap: 10 })([
             Select({
               label:    'Heal scales with stat',
-              options:  [{ value: '', label: '— none —' }, ...project.stats.map(s => ({ value: s.key, label: s.key }))],
+              options:  [{ value: '', label: '- none -' }, ...project.stats.filter(s => (s.type || 'number') === 'number').map(s => ({ value: s.key, label: s.key }))],
               value:    skill.selfHealStat || '',
               onChange: onText(v => set({ selfHealStat: v })),
             }),
@@ -213,7 +210,7 @@ const SkillEditor = (skill, project) => {
           ? [Grid({ cols: 3, gap: 10 })([
               Select({
                 label:    'Roll adds stat',
-                options:  [{ value: '', label: '— d20 only —' }, ...project.stats.map(s => ({ value: s.key, label: s.key }))],
+                options:  [{ value: '', label: '- d20 only -' }, ...project.stats.filter(s => (s.type || 'number') === 'number').map(s => ({ value: s.key, label: s.key }))],
                 value:    skill.hitStat || '',
                 onChange: onText(v => set({ hitStat: v })),
               }),
@@ -231,10 +228,10 @@ const SkillEditor = (skill, project) => {
           : []),
         p({ style: 'margin:0; font-size:11.5px; color:var(--text-muted)' })([
           skill.hitMode === 'percent'
-            ? `Roll 1d100 — hits if ≤ ${skill.hitPercent || 100}.`
+            ? `Roll 1d100 - hits if ≤ ${skill.hitPercent || 100}.`
             : skill.hitMode === 'statRoll'
-              ? `Roll 1d20${skill.hitStat ? ` + state.${skill.hitStat}` : ''}${skill.hitBonus ? ` + ${skill.hitBonus}` : ''} — hits if ≥ (enemy.defense + ${skill.hitDc || 10}).`
-              : 'No roll — the skill always lands.',
+              ? `Roll 1d20${skill.hitStat ? ` + state.${skill.hitStat}` : ''}${skill.hitBonus ? ` + ${skill.hitBonus}` : ''} - hits if ≥ (enemy.defense + ${skill.hitDc || 10}).`
+              : 'No roll - the skill always lands.',
         ]),
       ]),
     ]),

@@ -1,5 +1,5 @@
 /**
- * Rooms panel — list of rooms on the left, RoomEditor on the right.
+ * Rooms panel - list of rooms on the left, RoomEditor on the right.
  *
  * Selecting a room sets store.selectedRoomId; deleting one clears the
  * selection. Each room edit goes through setProject so the dirty flag stays
@@ -14,10 +14,10 @@ import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
 import { Checkbox } from '../../src/components/Checkbox.js';
 import { Select } from '../../src/components/Select.js';
-import { setProject, setState } from '../store.js';
+import { setProject, setState, updateById } from '../store.js';
 import { confirmAction } from '../components/ConfirmDialog.js';
 import { emptyRoom, emptyWardrobeRoom, emptyInventoryRoom, emptyPage, emptyChoice } from '../schema.js';
-import { onText, onCheck } from '../helpers.js';
+import { onText, onCheck, projectVars, updateAt, removeAt, swapAt } from '../helpers.js';
 import { PageEditor }     from '../components/PageEditor.js';
 import { ChoiceEditor }   from '../components/ChoiceEditor.js';
 import { EffectEditor }    from '../components/EffectEditor.js';
@@ -27,20 +27,9 @@ import { AssetInput }      from '../components/AssetInput.js';
 import { FolderedList, FolderField, folderSuggestions, groupedOptions } from '../components/FolderedList.js';
 
 // helpers
-const _vars = project => ({
-  stats:   project.stats.map(s => s.key).filter(Boolean),
-  flags:   project.flags.map(f => f.key).filter(Boolean),
-  items:   project.items,
-  skills:  project.skills || [],
-  npcs:    project.npcs,
-  rooms:   project.rooms,
-  combats: project.combats || [],
-});
+const _vars = projectVars;
 
-const _updateRoom = (id, mut) => setProject(p => ({
-  ...p,
-  rooms: p.rooms.map(r => r.id === id ? (typeof mut === 'function' ? mut(r) : { ...r, ...mut }) : r),
-}));
+const _updateRoom = updateById('rooms');
 
 const _addRoom = () => setProject(p => {
   const room = emptyRoom();
@@ -59,7 +48,7 @@ const _addInventoryRoom = () => setProject(p => {
 
 const _deleteRoom = id => setProject(p => {
   const next = p.rooms.filter(r => r.id !== id);
-  // Sweep choices pointing at this room — null out their `to`.
+  // Sweep choices pointing at this room - null out their `to`.
   const sanitized = next.map(r => ({
     ...r,
     choices: r.choices.map(c => c.to === id ? { ...c, to: '' } : c),
@@ -95,7 +84,7 @@ const _roomRow = (project, selectedId) => r =>
   ]);
 
 const RoomList = (project, selectedId, collapsed = {}) => {
-  // Story rooms live in the Story Points tab — keep the world-map list clean.
+  // Story rooms live in the Story Points tab - keep the world-map list clean.
   const worldRooms = project.rooms.filter(r => r.kind !== 'story');
   return Stack({ gap: 4 })([
     h2({ style: 'font-size:14px; margin:0 0 4px' })([`Rooms (${worldRooms.length})`]),
@@ -125,7 +114,7 @@ const InventoryRoomEditor = ({ room, project, onChange }) => {
   });
   return Card({ title: 'Inventory room' })([
     Stack({ gap: 12 })([
-      p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
+      p({ className: 'gef-hint gef-hint-13' })([
         'Renders every item the player is carrying, optionally filtered by kind. ',
         'Pair with a roomLink in the sidebar (or a choice anywhere) so the player can pop in to manage things. ',
         'Add a Choice below for a "← Back" exit.',
@@ -178,7 +167,7 @@ const WardrobeRoomEditor = ({ room, project, onChange }) => {
 
   return Card({ title: 'Wardrobe' })([
     Stack({ gap: 12 })([
-      p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
+      p({ className: 'gef-hint gef-hint-13' })([
         'A drop-in template: paper-doll portrait + a list of what the player is currently carrying that matches the selected item kinds. ',
         'Add a Choice below to let the player leave (e.g. "← Back" with no condition / action).',
       ]),
@@ -216,38 +205,25 @@ const WardrobeRoomEditor = ({ room, project, onChange }) => {
 const RoomEditor = (room, project) => {
   const vars = _vars(project);
   const roomOpts = groupedOptions(project.rooms)(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}` }));
-  const set = patch => _updateRoom(room.id, patch);
+  const set = patch => _updateRoom(room.id)(patch);
 
-  const _setPage = (i, patch) => _updateRoom(room.id, r => ({
-    ...r,
-    pages: r.pages.map((p, k) => k === i ? { ...p, ...patch } : p),
-  }));
-  const _addPage = () => _updateRoom(room.id, r => ({ ...r, pages: [...r.pages, emptyPage()] }));
-  const _deletePage = i => _updateRoom(room.id, r => {
-    const next = r.pages.filter((_, k) => k !== i);
+  // Curried per-list patchers - pages get a backfill so the editor never
+  // deals with an empty list.
+  const _overList  = key => fn => _updateRoom(room.id)(r => ({ ...r, [key]: fn(r[key] || []) }));
+  const _overPages = fn  => _updateRoom(room.id)(r => {
+    const next = fn(r.pages || []);
     return { ...r, pages: next.length ? next : [emptyPage()] };
   });
-  const _movePage = (i, dir) => _updateRoom(room.id, r => {
-    const j = i + dir;
-    if (j < 0 || j >= r.pages.length) return r;
-    const pages = [...r.pages];
-    [pages[i], pages[j]] = [pages[j], pages[i]];
-    return { ...r, pages };
-  });
 
-  const _setChoice = (i, patch) => _updateRoom(room.id, r => ({
-    ...r,
-    choices: r.choices.map((c, k) => k === i ? (typeof patch === 'function' ? patch(c) : { ...c, ...patch }) : c),
-  }));
-  const _addChoice = () => _updateRoom(room.id, r => ({ ...r, choices: [...r.choices, emptyChoice()] }));
-  const _deleteChoice = i => _updateRoom(room.id, r => ({ ...r, choices: r.choices.filter((_, k) => k !== i) }));
-  const _moveChoice = (i, dir) => _updateRoom(room.id, r => {
-    const j = i + dir;
-    if (j < 0 || j >= r.choices.length) return r;
-    const choices = [...r.choices];
-    [choices[i], choices[j]] = [choices[j], choices[i]];
-    return { ...r, choices };
-  });
+  const _setPage    = i => patch => _overPages(updateAt(i)(patch));
+  const _addPage    = ()         => _overPages(pages => [...pages, emptyPage()]);
+  const _deletePage = i          => _overPages(removeAt(i));
+  const _movePage   = i => dir   => _overPages(swapAt(i)(dir));
+
+  const _setChoice    = i => patch => _overList('choices')(updateAt(i)(patch));
+  const _addChoice    = ()         => _overList('choices')(arr => [...arr, emptyChoice()]);
+  const _deleteChoice = i          => _overList('choices')(removeAt(i));
+  const _moveChoice   = i => dir   => _overList('choices')(swapAt(i)(dir));
 
   return Stack({ gap: 14 })([
     Card({ title: 'Room basics' })([
@@ -283,7 +259,7 @@ const RoomEditor = (room, project) => {
         ]),
         Grid({ cols: 3, gap: 10 })([
           AssetInput({
-            label:       'Background music (URL or upload — optional override)',
+            label:       'Background music (URL or upload - optional override)',
             value:       room.music,
             onChange:    v => set({ music: v }),
             accept:      'audio',
@@ -299,7 +275,7 @@ const RoomEditor = (room, project) => {
             value:    room.kind || 'scene',
             onChange: onText(v => set({ kind: v })),
           }),
-          div({ style: 'display:flex; align-items:flex-end' })([
+          div({ className: 'gef-row-end' })([
             Checkbox({
               id:       `start-${room.id}`,
               checked:  project.meta.start === room.id,
@@ -313,14 +289,19 @@ const RoomEditor = (room, project) => {
           onChange:    v => set({ folder: v }),
           suggestions: folderSuggestions(project.rooms.filter(r => r.kind !== 'story')),
         }),
+        Checkbox({
+          id:       `hideonmap-${room.id}`,
+          checked:  !!room.hideOnMap,
+          onChange: onCheck(c => set({ hideOnMap: !!c })),
+        })(['Hide from Graph tab + in-game minimap (story rooms are hidden automatically).']),
       ]),
     ]),
 
     Card({ title: 'On enter' })([
       Stack({ gap: 10 })([
-        p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
-          'Effect fires each time the player navigates into this room — but only if the gate below allows it. ',
-          'Useful for one-shot encounters: gate behind ', span({ style: 'font-family:ui-monospace,monospace' })(['flags.fought === false']),
+        p({ className: 'gef-hint' })([
+          'Effect fires each time the player navigates into this room - but only if the gate below allows it. ',
+          'Useful for one-shot encounters: gate behind ', span({ className: 'dv-mono' })(['flags.fought === false']),
           ', then set the flag inside the combat\'s onWin.',
         ]),
         ConditionEditor({
@@ -355,10 +336,10 @@ const RoomEditor = (room, project) => {
                 index:       i,
                 isLast:      i === room.pages.length - 1,
                 canDelete:   room.pages.length > 1,
-                onChange:    next => _setPage(i, next),
+                onChange:    _setPage(i),
                 onDelete:    () => _deletePage(i),
-                onMoveUp:    () => _movePage(i, -1),
-                onMoveDown:  () => _movePage(i,  1),
+                onMoveUp:    () => _movePage(i)(-1),
+                onMoveDown:  () => _movePage(i)(+1),
               })
             ),
             Button({ size: 'sm', variant: 'ghost', onClick: _addPage })(['+ Add page']),
@@ -368,7 +349,7 @@ const RoomEditor = (room, project) => {
     Card({ title: `Choices (${room.choices.length})` })([
       Stack({ gap: 4 })([
         ...(room.choices.length === 0
-          ? [div({ className: 'gef-empty' })(['No choices yet — the player will be stuck here. Add one below.'])]
+          ? [div({ className: 'gef-empty' })(['No choices yet - the player will be stuck here. Add one below.'])]
           : room.choices.map((c, i) =>
               ChoiceEditor({
                 choice:     c,
@@ -376,10 +357,10 @@ const RoomEditor = (room, project) => {
                 roomOpts,
                 isFirst:    i === 0,
                 isLast:     i === room.choices.length - 1,
-                onChange:   next => _setChoice(i, () => next),
+                onChange:   _setChoice(i),
                 onDelete:   () => _deleteChoice(i),
-                onMoveUp:   () => _moveChoice(i, -1),
-                onMoveDown: () => _moveChoice(i,  1),
+                onMoveUp:   () => _moveChoice(i)(-1),
+                onMoveDown: () => _moveChoice(i)(+1),
               })
             )),
         Button({ size: 'sm', variant: 'ghost', onClick: _addChoice })(['+ Add choice']),
@@ -403,7 +384,7 @@ const RoomEditor = (room, project) => {
 
 const RoomsPanel = state => {
   const { project, selectedRoomId } = state;
-  // Resolve to a non-story room — story-kind rooms live in their own tab.
+  // Resolve to a non-story room - story-kind rooms live in their own tab.
   const worldRooms = project.rooms.filter(r => r.kind !== 'story');
   const pickedById = worldRooms.find(r => r.id === selectedRoomId);
   const selected   = pickedById

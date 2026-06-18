@@ -1,5 +1,5 @@
 /**
- * dervoJS — theme & style system
+ * dervoJS - theme & style system
  *
  * Usage:
  *   import { initStyles } from './styles.js';

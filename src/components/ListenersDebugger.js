@@ -126,7 +126,7 @@ const ListenersDebugger = ({ setState } = {}) => {
       Col({ span: 7 })([
         Stack({ gap: 8 })([
           div({ className: 'dbg-row dbg-header' })([
-            div({ className: 'dbg-cell dbg-key' })([`Event: ${_ui.selectedEvent || '—'}`]),
+            div({ className: 'dbg-cell dbg-key' })([`Event: ${_ui.selectedEvent || '-'}`]),
             span({ className: 'dbg-toolbar-stat' })([`${_ui.logs.length} logs`]),
           ]),
 

@@ -17,12 +17,12 @@ const sampleContent = [
   H2({})(['Headings']),
   P({})(['Six semantic levels are supported, each with consistent typographic scale:']),
   Stack({ gap: 4 })([
-    H1({})(['Heading 1 — 2 rem, weight 800']),
-    H2({})(['Heading 2 — 1.5 rem, weight 700']),
-    H3({})(['Heading 3 — 1.2 rem, weight 700']),
-    H4({})(['Heading 4 — 1.05 rem, weight 600']),
-    H5({})(['Heading 5 — 0.95 rem, weight 600']),
-    H6({})(['Heading 6 — 0.85 rem, uppercase, muted']),
+    H1({})(['Heading 1 - 2 rem, weight 800']),
+    H2({})(['Heading 2 - 1.5 rem, weight 700']),
+    H3({})(['Heading 3 - 1.2 rem, weight 700']),
+    H4({})(['Heading 4 - 1.05 rem, weight 600']),
+    H5({})(['Heading 5 - 0.95 rem, weight 600']),
+    H6({})(['Heading 6 - 0.85 rem, uppercase, muted']),
   ]),
 
   H2({})(['Paragraphs & Lead text']),
@@ -55,7 +55,7 @@ const sampleContent = [
     ' explains the convention, and the ', em({})(['Chicago Manual of Style']),
     ' ',
     Cite({ href: 'https://www.chicagomanualofstyle.org/' })(['(17th edition)']),
-    ' formalises it. Typography numbers each unique URL automatically and links the superscript marker to the References list at the bottom — try clicking one.',
+    ' formalises it. Typography numbers each unique URL automatically and links the superscript marker to the References list at the bottom - try clicking one.',
   ]),
   P({})([
     'Citing the same source twice, even with different inline text, reuses the same ',
@@ -67,7 +67,7 @@ const sampleContent = [
   H3({})(['Lists (native HTML)']),
   P({})(['Ordered and unordered lists inside a ', Code({})(['.typography']), ' context inherit comfortable spacing:']),
   ul({ style: 'padding-left:1.5rem; margin:.5rem 0' })([
-    li({})(['Zero-dependency rendering — no virtual DOM library required']),
+    li({})(['Zero-dependency rendering - no virtual DOM library required']),
     li({})(['Lightweight CSS custom-property theming']),
     li({})(['Reactive with any ', Code({})(['createStore']), ' state']),
   ]),
@@ -98,7 +98,7 @@ const sampleContent = [
   ),
 ];
 
-/*  Panel (static — no reactive state needed)  */
+/*  Panel (static - no reactive state needed)  */
 export const typographyPanel = () =>
   div({})([
     Card({ title: 'Typography + Auto-TOC' })([

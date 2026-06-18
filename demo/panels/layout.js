@@ -111,7 +111,7 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
         Stack({ gap: 8 })([
           Container({ maxWidth: 'sm', styled: true })([ demoBox('maxWidth: sm (640px) + styled') ]),
           Container({ maxWidth: 'md', styled: true })([ demoBox('maxWidth: md (768px) + styled') ]),
-          Container({ maxWidth: 'lg', styled: false })([ demoBox('maxWidth: lg — unstyled') ]),
+          Container({ maxWidth: 'lg', styled: false })([ demoBox('maxWidth: lg - unstyled') ]),
           Container({ maxWidth: 320, styled: true })([ demoBox('maxWidth: 320 (number) + styled') ]),
         ]),
         doc([`Container({ maxWidth: 'md', styled: true })([ content ])
@@ -154,9 +154,9 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
 })`]),      ]),
     ]),
 
-    //  Tabs — three example shapes
+    //  Tabs - three example shapes
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'Tabs — minimal' })([
+      Card({ title: 'Tabs - minimal' })([
         p({ style: 'margin-top:0; font-size:13px; color:var(--text-muted)' })([
           'The simplest shape: an array of ', span({ style: 'font-family:ui-monospace,monospace' })(['{ id, label }']),
           ' descriptors and one panel per tab. The matching panel is the only one rendered.',
@@ -170,7 +170,7 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
           activeTab: state.innerTab,
           onTabChange: id => setState({ innerTab: id }),
         })([
-          p({})(['Content for tab 1 — switch tabs to see only the matching panel render.']),
+          p({})(['Content for tab 1 - switch tabs to see only the matching panel render.']),
           p({})(['Content for tab 2.']),
           p({})(['Content for tab 3.']),
         ]),
@@ -186,7 +186,7 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
     ]),
 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'Tabs — richer content + nested layout' })([
+      Card({ title: 'Tabs - richer content + nested layout' })([
         p({ style: 'margin-top:0; font-size:13px; color:var(--text-muted)' })([
           'Each panel can be any vnode. Below: each panel composes ',
           span({ style: 'font-family:ui-monospace,monospace' })(['Stack']),
@@ -207,7 +207,7 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
           Stack({ gap: 8 })([
             p({ style: 'margin:0' })([
               strong({})(['What you\'re looking at: ']),
-              'Tabs only renders one panel at a time — the others aren\'t in the DOM. ',
+              'Tabs only renders one panel at a time - the others aren\'t in the DOM. ',
               'That means each panel can have its own focus, scroll position, and form state without ',
               'fighting the others.',
             ]),
@@ -255,7 +255,7 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
 
           Stack({ gap: 10 })([
             p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
-              'Settings panel — a regular form, mounted only while this tab is active. ',
+              'Settings panel - a regular form, mounted only while this tab is active. ',
               'Tab switches discard its DOM (and any uncommitted state).',
             ]),
             div({ style: 'display:flex; gap:8px; align-items:center' })([
@@ -272,10 +272,10 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
     ]),
 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'Tabs — independent strips on one page' })([
+      Card({ title: 'Tabs - independent strips on one page' })([
         p({ style: 'margin-top:0; font-size:13px; color:var(--text-muted)' })([
           'Two ', span({ style: 'font-family:ui-monospace,monospace' })(['Tabs']),
-          ' on one page — each reads + writes its own slice of state, so switching one doesn\'t affect the other. ',
+          ' on one page - each reads + writes its own slice of state, so switching one doesn\'t affect the other. ',
           'The active selection above and below are independent.',
         ]),
         Row({ gap: 12 })([
@@ -302,7 +302,7 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
                 span({ style: 'font-family:ui-monospace,monospace' })(['?']),   ' help.',
               ]),
               p({ style: 'font-size:13px; margin:0' })([
-                'Themes inherit from CSS custom properties — switching the document theme also reskins this tab strip without re-rendering.',
+                'Themes inherit from CSS custom properties - switching the document theme also reskins this tab strip without re-rendering.',
               ]),
             ]),
           ]),
@@ -319,24 +319,24 @@ Stack({ gap: 16, align: 'center' })([ item1, item2 ])`]),
             })([
               p({ style: 'margin:0; font-size:13px' })([
                 'This is the same ', span({ style: 'font-family:ui-monospace,monospace' })(['state.innerTab']),
-                ' the minimal example reads. Switch this one — the minimal one above changes too.',
+                ' the minimal example reads. Switch this one - the minimal one above changes too.',
               ]),
               p({ style: 'margin:0; font-size:13px' })(['Two views, one slice of state.']),
-              p({ style: 'margin:0; font-size:13px' })(['Or — sometimes that\'s what you want.']),
+              p({ style: 'margin:0; font-size:13px' })(['Or - sometimes that\'s what you want.']),
             ]),
           ]),
         ]),
-        doc([`// Two strips, two state slices — independent:
+        doc([`// Two strips, two state slices - independent:
 Tabs({ activeTab: state.tabsKbdTab, onTabChange: id => setState({ tabsKbdTab: id }), tabs: [...] })([panel1, panel2])
 Tabs({ activeTab: state.innerTab,   onTabChange: id => setState({ innerTab: id }),   tabs: [...] })([panel1, panel2])
 
-// Two strips, ONE state slice — they mirror each other (last example column above).`]),
+// Two strips, ONE state slice - they mirror each other (last example column above).`]),
       ]),
     ]),
 
     // DragList 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'DragList — single list reorder' })([
+      Card({ title: 'DragList - single list reorder' })([
         p({ style: 'margin-top:0; font-size:13px; color:var(--text-muted)' })([
           'Drag the handles to reorder. Order is kept in state.dragKeep.',
         ]),
@@ -354,7 +354,7 @@ Tabs({ activeTab: state.innerTab,   onTabChange: id => setState({ innerTab: id }
     ]),
 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'DragList — two-list transfer (keep / delete)' })([
+      Card({ title: 'DragList - two-list transfer (keep / delete)' })([
         p({ style: 'margin-top:0; font-size:13px; color:var(--text-muted)' })([
           'Drag items between the two columns. Items dropped into "To delete" will be removed when you confirm.',
         ]),

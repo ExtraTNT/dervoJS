@@ -26,7 +26,7 @@ const vnodeText = node => {
 
 /**
  * Recursively collect heading entries from a vnode tree.
- * Pure: no mutable accumulator — uses flatMap recursion.
+ * Pure: no mutable accumulator - uses flatMap recursion.
  */
 const collectHeadings = nodes =>
   [].concat(nodes).flatMap(node => {
@@ -53,7 +53,7 @@ const injectIds = node => {
 // Citations
 
 /**
- * Cite — inline citation marker. Inside Typography, each Cite becomes:
+ * Cite - inline citation marker. Inside Typography, each Cite becomes:
  *   - an accent-coloured link to `href` showing the children as the visible text
  *   - a superscript [N] linking down to the References list at the end
  * Same `href` reused → same [N]. The first occurrence of each [N] is the
@@ -95,7 +95,7 @@ const isCiteVNode = node =>
 
 /**
  * Walk the vnode tree in document order and pull out one entry per Cite node.
- * Doesn't descend into Cite children — they're the visible label, not body.
+ * Doesn't descend into Cite children - they're the visible label, not body.
  */
 const collectCites = nodes => {
   const out = [];
@@ -231,7 +231,7 @@ const renderTOC = tocTitle => headings => {
 // Main component 
 
 /**
- * Typography — prose wrapper with optional auto-generated Table of Contents.
+ * Typography - prose wrapper with optional auto-generated Table of Contents.
  *
  * Scans children for heading vnodes (h1–h6), attaches anchor ids, and renders a
  * side TOC panel. Pure function; works anywhere inside mount / createStore.

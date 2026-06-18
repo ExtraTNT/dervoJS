@@ -1,7 +1,7 @@
 import { div, input, label, p, span } from '../elements.js';
 
 /**
- * TextInput component — a labeled text input with optional hint and error.
+ * TextInput component - a labeled text input with optional hint and error.
  *
  * @param {Object}   opts
  * @param {string}   [opts.id]           - Input id (links label).

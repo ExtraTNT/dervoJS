@@ -1,5 +1,5 @@
 /**
- * PortraitEditor — multi-layer paper-doll style portrait builder.
+ * PortraitEditor - multi-layer paper-doll style portrait builder.
  *
  * A portrait widget has:
  *   width, height : box the portrait paints into
@@ -29,7 +29,7 @@ import { groupedOptions } from './FolderedList.js';
 import { resolveAssetRef } from '../assets.js';
 
 // Layer.defaultImage can be either a plain URL, an inline `data:` URL, or an
-// `asset:<id>` ref. Browsers can't render `asset:...` as an <img src> — we
+// `asset:<id>` ref. Browsers can't render `asset:...` as an <img src> - we
 // need to resolve it against the project's asset catalogue first. Asset
 // data bytes might be hydrating from IDB (the marker → '' branch in
 // resolveAssetRef), in which case we get back '' and show the empty-layer
@@ -55,7 +55,7 @@ const LayerCard = ({ layer, items, onChange, onDelete }) => {
   const set = patch => onChange({ ...layer, ...patch });
   const setBindings = bindings => onChange({ ...layer, bindings });
 
-  return div({ style: 'border:1px solid var(--border); border-radius:var(--radius); padding:10px; background:var(--surface)' })([
+  return div({ className: 'gef-surface-card' })([
     div({ style: 'display:flex; align-items:center; gap:8px; margin-bottom:8px' })([
       span({ style: 'cursor:grab; color:var(--text-muted)', title: 'Drag to reorder' })(['⋮⋮']),
       span({ style: 'font-weight:600; font-size:13px' })([layer.name || '(unnamed)']),
@@ -94,7 +94,7 @@ const LayerCard = ({ layer, items, onChange, onDelete }) => {
               Select({
                 label:    i === 0 ? 'When player has' : '',
                 options:  [
-                  { value: '', label: '— pick item —' },
+                  { value: '', label: '- pick item -' },
                   ...groupedOptions(items)(it => ({ value: it.id, label: `${it.name} (${it.id})` })),
                 ],
                 value:    b.itemId,

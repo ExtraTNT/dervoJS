@@ -7,7 +7,7 @@ import { doc } from '../components/doc.js';
 let _handles = [];
 const stopAll = () => { _handles.forEach(h => h.stop()); _handles = []; };
 
-// Mount helper — called after the vnode tree is in the DOM 
+// Mount helper - called after the vnode tree is in the DOM 
 
 const mountAll = () => {
   // CORS-friendly images (Unsplash direct URLs are blocked for canvas pixel
@@ -36,7 +36,7 @@ export const glitchPanel = () => {
   return div({})([
 
     // Default preset 
-    Card({ title: 'GlitchImg — default preset' })([
+    Card({ title: 'GlitchImg - default preset' })([
       p({ style: 'font-size:13px; color:var(--text-muted); margin:0 0 12px' })([
         'Default: 30 fps · RGB shift · 6 shift-line passes · 3 scatter slots.',
       ]),
@@ -51,9 +51,9 @@ fx.stop();    // cancel RAF and free resources`]),
 
     // RGB off, fewer shift lines 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'GlitchImg — no RGB, reduced shift lines' })([
+      Card({ title: 'GlitchImg - no RGB, reduced shift lines' })([
         p({ style: 'font-size:13px; color:var(--text-muted); margin:0 0 12px' })([
-          'rgb: false · fps: 20 · shiftLines: 3 — subtler glitch.',
+          'rgb: false · fps: 20 · shiftLines: 3 - subtler glitch.',
         ]),
         GlitchCanvas({ id: 'glitch-b', style: 'width:100%; max-width:640px; height:auto' }),
         doc([`GlitchImg({ src: '...', fps: 20, rgb: false, shiftLines: 3 })(el)`]),
@@ -62,7 +62,7 @@ fx.stop();    // cancel RAF and free resources`]),
 
     // High-brightness scanline + heavy scatter 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'GlitchImg — slow scan, heavy scatter' })([
+      Card({ title: 'GlitchImg - slow scan, heavy scatter' })([
         p({ style: 'font-size:13px; color:var(--text-muted); margin:0 0 12px' })([
           'fps: 15 · flowSpeed: 4 · flowBrightness: 90 · scatCount: 5.',
         ]),
@@ -79,7 +79,7 @@ fx.stop();    // cancel RAF and free resources`]),
 
     // CanvasBg 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'CanvasBg — canvas as a background' })([
+      Card({ title: 'CanvasBg - canvas as a background' })([
         CanvasBg({ id: 'glitch-bg', height: '300px' })([
           div({ style: 'display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; padding:24px; text-align:center; gap:12px;' })([
             p({ style: 'margin:0; font-size:28px; font-weight:700; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.7); letter-spacing:-0.5px;' })([
@@ -90,7 +90,7 @@ fx.stop();    // cancel RAF and free resources`]),
             ]),
           ]),
         ]),
-        doc([`// Pure vnode — no side effects:
+        doc([`// Pure vnode - no side effects:
 CanvasBg({ id: 'bg1', height: '320px' })([
   div({ className: 'cvs-bg-content' })([ ...children ]),
 ])

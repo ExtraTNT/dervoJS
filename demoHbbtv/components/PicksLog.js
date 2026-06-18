@@ -1,5 +1,5 @@
 /**
- * PicksLog — formatting of the demo's "what was activated" trail.
+ * PicksLog - formatting of the demo's "what was activated" trail.
  *
  * The scroll-container behaviour lives in the library (FocusScroll); this
  * component is just the row formatting.

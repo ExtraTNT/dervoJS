@@ -1,7 +1,7 @@
 import { div, span, hr } from '../elements.js';
 
 /**
- * Container — centered max-width wrapper.
+ * Container - centered max-width wrapper.
  *
  * @param {Object}   opts
  * @param {'sm'|'md'|'lg'|'xl'|'full'|number} [opts.maxWidth='lg']
@@ -26,7 +26,7 @@ const Container = ({ maxWidth = 'lg', styled = false, style = '' } = {}) => chil
 };
 
 /**
- * Row — 12-column CSS Grid container. Pair with Col for responsive layouts.
+ * Row - 12-column CSS Grid container. Pair with Col for responsive layouts.
  *
  * @param {Object} opts
  * @param {number} [opts.gap=16]           Column+row gap in px.
@@ -47,7 +47,7 @@ const Row = ({ gap = 16, align = 'start', style = '' } = {}) => children =>
   })(children);
 
 /**
- * Col — responsive grid column. Must be a direct child of Row.
+ * Col - responsive grid column. Must be a direct child of Row.
  *
  * @param {Object} opts
  * @param {number} [opts.span=12]  Default span (12 = full width).
@@ -72,7 +72,7 @@ const Col = ({ span = 12, sm, md, lg, style = '' } = {}) => children => {
 };
 
 /**
- * Stack — vertical flex column with uniform gaps.
+ * Stack - vertical flex column with uniform gaps.
  *
  * @param {Object} opts
  * @param {number} [opts.gap=16]
@@ -93,7 +93,7 @@ const Stack = ({ gap = 16, align = 'stretch', style = '' } = {}) => children =>
   })(children);
 
 /**
- * Grid — equal-column CSS grid. Children don't need Col wrappers.
+ * Grid - equal-column CSS grid. Children don't need Col wrappers.
  *
  * @param {Object}  opts
  * @param {number}  [opts.cols=3]      Columns at default width.
@@ -123,7 +123,7 @@ const Grid = ({ cols = 3, sm, md, lg, gap = 16, styled = false, style = '' } = {
 };
 
 /**
- * PageLayout — full-viewport app shell with sticky top/bottom bars,
+ * PageLayout - full-viewport app shell with sticky top/bottom bars,
  * toggle-able left/right panels, scrollable main area and optional footer.
  *
  * @param {Object}  opts
@@ -179,7 +179,7 @@ const PageLayout = ({
   ]);
 
 /**
- * AppShell — topBar + collapsible sidebar + main + optional footer.
+ * AppShell - topBar + collapsible sidebar + main + optional footer.
  * Preset for dashboards and SPAs. Thin wrapper around PageLayout.
  *
  * @param {Object}  opts
@@ -199,7 +199,7 @@ const AppShell = ({ topBar, sidebar, sidebarOpen = true, sidebarWidth = '220px',
   children => PageLayout({ topBar, sidebar, sidebarOpen, sidebarWidth, footer })(children);
 
 /**
- * TwoPane — side-by-side split view without a top bar.
+ * TwoPane - side-by-side split view without a top bar.
  * Good for editors, diff views, or comparison layouts.
  * The left pane collapses via the `leftOpen` prop.
  *
@@ -221,7 +221,7 @@ const TwoPane = ({ left, leftOpen = true, leftWidth = '360px', style = '' } = {}
     })(rightChildren);
 
 /**
- * BlogLayout — centered content column with optional full-width header and footer.
+ * BlogLayout - centered content column with optional full-width header and footer.
  * No sidebar. Suitable for articles, documentation, and content-focused pages.
  *
  * @param {Object}  opts
@@ -243,7 +243,7 @@ const BlogLayout = ({ header, footer, maxWidth = '680px', mainPadding = '32px 16
     ]);
 
 /**
- * Divider — horizontal separator with an optional centered text label.
+ * Divider - horizontal separator with an optional centered text label.
  *
  * @param {Object}  opts
  * @param {string}  [opts.label]    Text label in the center of the line.
@@ -264,7 +264,7 @@ const Divider = ({ label: labelText, style = '' } = {}) =>
     : hr({ className: 'divider-plain', style })([]);
 
 /**
- * Spacer — a flex-grow filler that pushes siblings apart.
+ * Spacer - a flex-grow filler that pushes siblings apart.
  *
  * @param {Object}        opts
  * @param {number|string} [opts.size]  Fixed size (number = px, string = any CSS value).
@@ -283,7 +283,7 @@ const Spacer = ({ size, style = '' } = {}) => {
 };
 
 /**
- * AspectBox — constrains children to a fixed aspect ratio.
+ * AspectBox - constrains children to a fixed aspect ratio.
  *
  * @param {Object}  opts
  * @param {string}  [opts.ratio='16/9']  CSS aspect-ratio value.
@@ -297,7 +297,7 @@ const AspectBox = ({ ratio = '16/9', style = '' } = {}) => children =>
   div({ className: 'aspect-box', style: `aspect-ratio:${ratio}; ${style}` })(children);
 
 /**
- * Float — applies CSS float to its children with a clearfix wrapper.
+ * Float - applies CSS float to its children with a clearfix wrapper.
  *
  * @param {Object}          opts
  * @param {'left'|'right'}  [opts.side='left']  Float direction.
@@ -311,7 +311,7 @@ const Float = ({ side = 'left', style = '' } = {}) => children =>
   div({ className: `float-${side}`, style })(children);
 
 /**
- * Clearfix — wrapper that clears floated children.
+ * Clearfix - wrapper that clears floated children.
  *
  * @param {string}  [opts.style='']
  * @returns {function} children => vnode
@@ -325,7 +325,7 @@ const Clearfix = ({ style = '' } = {}) => children =>
 // DragList 
 
 /**
- * DragList — drag-and-drop reorderable list with optional cross-list transfer.
+ * DragList - drag-and-drop reorderable list with optional cross-list transfer.
  *
  * Fully stateless: the component renders from an `items` array you own in your
  * store and calls `onChange(newItems)` whenever the order changes or an item is
@@ -339,13 +339,13 @@ const Clearfix = ({ style = '' } = {}) => children =>
  *
  * @param {Object}    opts
  * @param {Array}     opts.items              - Array of objects (must each have `id`).
- * @param {function}  opts.onChange           - (newItems: Array) => void — called after drop.
+ * @param {function}  opts.onChange           - (newItems: Array) => void - called after drop.
  * @param {function}  opts.renderItem         - (item, isDragging: bool) => vnode
  * @param {string}    [opts.groupId]          - Shared token that allows cross-list drops.
- * @param {function}  [opts.onAdd]            - (item) => void — fires on the *receiving* list when
+ * @param {function}  [opts.onAdd]            - (item) => void - fires on the *receiving* list when
  *                                              an item arrives from another group member. If omitted
  *                                              the item is prepended and onChange fires instead.
- * @param {function}  [opts.onRemove]         - (item) => void — fires on the *source* list when an
+ * @param {function}  [opts.onRemove]         - (item) => void - fires on the *source* list when an
  *                                              item leaves. If omitted the item is removed and
  *                                              onChange fires instead.
  * @param {boolean}   [opts.disabled=false]   - Disable all drag interactions.
@@ -440,7 +440,7 @@ const DragList = ({
           // same list: reorder
           const next = reorder(items)(srcId)(String(item.id));
           if (next !== items) onChange?.(next);
-          e.stopPropagation();                    // handled — don't let container fire too
+          e.stopPropagation();                    // handled - don't let container fire too
         }
         // cross-list: fall through so the event reaches the container ondrop
       },
@@ -454,11 +454,11 @@ const DragList = ({
     const srcGrp    = e.dataTransfer.getData(DRAG_GRP_KEY);
     const srcListId = e.dataTransfer.getData(DRAG_LIST_KEY);
 
-    if (srcGrp !== groupId) return;              // different group — ignore
-    if (srcListId === listId) return;            // same list drop on empty space — ignore
+    if (srcGrp !== groupId) return;              // different group - ignore
+    if (srcListId === listId) return;            // same list drop on empty space - ignore
     if (items.some(x => String(x.id) === srcId)) return;  // already here
 
-    // Notify the caller directly — no DOM event needed
+    // Notify the caller directly - no DOM event needed
     onTransfer?.(srcId)(srcListId)(listId);
   };
 
@@ -485,7 +485,7 @@ const DragList = ({
 };
 
 /**
- * useDragListGroup — returns an onTransfer callback that moves items between
+ * useDragListGroup - returns an onTransfer callback that moves items between
  * named store slices. Pass the same returned function as the `onTransfer` prop
  * to every DragList in the group.
  *

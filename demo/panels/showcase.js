@@ -1,14 +1,14 @@
 /**
- * Showcase panel — a single dashboard that exercises the renderer end-to-end:
+ * Showcase panel - a single dashboard that exercises the renderer end-to-end:
  *
- *   • createBus / getBus     — one named pub-sub bus, multiple subscribers
- *   • createInterval         — five independent emitters, each toggleable
- *   • setState updaters      — pure (state -> state) reducers driven by bus events
- *   • keyed reconciler       — feed list reorders + animates without losing focus
- *   • focus preservation     — search input keeps cursor while feed updates 4x/s
- *   • currying / templates   — emitter rows + stat tiles built via partial app.
- *   • memoization            — Badge is memoised once, reused for every event
- *   • charts                 — BarChart + SparkLine derived from the same store
+ *   • createBus / getBus     - one named pub-sub bus, multiple subscribers
+ *   • createInterval         - five independent emitters, each toggleable
+ *   • setState updaters      - pure (state -> state) reducers driven by bus events
+ *   • keyed reconciler       - feed list reorders + animates without losing focus
+ *   • focus preservation     - search input keeps cursor while feed updates 4x/s
+ *   • currying / templates   - emitter rows + stat tiles built via partial app.
+ *   • memoization            - Badge is memoised once, reused for every event
+ *   • charts                 - BarChart + SparkLine derived from the same store
  */
 
 import {
@@ -57,7 +57,7 @@ const _id   = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 const _ts   = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const _pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
-// type -> event factory   (curried — capture the type once, reuse)
+// type -> event factory   (curried - capture the type once, reuse)
 const eventFor = type => () => ({ id: _id(), type, ts: _ts(), msg: _pick(SAMPLES[type]) });
 
 // state-slice updater   (key -> updater -> setState patch)
@@ -65,7 +65,7 @@ const updateShowcase = updater => setState(s => ({ showcase: updater(s.showcase 
 
 // Bus + module-level controllers (created lazily, once)
 
-const _bus    = getBus(BUS_ID);     // named — any other module can grab it too
+const _bus    = getBus(BUS_ID);     // named - any other module can grab it too
 const _ctrls  = {};                 // type -> interval controller
 let   _wired  = false;
 let   _sampler = null;
@@ -74,14 +74,14 @@ const _wire = () => {
   if (_wired) return;
   _wired = true;
 
-  // Subscriber 1 — cap feed at 14, bump per-type counter
+  // Subscriber 1 - cap feed at 14, bump per-type counter
   _bus.on('event', ev => updateShowcase(sc => ({
     ...sc,
     feed:     [ev, ...(sc.feed || [])].slice(0, 14),
     counters: { ...(sc.counters || {}), [ev.type]: ((sc.counters || {})[ev.type] || 0) + 1 },
   })));
 
-  // Subscriber 2 — clear-all command channel
+  // Subscriber 2 - clear-all command channel
   _bus.on('clear', () => updateShowcase(sc => ({
     ...sc, feed: [], counters: {}, history: [], pinned: {},
   })));
@@ -98,7 +98,7 @@ const _ensureCtrl = type => {
   return _ctrls[type];
 };
 
-// 1 Hz sampler — converts cumulative counters into a per-second rate stream.
+// 1 Hz sampler - converts cumulative counters into a per-second rate stream.
 // Created paused (autoStart: false). The user toggles it from the UI so the
 // profiler isn't spammed with a setState every second when they're trying to
 // inspect a specific render.
@@ -168,7 +168,7 @@ const togglePin = id => () => updateShowcase(sc => {
   return { ...sc, pinned };
 });
 
-// Memoised badge — cached by stableKey(opts), reused across every render
+// Memoised badge - cached by stableKey(opts), reused across every render
 
 const MemoBadge = memoComponent(Badge);
 
@@ -176,18 +176,18 @@ const MemoBadge = memoComponent(Badge);
 //
 // sdiv(style) returns a curried vnode factory: props -> children -> vnode.
 // Because the style string is baked in once, every reuse skips that arg
-// entirely — the renderer also patches a stable style attribute, so React-
+// entirely - the renderer also patches a stable style attribute, so React-
 // style "did the className change?" diffing wins big when 200+ cells share
 // the same shell.
 
-// Outer cube wrapper — a single styled div used for every plane
+// Outer cube wrapper - a single styled div used for every plane
 const planeBox = sdiv([
   'display:flex; flex-direction:column; gap:6px; padding:8px;',
   'background:var(--surface); border:1px solid var(--border);',
   'border-radius:var(--radius);',
 ].join(' '));
 
-// Row inside a plane — flex row of cells, baked once
+// Row inside a plane - flex row of cells, baked once
 const planeRow = sdiv('display:flex; gap:4px;');
 
 // One styled cell template, parameterised only by inline color via props.style
@@ -200,7 +200,7 @@ const cellBox = sdiv([
   'transition:transform .15s, filter .15s;',
 ].join(' '));
 
-// Header chip (also styled) — reused per plane
+// Header chip (also styled) - reused per plane
 const planeLabel = sspan([
   'font-size:11px; font-weight:700; text-transform:uppercase;',
   'letter-spacing:.06em; color:var(--text-muted);',
@@ -219,12 +219,12 @@ const HUES = {
 //
 // Three layers, each a pure (opts -> vnode) factory wrapped in memoize().
 // When the matrix params don't change between renders, every cell is a
-// cache hit — vnode construction is essentially free, even for 32³ cells.
+// cache hit - vnode construction is essentially free, even for 32³ cells.
 //
 // At n=32 -> 32³ = 32768 cells. Cap the cell cache at 50k so a full grid
 // fits without eviction. Plane and matrix caches stay small (≤ 32 entries).
 
-// Raw factories — wrapped in freeze() so the cached vnodes carry props.memo
+// Raw factories - wrapped in freeze() so the cached vnodes carry props.memo
 // and the renderer can short-circuit on ===-equality next render.
 const _cellRaw = ({ x, y, z, color }) =>
   freeze(cellBox({ key: `c-${x}-${y}-${z}`, style: `background:${color}` })([`${x}${y}${z}`]));
@@ -249,21 +249,21 @@ const _matrixRawWith = planeFn => ({ hue, n }) =>
     style: `display:grid; gap:8px; grid-template-columns:repeat(${Math.min(n, 4)}, 1fr)`,
   })(Array.from({ length: n }, (_, z) => planeFn({ hue, n, z }))));
 
-// Cached pipeline — chain memoized layers
-//  Cell    : memoize(50_000)  — covers n=32 (32k cells) without eviction
-//  Plane   : memoize() default — at most n entries (≤ 32)
-//  Matrix  : memoLeaf          — single (hue, n) tuple
+// Cached pipeline - chain memoized layers
+//  Cell    : memoize(50_000)  - covers n=32 (32k cells) without eviction
+//  Plane   : memoize() default - at most n entries (≤ 32)
+//  Matrix  : memoLeaf          - single (hue, n) tuple
 const Cell        = memoize(50_000)(_cellRaw);
 const Plane       = memoize(64)(_planeRawWith(Cell));
 const MatrixMemo  = memoLeaf(_matrixRawWith(Plane));
 
-// Uncached pipeline — same code, no memoize wrappers, for A/B comparison
+// Uncached pipeline - same code, no memoize wrappers, for A/B comparison
 const MatrixRaw   = _matrixRawWith(_planeRawWith(_cellRaw));
 
 const buildMatrix = (hue, n, useMemo) =>
   (useMemo ? MatrixMemo : MatrixRaw)({ hue, n });
 
-// Curried view templates — partial application builds widgets
+// Curried view templates - partial application builds widgets
 
 const tile = ({ label: lbl, color, value, sub, onClick, active }) =>
   div({
@@ -360,14 +360,14 @@ export const showcasePanel = state => {
   return div({ style: 'display:flex; flex-direction:column; gap:16px' })([
 
     // Intro
-    Card({ title: '◆ Live Telemetry — renderer showcase' })([
+    Card({ title: '◆ Live Telemetry - renderer showcase' })([
       p({ style: 'margin:0 0 10px; font-size:13px; color:var(--text-muted); line-height:1.6' })([
         'A single page exercising every renderer feature at once: a named ',
         code({})(['createBus']), ' fans events out to subscribers, ',
         code({})(['createInterval']), ' drives five independent emitters, ',
         'derived state feeds a ', code({})(['BarChart']), ' + ', code({})(['SparkLine']),
         ', and the feed list uses ', strong({})(['keyed reconciliation']), ' so reordering and pinning never tears the DOM. ',
-        'Type into the filter while events stream — the cursor stays put.',
+        'Type into the filter while events stream - the cursor stays put.',
       ]),
       div({ style: 'display:flex; gap:8px; flex-wrap:wrap' })([
         button({
@@ -380,7 +380,7 @@ export const showcasePanel = state => {
         })(['⏸ Stop all']),
         button({
           type: 'button', onclick: clearAll,
-          title: "Emits 'clear' on the bus — both subscribers react",
+          title: "Emits 'clear' on the bus - both subscribers react",
           style: 'padding:6px 14px; font-size:12px; font-weight:600; background:none; color:var(--text); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer',
         })(['⌫ bus.emit("clear")']),
         div({ style: 'flex:1' })([]),
@@ -390,7 +390,7 @@ export const showcasePanel = state => {
       ]),
     ]),
 
-    // Stat tiles — derived from the SAME counters the chart reads
+    // Stat tiles - derived from the SAME counters the chart reads
     div({ style: 'display:flex; gap:12px; flex-wrap:wrap' })([
       tile({
         label: 'Total events', color: 'var(--accent)',
@@ -414,7 +414,7 @@ export const showcasePanel = state => {
     // Charts row
     Row({ gap: 16 })([
       Col({ span: 12, md: 7 })([
-        Card({ title: 'Counters by type — click a bar to filter the feed' })([
+        Card({ title: 'Counters by type - click a bar to filter the feed' })([
           p({ style: 'margin:0 0 10px; font-size:12px; color:var(--text-muted)' })([
             selected
               ? span({})([
@@ -425,7 +425,7 @@ export const showcasePanel = state => {
                     onclick: () => updateShowcase(s => ({ ...s, selected: null })),
                   })(['clear']),
                 ])
-              : 'Both this chart and the feed below derive from the same store — one source of truth.',
+              : 'Both this chart and the feed below derive from the same store - one source of truth.',
           ]),
           div({ style: 'overflow-x:auto' })([
             BarChart({
@@ -441,7 +441,7 @@ export const showcasePanel = state => {
         Card({ title: 'Events / second (1Hz sampler -> SparkLine)' })([
           p({ style: 'margin:0 0 10px; font-size:12px; color:var(--text-muted)' })([
             'A second ', code({})(['createInterval']), ' samples the cumulative counter once per second. ',
-            strong({})(['Off by default']), ' so the profiler is not spammed — toggle it on to populate the chart.',
+            strong({})(['Off by default']), ' so the profiler is not spammed - toggle it on to populate the chart.',
           ]),
           div({ style: 'display:flex; gap:10px; align-items:center; margin-bottom:8px' })([
             Toggle({ on: sampling, onChange: toggleSampler })([
@@ -456,7 +456,7 @@ export const showcasePanel = state => {
             sparkData.length > 1
               ? SparkLine({ width: 320, height: 80, color: '#59a14f', fill: true, smooth: true })(sparkData)
               : div({ style: 'font-size:12px; color:var(--text-muted); text-align:center; padding:24px' })([
-                  sampling ? 'Buffering — wait for the next tick…' : 'Sampler paused. Toggle it on above to start collecting.',
+                  sampling ? 'Buffering - wait for the next tick…' : 'Sampler paused. Toggle it on above to start collecting.',
                 ]),
           ]),
           div({ style: 'display:flex; gap:8px; align-items:center; font-size:12px; color:var(--text-muted)' })([
@@ -473,7 +473,7 @@ export const showcasePanel = state => {
       Col({ span: 12, md: 6 })([
         Card({ title: 'Emitters (each is its own createInterval)' })([
           p({ style: 'margin:0 0 10px; font-size:12px; color:var(--text-muted)' })([
-            'Toggling a row starts/stops the underlying interval. The bus does not know — and does not care — who publishes.',
+            'Toggling a row starts/stops the underlying interval. The bus does not know - and does not care - who publishes.',
           ]),
           div({ style: 'display:flex; flex-direction:column; gap:6px' })(
             TYPES.map(t => emitterRow(t)(!!running[t]))
@@ -483,7 +483,7 @@ export const showcasePanel = state => {
       Col({ span: 12, md: 6 })([
         Card({ title: 'Tick rate (live re-binding)' })([
           p({ style: 'margin:0 0 10px; font-size:12px; color:var(--text-muted)' })([
-            'Changing the slider tears down each emitter and rebuilds it at the new interval — without dropping a beat for the running ones.',
+            'Changing the slider tears down each emitter and rebuilds it at the new interval - without dropping a beat for the running ones.',
           ]),
           Slider({
             id:      'rate-slider',
@@ -501,10 +501,10 @@ export const showcasePanel = state => {
       ]),
     ]),
 
-    // Feed — keyed reconciler + focus preservation
+    // Feed - keyed reconciler + focus preservation
     Card({ title: 'Live event feed (keyed list)' })([
       div({ style: 'display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap' })([
-        // Live filter input — focus survives every re-render below it
+        // Live filter input - focus survives every re-render below it
         input({
           type:        'search',
           placeholder: 'Filter (try "user" or "401")…',
@@ -513,14 +513,14 @@ export const showcasePanel = state => {
           style: 'flex:1; min-width:180px; padding:6px 10px; font-size:13px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); color:var(--text)',
         }),
         span({ style: 'font-size:11px; color:var(--text-muted)' })([
-          'cursor stays put while events stream — focus is restored after every patch',
+          'cursor stays put while events stream - focus is restored after every patch',
         ]),
       ]),
 
       shownFeed.length === 0
         ? div({ style: 'padding:20px; text-align:center; font-size:12px; color:var(--text-muted)' })([
             feed.length === 0
-              ? 'No events yet — start a stream above or click "emit one" on a row.'
+              ? 'No events yet - start a stream above or click "emit one" on a row.'
               : 'No events match the current filter.',
           ])
         : div({ style: 'display:flex; flex-direction:column; gap:4px' })(
@@ -529,7 +529,7 @@ export const showcasePanel = state => {
 
       Object.keys(pinned).length > 0
         ? div({ style: 'margin-top:8px; padding-top:8px; border-top:1px solid var(--border); font-size:11px; color:var(--text-muted)' })([
-            `${Object.keys(pinned).length} pinned — pinned rows survive even after they age out of the feed buffer (state lives in the store, not the DOM).`,
+            `${Object.keys(pinned).length} pinned - pinned rows survive even after they age out of the feed buffer (state lives in the store, not the DOM).`,
           ])
         : div({})([]),
     ]),
@@ -552,30 +552,30 @@ export const showcasePanel = state => {
         div({ style: 'padding:10px 12px; background:var(--surface-2); border-radius:var(--radius); border:1px solid var(--border)' })([
           strong({ style: 'font-size:12px' })(['Keyed reordering']),
           p({ style: 'margin:4px 0 0; font-size:12px; color:var(--text-muted)' })([
-            'Each feed row carries key:ev.id, so when a new event arrives the reconciler does an insertBefore — not a full rebuild. That is what keeps the input focused.',
+            'Each feed row carries key:ev.id, so when a new event arrives the reconciler does an insertBefore - not a full rebuild. That is what keeps the input focused.',
           ]),
         ]),
         div({ style: 'padding:10px 12px; background:var(--surface-2); border-radius:var(--radius); border:1px solid var(--border)' })([
           strong({ style: 'font-size:12px' })(['Currying as templating']),
           p({ style: 'margin:4px 0 0; font-size:12px' })([
             code({})(['emitterRow(type)(running)']), ' and ', code({})(['feedRow(pinned)(ev)']),
-            ' are partially-applied templates — each call is one expression, no JSX necessary.',
+            ' are partially-applied templates - each call is one expression, no JSX necessary.',
           ]),
         ]),
       ]),
     ]),
 
-    // n³ template grid — partial application generates thousands of cells
-    Card({ title: `Templating with sdiv — ${matrixN}³ = ${matrixN ** 3} cells from one styled template` })([
+    // n³ template grid - partial application generates thousands of cells
+    Card({ title: `Templating with sdiv - ${matrixN}³ = ${matrixN ** 3} cells from one styled template` })([
       p({ style: 'margin:0 0 10px; font-size:13px; color:var(--text-muted); line-height:1.6' })([
         strong({})(['sdiv(style)']), ' bakes a style string into a vnode factory once. ',
-        'The pipeline is three pure layers — ',
+        'The pipeline is three pure layers - ',
         code({})(['Cell -> Plane -> Matrix']),
-        ' — each wrapped in ', code({})(['memoize()']),
+        ' - each wrapped in ', code({})(['memoize()']),
         '. When the matrix params don\'t change between renders, every node is a cache hit, ',
         'so vnode construction for ', strong({})([`${matrixN ** 3}`]), ' cells is essentially free. ',
         'Open the State Debugger ⚙ to watch ', code({})(['computeMs']),
-        ' — flip the toggle below for an A/B comparison at the same n.',
+        ' - flip the toggle below for an A/B comparison at the same n.',
       ]),
 
       div({ style: 'display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:14px' })([
@@ -643,16 +643,16 @@ const Cell    = memoize(50_000)(_cellRaw);
 const Plane   = memoize(64)(_planeRawWith(Cell));
 const Matrix  = memoLeaf(_matrixRawWith(Plane));
 
-// 4. Render — when (hue, n) are unchanged, every cell is a cache hit
+// 4. Render - when (hue, n) are unchanged, every cell is a cache hit
 const view = state => Matrix({ hue: state.hue, n: state.n });`]),
     ]),
 
     // Code
     Card({ title: 'Bus + interval wiring' })([
-      doc([`// 1. Grab a named bus — same instance everywhere
+      doc([`// 1. Grab a named bus - same instance everywhere
 const bus = getBus('showcase');
 
-// 2. Curried event factory — partial application
+// 2. Curried event factory - partial application
 const eventFor = type => () =>
   ({ id: _id(), type, ts: _ts(), msg: pickSample(type) });
 

@@ -1,5 +1,5 @@
 /**
- * Hero Trainer — small demo game built on dervoJS's game module.
+ * Hero Trainer - small demo game built on dervoJS's game module.
  */
 
 import { initStyles, createGame } from '../src/index.js';

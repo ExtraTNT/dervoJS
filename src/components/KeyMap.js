@@ -70,7 +70,7 @@ const formatCombo = combo => {
 // createKeymap 
 /**
  * Purely functional keyboard-event manager.
- * Routing is delegated to the shared createBus pub/sub from listeners.js —
+ * Routing is delegated to the shared createBus pub/sub from listeners.js -
  * each (scope x combo) pair becomes a bus event; no custom dispatch logic needed.
  *
  * @param {Object}      [opts]
@@ -99,7 +99,7 @@ const formatCombo = combo => {
  *  getActive  :: () -> { id: string, element: Element | null } | null
  *
  *  getBindings :: () -> { global: [{combo, raw}], scoped: {[id]: [{combo, raw}]} }
- *    Snapshot of all registered bindings — useful for rendering help overlays.
+ *    Snapshot of all registered bindings - useful for rendering help overlays.
  *
  *  destroy :: () -> void
  *    Remove the keydown listener and destroy the internal bus.
@@ -107,8 +107,8 @@ const formatCombo = combo => {
  *  Handler signature 
  *
  *  handler(element)(event)
- *    element — the DOM element passed to focusScope (null when no scope active)
- *    event   — the native KeyboardEvent
+ *    element - the DOM element passed to focusScope (null when no scope active)
+ *    event   - the native KeyboardEvent
  */
 const createKeymap = (opts = {}) => {
   const {
@@ -117,8 +117,8 @@ const createKeymap = (opts = {}) => {
   } = opts;
 
   // Bus event names:
-  //  "any:<comboKey>"              — global bindings
-  //  "scope:<scopeId>:<comboKey>"  — scoped bindings
+  //  "any:<comboKey>"              - global bindings
+  //  "scope:<scopeId>:<comboKey>"  - scoped bindings
   // Bus payload: { element, event }
   const bus = createBus();
 
@@ -132,7 +132,7 @@ const createKeymap = (opts = {}) => {
     return _comboKey({ ctrl: e.ctrlKey, meta: e.metaKey, shift: e.shiftKey, alt: e.altKey, key: k });
   };
 
-  // Metadata list for getBindings() — only display strings, no handlers
+  // Metadata list for getBindings() - only display strings, no handlers
   let _meta   = { global: [], scoped: {} };
   let _active = null; // { id: string, element: Element | null } | null
 

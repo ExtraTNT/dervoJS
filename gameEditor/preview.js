@@ -1,5 +1,5 @@
 /**
- * preview.js — turn a project JSON into a runnable createGame config.
+ * preview.js - turn a project JSON into a runnable createGame config.
  *
  * The interpreter is the runtime semantics of the editor's data model:
  *   - Pages render in sequence; "More" advances a per-scene index in state.
@@ -13,7 +13,17 @@
 import { div, p, img, video, span, h3, button } from '../src/elements.js';
 import { Scene, NpcChoices, NpcLine } from '../src/game.js';
 import { resolveAssetsForPreview } from './extractAssets.js';
-import { Just, Nothing, bind, guard, fromMaybe } from '../lib/odocosjs/src/core.js';
+import { Just, Nothing, bind, guard, fromMaybe, orElse } from '../lib/odocosjs/src/core.js';
+import { vnode } from '../lib/odocosjs/src/render.js';
+
+// SVG factories for the minimap widget - same curried-vnode shape as
+// graph.js, namespaced via the reconciler's auto-SVG dispatch.
+const _svgEl  = vnode('svg');
+const _svgG   = vnode('g');
+const _svgRct = vnode('rect');
+const _svgLn  = vnode('line');
+const _svgPl  = vnode('polyline');
+const _svgTxt = vnode('text');
 
 const _safeFn = (argNames, body) => {
   try { return new Function(...argNames, body); }
@@ -68,7 +78,7 @@ const _writeOpToPatch = (state, op, ctx) => {
       kind === 'take' ? cur - n :
       kind === 'set'  ? n :
       cur;
-    // Implicit floor of 0 only on `take` — matches the engine's original
+    // Implicit floor of 0 only on `take` - matches the engine's original
     // behaviour. User min/max apply on top of it for take; for give/set,
     // user min/max are the only clamp source.
     const lo = _evalOpLimit(op.min, state);
@@ -86,8 +96,34 @@ const _writeOpToPatch = (state, op, ctx) => {
     if (kind === 'forget') return { skills: cur.filter(x => x !== k) };
     return null;
   }
-  // plain stat
-  const cur = Number(state[target] || 0);
+  // plain stat - number, string, or array. We branch on the CURRENT value's
+  // shape so legacy projects (declaration-less, all numbers) still work
+  // unchanged. Engine never required typed declarations.
+  const live = state[target];
+  if (Array.isArray(live)) {
+    // Array stat ops: push, removeValue, clear, set (=, comma-csv).
+    if (kind === 'push')        return { [target]: [...live, String(value)] };
+    if (kind === 'removeValue') return { [target]: live.filter(x => x !== String(value)) };
+    if (kind === 'clear')       return { [target]: [] };
+    if (kind === 'set') {
+      const next = Array.isArray(value)
+        ? value.map(String)
+        : String(value || '').split(',').map(s => s.trim()).filter(Boolean);
+      return { [target]: next };
+    }
+    return null;
+  }
+  if (typeof live === 'string' || (live === undefined && typeof value === 'string' && kind !== 'add' && kind !== 'sub')) {
+    // String stat ops: set, append, clear.
+    if (kind === 'set')    return { [target]: String(value ?? '') };
+    if (kind === 'append') return { [target]: (live ?? '') + String(value ?? '') };
+    if (kind === 'clear')  return { [target]: '' };
+    return null;
+  }
+  // Numeric stat (or legacy untyped). Set with a non-numeric value falls
+  // through to the raw value so authors can repurpose a previously-numeric
+  // stat to a string mid-project without rewriting old ops.
+  const cur = Number(live || 0);
   const n = Number(value);
   const isNumeric = Number.isFinite(n);
   let next =
@@ -95,7 +131,6 @@ const _writeOpToPatch = (state, op, ctx) => {
     kind === 'add' ? cur + (isNumeric ? n : 0) :
     kind === 'sub' ? cur - (isNumeric ? n : 0) :
     cur;
-  // Clamp numeric results only — string `set` (e.g. setting a label) skips.
   if (typeof next === 'number') {
     const lo = _evalOpLimit(op.min, state);
     const hi = _evalOpLimit(op.max, state);
@@ -109,16 +144,26 @@ const _compileCondition = cond => {
   if (!cond || cond.mode === 'always') return () => true;
   if (cond.mode === 'simple') {
     return c => {
-      const left = _readPath(c.state, cond.key);
+      const left  = _readPath(c.state, cond.key);
       const right = cond.value;
       switch (cond.op) {
+        // numeric comparisons
         case '>=': return Number(left) >= Number(right);
         case '>':  return Number(left) >  Number(right);
         case '<=': return Number(left) <= Number(right);
         case '<':  return Number(left) <  Number(right);
         case '==': return left == right;     // eslint-disable-line eqeqeq
         case '!=': return left != right;     // eslint-disable-line eqeqeq
-        default:   return false;
+        // string-typed stat comparisons
+        case 'contains':   return String(left ?? '').includes(String(right ?? ''));
+        case 'startsWith': return String(left ?? '').startsWith(String(right ?? ''));
+        // array-typed stat comparisons
+        case 'includes':   return Array.isArray(left) && left.includes(String(right));
+        case 'excludes':   return !Array.isArray(left) || !left.includes(String(right));
+        case 'lenAtLeast': return (Array.isArray(left) ? left.length : 0) >= (Number(right) || 0);
+        // shared: empty check works for both strings and arrays
+        case 'isEmpty':    return left == null || left === '' || (Array.isArray(left) && left.length === 0);
+        default:           return false;
       }
     };
   }
@@ -130,6 +175,10 @@ const _compileCondition = cond => {
       if (cond.op === 'atleast') return have >= Number(cond.count || 1);
       return false;
     };
+  }
+  if (cond.mode === 'random') {
+    const p = Math.max(0, Math.min(1, Number(cond.p ?? 0.25)));
+    return () => Math.random() < p;
   }
   if (cond.mode === 'js') {
     const fn = _safeFn(['c'], `return (${cond.expr || 'true'});`);
@@ -269,15 +318,15 @@ const _compileRandomLoot = rawTable => {
 //
 // Any Effect (or LootEntry) can carry an optional `message` template. After
 // the action's core fires, the template is evaluated against:
-//   state — post-action live state
-//   init  — snapshot of state just before the OUTER choice action ran
-//   gain  — per-key positive deltas (numeric stat-ups, item increases,
+//   state - post-action live state
+//   init  - snapshot of state just before the OUTER choice action ran
+//   gain  - per-key positive deltas (numeric stat-ups, item increases,
 //           newly-true flags, newly-learned skills)
-//   loss  — per-key negative deltas (mirror of gain)
+//   loss  - per-key negative deltas (mirror of gain)
 //
 // The rendered string is appended to state._messageQueue. The next scene
 // render shows the buffer as a Continue interstitial, then clears it. Multi
-// steps + randomLoot picks accumulate naturally — each pushes one entry.
+// steps + randomLoot picks accumulate naturally - each pushes one entry.
 
 const _isObj = v => v != null && typeof v === 'object' && !Array.isArray(v);
 
@@ -288,7 +337,7 @@ const _diff = (init, after) => {
   const out  = {};
   const keys = new Set([...Object.keys(init || {}), ...Object.keys(after || {})]);
   for (const k of keys) {
-    if (k.startsWith('_')) continue;            // engine internals — skip
+    if (k.startsWith('_')) continue;            // engine internals - skip
     const a = (init  || {})[k];
     const b = (after || {})[k];
     if (_isObj(a) || _isObj(b)) {
@@ -391,7 +440,7 @@ const _compileEffectCore = (effect, project) => {
   if (effect.mode === 'oneOf') {
     // Pick ONE option per call. Effective weight = base + Σ applicable bonuses
     // (same machinery as random loot entries via _resolveWeight). The picked
-    // option's Effect fires — any mode, including another oneOf or multi.
+    // option's Effect fires - any mode, including another oneOf or multi.
     const opts = (effect.options || []).map(o => ({
       weight:  Number(o.weight) || 0,
       bonuses: o.bonuses || [],
@@ -407,7 +456,7 @@ const _compileEffectCore = (effect, project) => {
   if (effect.mode === 'talkTo') {
     return c => {
       if (!effect.npcId) return;
-      // Fresh visit — reset greeting, drop the topic stack, drop any in-progress topic.
+      // Fresh visit - reset greeting, drop the topic stack, drop any in-progress topic.
       c.setState(s => ({
         _npcPageIdx:      { ...(s._npcPageIdx      || {}), [effect.npcId]: 0 },
         _npcGreetingDone: { ...(s._npcGreetingDone || {}), [effect.npcId]: false },
@@ -442,7 +491,7 @@ const _compileEffectCore = (effect, project) => {
   return () => {};
 };
 
-// Public `_compileEffect` — wraps the core runner with an optional message
+// Public `_compileEffect` - wraps the core runner with an optional message
 // push. Nested effects (multi/oneOf steps, randomLoot entries) flow through
 // the same wrapper so their own .message fields fire after their core logic.
 const _compileEffect = (effect, project) => {
@@ -476,7 +525,7 @@ const _mediaNode = page => {
 // Project text strings are bounded by the project size, so it can't run away.
 const _templateCache = new Map();
 
-// Maybe helpers — matches the parser-combinator style used by src/components/Markdown.js.
+// Maybe helpers - matches the parser-combinator style used by src/components/Markdown.js.
 const _liftIndex = i => i < 0 ? Nothing : Just(i);
 const _findClose = marker => from => text => _liftIndex(text.indexOf(marker, from));
 
@@ -546,6 +595,146 @@ const _pageBody = ctx => page => [
   ...(page.text ? [p({})([_evalText(ctx.state)(page.text)])] : []),
 ];
 
+// ── Character-creation wizard scenes ──────────────────────────────────────
+//
+// Two step types render through Scene with custom bodies + a small set of
+// choices. The store key `state._cc` tracks progress and the last seen
+// startRoom override; once all steps finish, the final `Continue` action
+// goto's the resolved start room (override OR meta.start).
+
+// `_ccAdvance` produces the action that closes a step - patches `_cc`,
+// then either navigates to the next step's `_cc:<stepId>` scene or, on
+// the LAST step, navigates to the resolved start room. Curried so the
+// per-type scene builders can hand a fresh closure to each Choice.
+const _ccAdvance = allSteps => idx => project => maybeStartRoom => c => {
+  const cur = c.getState();
+  const cc  = cur._cc || { picks: {}, points: {}, startRoom: null };
+  const startRoom = maybeStartRoom || cc.startRoom;
+  const next = allSteps[idx + 1];
+  c.setState({ _cc: { ...cc, step: idx + 1, startRoom, done: !next } });
+  if (next) {
+    c.goto(`_cc:${next.id}`);
+    return;
+  }
+  const dest = startRoom || project.meta.start || project.rooms[0]?.id;
+  if (dest) {
+    c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [dest]: 0 } }));
+    c.goto(dest);
+  }
+};
+
+// Point-buy step - render +/- buttons for each stat row; spent points come
+// out of `step.budget` and the Continue Choice is gated by remaining >= 0.
+const _buildCcPointBuyFn = step => idx => allSteps => project => ctx => {
+  const ccs = ctx.state._cc || {};
+  // Per-step current allocation. First time we see the step the row's
+  // `start` is the default.
+  const cur = ccs.points?.[step.id] || Object.fromEntries((step.stats || []).map(r => [r.statKey, Number(r.start) || 0]));
+  const spent = (step.stats || []).reduce(
+    (sum, r) => sum + Math.max(0, (cur[r.statKey] ?? r.start) - r.start), 0);
+  const remaining = (Number(step.budget) || 0) - spent;
+
+  const adjust = (statKey, delta) => () => ctx.setState(s => {
+    const cc = s._cc || {};
+    const points = cc.points?.[step.id] || {};
+    const row = (step.stats || []).find(r => r.statKey === statKey);
+    if (!row) return s;
+    const at = (points[statKey] ?? Number(row.start)) || 0;
+    const want = at + delta;
+    const next = Math.max(row.min, Math.min(row.max, want));
+    if (next === at) return s;
+    // Block upward spend when out of budget.
+    if (delta > 0) {
+      const cost = Math.max(0, (next - row.start)) - Math.max(0, (at - row.start));
+      if (cost > 0 && cost > remaining) return s;
+    }
+    return { _cc: { ...cc, points: { ...(cc.points || {}), [step.id]: { ...points, [statKey]: next } } } };
+  });
+
+  const rows = (step.stats || []).map(r => {
+    const at = (cur[r.statKey] ?? Number(r.start)) || 0;
+    return div({ style: 'display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border-2, var(--border))' })([
+      span({ style: 'min-width:100px; font-weight:600' })([r.statKey || '(unset)']),
+      button({ type: 'button', onclick: adjust(r.statKey, -1), style: 'padding:4px 12px; border:1px solid var(--border); background:var(--surface); color:var(--text); cursor:pointer; border-radius:var(--radius)' })(['-']),
+      span({ style: 'min-width:32px; text-align:center; font-family:ui-monospace,monospace; font-size:14px; font-weight:600' })([String(at)]),
+      button({ type: 'button', onclick: adjust(r.statKey, +1), style: 'padding:4px 12px; border:1px solid var(--border); background:var(--surface); color:var(--text); cursor:pointer; border-radius:var(--radius)' })(['+']),
+      span({ style: 'color:var(--text-muted); font-size:12px; margin-left:auto' })([`[${r.min} – ${r.max}]`]),
+    ]);
+  });
+
+  return Scene({
+    title: step.title || 'Allocate stat points',
+    body: [
+      ...(step.prompt ? [p({ style: 'color:var(--text-muted)' })([step.prompt])] : []),
+      div({ style: 'padding:8px 12px; margin-bottom:12px; background:var(--surface); border-radius:var(--radius); font-family:ui-monospace,monospace' })([
+        `Remaining points: ${remaining} / ${Number(step.budget) || 0}`,
+      ]),
+      ...rows,
+    ],
+    choices: [
+      {
+        label:  idx + 1 === allSteps.length ? 'Start' : 'Continue',
+        if:     () => remaining >= 0,
+        action: c => {
+          // Commit allocations to state.<statKey>.
+          const patch = (step.stats || []).reduce((acc, r) => {
+            acc[r.statKey] = (cur[r.statKey] ?? Number(r.start)) || 0;
+            return acc;
+          }, {});
+          c.setState(patch);
+          _ccAdvance(allSteps)(idx)(project)(null)(c);
+        },
+      },
+    ],
+  })(ctx);
+};
+
+// Choice step - render each option as a clickable card-shaped choice.
+// Selection runs the option's Effect, records the option id in
+// `_cc.picks`, and tracks `option.startRoom` as the latest override.
+const _buildCcChoiceFn = step => idx => allSteps => project => ctx => {
+  const choices = (step.options || []).map(opt => ({
+    label:  opt.label || '(unnamed)',
+    action: c => {
+      const effFn = _compileEffect(opt.effect, project);
+      effFn(c);
+      c.setState(s => ({
+        _cc: { ...(s._cc || {}), picks: { ...(s._cc?.picks || {}), [step.id]: opt.id } },
+      }));
+      _ccAdvance(allSteps)(idx)(project)(opt.startRoom || null)(c);
+    },
+  }));
+  // Render option descriptions as the body so the player sees the choices
+  // in context before clicking.
+  const optionCards = (step.options || []).map(opt => div({
+    style: 'border:1px solid var(--border); border-radius:var(--radius); padding:10px 14px; margin-bottom:10px; background:var(--surface)',
+  })([
+    div({ style: 'display:flex; gap:12px; align-items:flex-start' })([
+      ...(opt.image
+        ? [img({ src: opt.image, style: 'width:80px; height:80px; object-fit:cover; border-radius:var(--radius); flex-shrink:0' })([])]
+        : []),
+      div({ style: 'flex:1' })([
+        div({ style: 'font-weight:600; margin-bottom:4px' })([opt.label || '(unnamed)']),
+        ...(opt.description ? [p({ className: 'gef-hint gef-hint-13' })([_evalText(ctx.state)(opt.description)])] : []),
+        ...(opt.startRoom ? [div({ style: 'margin-top:6px; font-size:11px; color:var(--text-subtle); font-family:ui-monospace,monospace' })([`→ spawn at ${opt.startRoom}`])] : []),
+      ]),
+    ]),
+  ]));
+  return Scene({
+    title: step.title || 'Choose',
+    body: [
+      ...(step.prompt ? [p({ style: 'color:var(--text-muted)' })([step.prompt])] : []),
+      ...optionCards,
+    ],
+    choices,
+  })(ctx);
+};
+
+const _buildCharCreationSceneFn = step => idx => allSteps => project =>
+  step.type === 'pointBuy'
+    ? _buildCcPointBuyFn(step)(idx)(allSteps)(project)
+    : _buildCcChoiceFn  (step)(idx)(allSteps)(project);
+
 // Build the scene fn for a room. Wardrobe rooms render a paper-doll + the
 // items the player is carrying that match the configured kinds. Scene rooms
 // page through their pages with a "More" advance, then show real choices on
@@ -566,7 +755,7 @@ const _buildSceneFn = (room, project) => ctx => {
   // AND room.onEnd is non-none, render a single button (labelled by the page's
   // advanceLabel) that fires the Effect. Useful for "drink beer → randomLoot
   // navigate" or any auto-routing at the end of a story chain. NOTHING is
-  // created automatically — devs opt in by configuring onEnd.
+  // created automatically - devs opt in by configuring onEnd.
   const onEndFn       = _compileEffect(room.onEnd, project);
   const hasOnEnd      = room.onEnd && room.onEnd.mode && room.onEnd.mode !== 'none';
   const onEndFallback = isLast && room.choices.length === 0 && hasOnEnd
@@ -612,7 +801,7 @@ const _buildInventoryRoomFn = (room, project) => ctx => {
   const cfg = room.inventory || { kinds: [], layout: 'grid', showDescription: true, emptyMessage: 'You are not carrying anything.' };
   const inv = ctx.state.inventory || {};
 
-  // Reading overlay — shown when _reading is set to this room's id + item id.
+  // Reading overlay - shown when _reading is set to this room's id + item id.
   const reading = ctx.state._reading;
   if (reading && reading.roomId === room.id) {
     const book = project.items.find(it => it.id === reading.itemId);
@@ -720,7 +909,7 @@ const _buildWardrobeFn = (room, project) => ctx => {
   const inv = ctx.state.inventory || {};
   const equippedSlots = ctx.state.equipped || {};
   const equippedIds = new Set(Object.values(equippedSlots));
-  // The kinds filter is informational — equipped items always appear, carried
+  // The kinds filter is informational - equipped items always appear, carried
   // items only if they match.
   const carrying = project.items.filter(it => wb.kinds.includes(it.kind) && (Number(inv[it.id]) || 0) > 0);
 
@@ -801,10 +990,17 @@ const _buildChoice = (ch, project, fromRoomId) => {
       if (!ch.to) return;
       c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [ch.to]: 0 } }));
       const live = { ...c, state: c.getState() };
-      if (enterGuard(live)) enterEffect(c);
+      if (enterGuard(live)) {
+        // Re-snapshot _scene around enterEffect - if the room's onEnter
+        // navigates (enterCombat / talkTo / js goto), the trailing
+        // c.goto(ch.to) below would override and silently cancel it.
+        const beforeEnter = c.getState()._scene;
+        enterEffect(c);
+        if (c.getState()._scene !== beforeEnter) return;
+      }
       c.goto(ch.to);
     },
-    // No `to` returned — we already handle navigation in action so the engine
+    // No `to` returned - we already handle navigation in action so the engine
     // doesn't goto twice.
   };
 };
@@ -831,7 +1027,7 @@ const _buildShopScene = (npc, project) => {
         .filter(it => (Number(inv[it.id]) || 0) > 0)
         .map(it => ({ item: it, multiplier: Number(buyback.multiplier) || 0.8 }));
     }
-    // list mode — only the whitelisted items, with per-item override fallback.
+    // list mode - only the whitelisted items, with per-item override fallback.
     return (buyback.items || [])
       .map(e => {
         const it = project.items.find(x => x.id === e.itemId);
@@ -870,7 +1066,7 @@ const _buildShopScene = (npc, project) => {
     };
 
     // Sell: player → shop. Player loses 1 of the item and gains
-    // floor(multiplier × item.price.amount) of the item's price stat.
+    // floor(multiplier x item.price.amount) of the item's price stat.
     const sell = ({ item, multiplier }) => c => {
       const have = Number(c.state.inventory?.[item.id] || 0);
       if (have <= 0) return;
@@ -981,21 +1177,63 @@ const _buildShopScene = (npc, project) => {
 //   advanced (advanced: true):
 //     greeting pages → entry topic → other topics via `change` flow
 //     Choices on topics decide what happens next:
-//       change      — push current topic on stack, switch to ch.topicId
-//       exitBack    — pop the stack (or leave the NPC if stack is empty)
-//       exitRoom    — leave the NPC entirely, goto ch.to (or back if ch.to:'')
-//       exitCombat  — leave the NPC, start ch.combatId
+//       change      - push current topic on stack, switch to ch.topicId
+//       exitBack    - pop the stack (or leave the NPC if stack is empty)
+//       exitRoom    - leave the NPC entirely, goto ch.to (or back if ch.to:'')
+//       exitCombat  - leave the NPC, start ch.combatId
 //
 //   State keys this owns:
-//     _npcPageIdx[npcId]                 — greeting page idx
-//     _npcTopic[npcId]                   — current topic id (or null = pre-topic / entry)
-//     _npcTopicStack[npcId]              — [topicId,…] previously-visited topics
-//     _npcTopicPageIdx[npcId][topicId]   — page idx within a topic
+//     _npcPageIdx[npcId]                 - greeting page idx
+//     _npcTopic[npcId]                   - current topic id (or null = pre-topic / entry)
+//     _npcTopicStack[npcId]              - [topicId,…] previously-visited topics
+//     _npcTopicPageIdx[npcId][topicId]   - page idx within a topic
+/** Return override when non-empty (string or array), else base. */
+const _pickOverride = base => override =>
+  override && (typeof override === 'string' ? override.length > 0 : (Array.isArray(override) ? override.length > 0 : false))
+    ? override
+    : base;
+
+/** Memoised guard list per npc reference. */
+const _npcVariantCache = new WeakMap();
+const _compiledVariants = npc => {
+  const cached = _npcVariantCache.get(npc);
+  if (cached) return cached;
+  const fresh = npc.variants.map(v => ({ variant: v, guard: _compileCondition(v.condition) }));
+  _npcVariantCache.set(npc, fresh);
+  return fresh;
+};
+
+/** First matching variant against the live ctx, or null. */
+const _firstMatchingVariant = live => compiled =>
+  compiled.find(({ guard }) => { try { return guard(live); } catch { return false; } }) || null;
+
+/** Apply the first matching variant onto the base npc. Empty fields inherit from base. */
+const _resolveNpcVariant = (npc, _project, ctx) => {
+  if (!Array.isArray(npc.variants) || npc.variants.length === 0) return npc;
+  const live = { ...ctx, state: ctx.getState ? ctx.getState() : ctx.state };
+  const hit  = _firstMatchingVariant(live)(_compiledVariants(npc));
+  if (!hit) return npc;
+  const o = hit.variant.overrides || {};
+  const pick = key => _pickOverride(npc[key])(o[key]);
+  return {
+    ...npc,
+    greeting:     pick('greeting'),
+    portrait:     pick('portrait'),
+    pages:        pick('pages'),
+    choices:      pick('choices'),
+    topics:       pick('topics'),
+    entryTopicId: pick('entryTopicId'),
+  };
+};
+
 const _buildNpcDialogue = (npc, project) => ctx => {
   const back = ctx.scene;
-  // Simple flat dialogue — preserves v0 behaviour exactly when advanced is off.
-  if (!npc.advanced) return _renderNpcSimple(npc, project, back, ctx);
-  return _renderNpcAdvanced(npc, project, back, ctx);
+  // Pick the effective NPC for THIS render (variants can swap fields based
+  // on state - gender, faction reputation, …).
+  const effective = _resolveNpcVariant(npc, project, ctx);
+  // Simple flat dialogue - preserves v0 behaviour exactly when advanced is off.
+  if (!effective.advanced) return _renderNpcSimple(effective, project, back, ctx);
+  return _renderNpcAdvanced(effective, project, back, ctx);
 };
 
 const _renderNpcSimple = (npc, project, back, ctx) => {
@@ -1017,7 +1255,7 @@ const _renderNpcSimple = (npc, project, back, ctx) => {
     })(ctx);
   }
 
-  // Final page — render NPC's flat choices + an auto "Goodbye" when none lead out.
+  // Final page - render NPC's flat choices + an auto "Goodbye" when none lead out.
   const choices = npc.choices.map(ch => _buildSimpleNpcChoice(ch, project, back));
   const hasLeavingChoice = npc.choices.length > 0;   // any choice is good enough as an out
   if (!hasLeavingChoice) choices.push({ label: 'Goodbye', action: c => c.setState({ _scene: back }) });
@@ -1035,7 +1273,7 @@ const _buildSimpleNpcChoice = (ch, project, back) => {
     if:    c => guard(c),
     action: c => {
       _startAction(c);
-      // See note in _buildChoice — `c.scene` is patched to the calling-room
+      // See note in _buildChoice - `c.scene` is patched to the calling-room
       // id inside dialogue contexts, so we read the canonical scene id from
       // state instead.
       const before = c.getState()._scene;
@@ -1047,13 +1285,17 @@ const _buildSimpleNpcChoice = (ch, project, back) => {
       const enterEffect = target ? _compileEffect(target.onEnter, project)    : () => {};
       c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [ch.to]: 0 } }));
       const live = { ...c, state: c.getState() };
-      if (enterGuard(live)) enterEffect(c);
+      if (enterGuard(live)) {
+        const beforeEnter = c.getState()._scene;
+        enterEffect(c);
+        if (c.getState()._scene !== beforeEnter) return;
+      }
       c.goto(ch.to);
     },
   };
 };
 
-// — Advanced (topic-tree) mode ————————————————————————————————
+// - Advanced (topic-tree) mode --------------------------------
 
 const _renderNpcAdvanced = (npc, project, back, ctx) => {
   const topics = Array.isArray(npc.topics) ? npc.topics : [];
@@ -1123,7 +1365,7 @@ const _renderNpcTopic = (npc, topic, allTopics, project, back, ctx) => {
     })(ctx);
   }
 
-  // Final page — render the topic's choices. If empty, give the player an
+  // Final page - render the topic's choices. If empty, give the player an
   // exitBack so they're never stuck.
   const choices = (topic.choices || []).map(ch => _buildTopicChoice(ch, npc, topic, allTopics, project, back));
   if (choices.length === 0) {
@@ -1163,7 +1405,7 @@ const _buildTopicChoice = (ch, npc, topic, allTopics, project, back) => {
     if:    c => guard(c),
     action: c => {
       _startAction(c);
-      // Snapshot the canonical scene id (NOT `c.scene` — that's patched to
+      // Snapshot the canonical scene id (NOT `c.scene` - that's patched to
       // the calling-room id in dialogue contexts and would always read as
       // "different" once the player is talking to an NPC, swallowing every
       // flow:'exitBack' / 'change' / etc. action).
@@ -1173,7 +1415,7 @@ const _buildTopicChoice = (ch, npc, topic, allTopics, project, back) => {
       // talkTo, etc.) we yield to it and skip the choice's flow-based nav.
       if (c.getState()._scene !== before) return;
 
-      // `stay` — effect ran, no navigation. The scene re-renders on next tick;
+      // `stay` - effect ran, no navigation. The scene re-renders on next tick;
       // current topic + page index are untouched.
       if (flow === 'stay') return;
 
@@ -1197,7 +1439,11 @@ const _buildTopicChoice = (ch, npc, topic, allTopics, project, back) => {
         const enterEffect = target ? _compileEffect(target.onEnter, project)    : () => {};
         c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [ch.to]: 0 } }));
         const live = { ...c, state: c.getState() };
-        if (enterGuard(live)) enterEffect(c);
+        if (enterGuard(live)) {
+          const beforeEnter = c.getState()._scene;
+          enterEffect(c);
+          if (c.getState()._scene !== beforeEnter) return;
+        }
         c.goto(ch.to);
         return;
       }
@@ -1223,7 +1469,7 @@ const _buildTopicChoice = (ch, npc, topic, allTopics, project, back) => {
   };
 };
 
-// Sidebar widget renderers — return [vnode] per widget. The createGame engine
+// Sidebar widget renderers - return [vnode] per widget. The createGame engine
 // wraps them in a scrollable column; we just emit content.
 const _renderSidebar = project => ctx => {
   const sb = project.sidebar || { enabled: false, widgets: [] };
@@ -1247,7 +1493,7 @@ const _renderWidget = (w, project, ctx) => {
         div({ style: 'display:flex; flex-direction:column; gap:4px; font-size:13px' })(
           keys.map(k => div({ style: 'display:flex; justify-content:space-between' })([
             span({})([k]),
-            span({ style: 'font-family:ui-monospace,monospace' })([String(ctx.state[k] ?? 0)]),
+            span({ className: 'dv-mono' })([String(ctx.state[k] ?? 0)]),
           ]))
         ),
       ]);
@@ -1266,6 +1512,9 @@ const _renderWidget = (w, project, ctx) => {
         span({ style: 'color:var(--text-muted); font-size:11px' })(['→']),
       ]);
     }
+    case 'minimap': {
+      return _renderMinimap(w)(project)(ctx);
+    }
     case 'js': {
       return _renderJsWidget(w, ctx);
     }
@@ -1277,7 +1526,7 @@ const _renderWidget = (w, project, ctx) => {
       return div({ style: 'margin-bottom:12px' })([
         h3({ style: 'margin:0 0 6px; font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em' })(['Inventory']),
         ...(entries.length === 0
-          ? [p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })(['(empty)'])]
+          ? [p({ className: 'gef-hint' })(['(empty)'])]
           : (w.layout === 'grid'
               ? [div({ style: 'display:grid; grid-template-columns:repeat(auto-fill,minmax(56px,1fr)); gap:6px' })(
                   entries.map(([id, n]) => {
@@ -1353,6 +1602,364 @@ const _renderPortrait = (w, ctx) => {
   ]);
 };
 
+/** True for rooms that render on the map. Story + hideOnMap are filtered. */
+const _mappable = r => r && r.kind !== 'story' && !r.hideOnMap;
+
+// Whole-word direction hints in choice labels. "downtown" never matches
+// "down"; "upstairs" never matches "up". Order = priority.
+const _DIR_WORDS = [
+  ['north', [0, -1]], ['up',    [0, -1]], ['above', [0, -1]],
+  ['south', [0,  1]], ['down',  [0,  1]], ['below', [0,  1]],
+  ['east',  [1,  0]], ['right', [1,  0]],
+  ['west',  [-1, 0]], ['left',  [-1, 0]],
+];
+
+/** Maybe<item>: first list item matching pred, or Nothing. */
+const _tryListM = pred => list => {
+  const hit = list.find(pred);
+  return hit ? Just(hit) : Nothing;
+};
+
+/** Maybe<[dx,dy]>: direction word from a choice label. */
+const _dirFromLabel = label => {
+  const lower = String(label || '').toLowerCase();
+  const m = _tryListM(([word]) => new RegExp(`\\b${word}\\b`).test(lower))(_DIR_WORDS);
+  return bind(m)(([, dir]) => Just(dir));
+};
+
+/** Cardinal fallback offsets in a fixed order so layouts are deterministic. */
+const _CARDINAL_OFFSETS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+/** Spiral offsets up to radius 50, ring by ring, nearest first. */
+const _spiralOffsets = (() => {
+  const ring = r => {
+    const range = Array.from({ length: 2 * r + 1 }, (_, i) => i - r);
+    return range.flatMap(d => [[d, -r], [d, r], [-r, d], [r, d]]);
+  };
+  return Array.from({ length: 49 }, (_, i) => i + 2).flatMap(ring);
+})();
+
+/** Maybe<offset>. Tries hint, cardinals, spiral; Nothing on saturated grid. */
+const _findFreeOffset = occupied => x => y => mHint => {
+  const free    = ([dx, dy]) => !occupied.has(`${x + dx},${y + dy}`);
+  const tryHint = bind(mHint)(h => free(h) ? Just(h) : Nothing);
+  return orElse(orElse(tryHint)(_tryListM(free)(_CARDINAL_OFFSETS)))(_tryListM(free)(_spiralOffsets));
+};
+
+/**
+ * Place one child at the next free cell. Reducer-shaped (state, choice)
+ * so it drops into Array.reduce. Curried on static deps.
+ */
+const _placeChild = byId => id => (state, choice) => {
+  if (!choice.to || !byId[choice.to] || state.posById[choice.to]) return state;
+  const [x, y] = state.posById[id];
+  const placed = bind(_findFreeOffset(state.occupied)(x)(y)(_dirFromLabel(choice.label)))(offset => {
+    const cell = [x + offset[0], y + offset[1]];
+    return Just({
+      posById:  { ...state.posById,  [choice.to]: cell },
+      occupied: new Map(state.occupied).set(`${cell[0]},${cell[1]}`, choice.to),
+      queue:    [...state.queue, choice.to],
+    });
+  });
+  return fromMaybe(state)(placed);
+};
+
+/** One BFS step: pop head, place its children. Returns null when done. */
+const _layoutStep = byId => state => {
+  const [head, ...rest] = state.queue;
+  if (head === undefined) return null;
+  const children = byId[head].choices || [];
+  return children.reduce(_placeChild(byId)(head), { ...state, queue: rest });
+};
+
+/** Iterative driver. One `let` because JS lacks TCO. */
+const _runLayout = byId => initial => {
+  let state = initial;
+  while (state.queue.length > 0) state = _layoutStep(byId)(state);
+  return state;
+};
+
+/**
+ * Stable global grid layout for every mapped room. BFS from start,
+ * place each new room at the cell hinted by its incoming choice label
+ * (cardinals then spiral on conflict). Independent of visited / fog state.
+ */
+const _minimapLayout = project => {
+  const mapped  = project.rooms.filter(_mappable);
+  const byId    = Object.fromEntries(mapped.map(r => [r.id, r]));
+  const startId = byId[project.meta.start] ? project.meta.start : mapped[0]?.id;
+  if (!startId) return { posById: {}, byId, startId: null };
+  const final = _runLayout(byId)({
+    posById:  { [startId]: [0, 0] },
+    occupied: new Map([['0,0', startId]]),
+    queue:    [startId],
+  });
+  return { posById: final.posById, byId, startId };
+};
+
+// Generic depth-aware BFS fold. `expand` produces the children to enqueue
+// from a given id; `state` is the running fold accumulator. The driver
+// runs until the queue is drained - single `let` for the loop, pure step.
+const _bfsFold = expand => initial => {
+  let state = initial;
+  while (state.queue.length > 0) {
+    const [[id, depth], ...rest] = state.queue;
+    const next = { ...state, queue: rest };
+    const cut  = state.maxDepth > 0 && depth >= state.maxDepth;
+    state = cut ? next : expand(id)(depth)(next);
+  }
+  return state;
+};
+
+// Both BFS helpers below batch the per-parent frontier into one Set
+// union so the overall fold stays O(n).
+
+/**
+ * Fast-travel reachability. Returns Set of ids reachable from fromId
+ * through visited rooms whose edges' conditions currently pass.
+ */
+const _reachableFastTravel = byId => ctx => fromId => {
+  if (!fromId || !byId[fromId]) return new Set();
+  const visited = ctx.state._mapVisited || {};
+  const live    = { ...ctx, state: ctx.getState() };
+  const passable = ch =>
+       ch.to && byId[ch.to]
+    && visited[ch.to]
+    && _compileCondition(ch.condition)(live);
+  const expand = id => _depth => state => {
+    const frontier = (byId[id]?.choices || [])
+      .filter(ch => passable(ch) && !state.seen.has(ch.to))
+      .map(ch => ch.to);
+    return frontier.length === 0 ? state : {
+      ...state,
+      seen:  new Set([...state.seen, ...frontier]),
+      out:   new Set([...state.out,  ...frontier]),
+      queue: [...state.queue, ...frontier.map(to => [to, 0])],
+    };
+  };
+  const final = _bfsFold(expand)({
+    seen: new Set([fromId]), out: new Set(),
+    queue: [[fromId, 0]], maxDepth: 0,
+  });
+  return final.out;
+};
+
+/** BFS over the choice graph. maxDepth 0 means unlimited. */
+const _bfsWithin = byId => rootId => maxDepth => {
+  if (!byId[rootId]) return new Set();
+  const expand = id => depth => state => {
+    const frontier = (byId[id]?.choices || [])
+      .filter(ch => ch.to && byId[ch.to] && !state.seen.has(ch.to))
+      .map(ch => ch.to);
+    return frontier.length === 0 ? state : {
+      ...state,
+      seen:  new Set([...state.seen, ...frontier]),
+      queue: [...state.queue, ...frontier.map(to => [to, depth + 1])],
+    };
+  };
+  const final = _bfsFold(expand)({
+    seen: new Set([rootId]),
+    queue: [[rootId, 0]],
+    maxDepth,
+  });
+  return final.seen;
+};
+
+/** Player's physical room. During combat ctx.scene is _combat:<id>; the calling room sits at state._combat.returnTo. */
+const _physicalScene = ctx => {
+  const s = ctx.scene;
+  if (typeof s === 'string' && s.startsWith('_combat:')) {
+    return ctx.state._combat?.returnTo || null;
+  }
+  return s;
+};
+
+const _renderMinimap = w => project => ctx => {
+  // Grid layout is global and stable. Visited / fog / range only filter
+  // which cells render; coordinates never shift.
+  const { posById: gridPos, byId, startId } = _minimapLayout(project);
+  if (!startId) return div({})([]);
+
+  const range   = Math.max(0, Number(w.range) || 0);
+  const here    = _physicalScene(ctx);
+  const showLbl = !!w.showLabels;
+  const dim     = w.dimUnvisited !== false;
+  const wPx     = Math.max(0, Number(w.width) || 0);
+  const fog     = !!w.visitedOnly;
+  const reach   = Math.max(0, Number(w.reach) || 0);
+  // Zoom is a max-viewport cap in CSS pixels. >0 wraps the SVG in a
+  // scrolling div with that cap on both axes - the SVG renders at its
+  // natural size so anything past the cap scrolls. 0 = off (SVG just
+  // fits its container via max-width:100%, original behaviour).
+  // Anything under 16px would clip the map to a sliver; the knob was
+  // previously a multiplier (`zoom: 1` shipped as the default), so we
+  // treat any saved-from-the-old-schema value of 1 (or any value < 16)
+  // as "off" - no migration code needed.
+  const rawZoom = Math.max(0, Number(w.zoom) || 0);
+  const zoom    = rawZoom < 16 ? 0 : rawZoom;
+  const ftOn    = !!w.fastTravel;
+  const visited = ctx.state._mapVisited || {};
+
+  // Range filter - BFS over the choice graph from the player's room (or
+  // start if range is 0 or the player is off-grid). Range 0 means no
+  // depth limit, so everything mapped is in `rangeSet`.
+  const rangeRoot = range > 0 ? (gridPos[here] ? here : startId) : startId;
+  const rangeSet  = _bfsWithin(byId)(rangeRoot)(range);
+
+  // Fog-of-war filter - keep visited (and the current cell) inside
+  // rangeSet, then optionally expand by `reach` BFS steps over the choice
+  // graph. Expansion stays inside rangeSet so range still wins.
+  let visibleSet;
+  if (fog) {
+    visibleSet = new Set();
+    for (const id of rangeSet) if (visited[id]) visibleSet.add(id);
+    if (here && rangeSet.has(here)) visibleSet.add(here);
+    let frontier = new Set(visibleSet);
+    for (let d = 0; d < reach && frontier.size > 0; d++) {
+      const next = new Set();
+      for (const id of frontier) {
+        for (const ch of (byId[id]?.choices || [])) {
+          if (ch.to && rangeSet.has(ch.to) && !visibleSet.has(ch.to)) {
+            visibleSet.add(ch.to);
+            next.add(ch.to);
+          }
+        }
+      }
+      frontier = next;
+    }
+  } else {
+    visibleSet = rangeSet;
+  }
+  if (visibleSet.size === 0) return div({})([]);
+
+  // Visited write - physical room becomes visited next frame. Microtask so
+  // we don't mutate store state mid-render.
+  if (typeof here === 'string' && gridPos[here] && !visited[here]) {
+    Promise.resolve().then(() => ctx.setState(s => ({
+      _mapVisited: { ...(s._mapVisited || {}), [here]: true },
+    })));
+  }
+
+  // Viewport = bounding box of visible grid cells. Hidden cells in between
+  // leave gaps, but visible cells never shift between renders.
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const id of visibleSet) {
+    const [gx, gy] = gridPos[id];
+    if (gx < minX) minX = gx;
+    if (gx > maxX) maxX = gx;
+    if (gy < minY) minY = gy;
+    if (gy > maxY) maxY = gy;
+  }
+  const cols = maxX - minX + 1;
+  const rows = maxY - minY + 1;
+
+  const CELL_W = showLbl ? 56 : 18;
+  const CELL_H = showLbl ? 22 : 18;
+  const GAP    = 4;
+  const PAD    = 6;
+  const W      = PAD * 2 + cols * CELL_W + Math.max(0, cols - 1) * GAP;
+  const H      = PAD * 2 + rows * CELL_H + Math.max(0, rows - 1) * GAP;
+
+  const placed = [...visibleSet].map(id => {
+    const [gx, gy] = gridPos[id];
+    const col = gx - minX, row = gy - minY;
+    const x = PAD + col * (CELL_W + GAP);
+    const y = PAD + row * (CELL_H + GAP);
+    return { id, title: byId[id].title || id, x, y, cx: x + CELL_W / 2, cy: y + CELL_H / 2 };
+  });
+  const posByIdVisible = Object.fromEntries(placed.map(n => [n.id, n]));
+
+  // Reachable-by-fast-travel - single BFS per render shared across all cells.
+  const ftReachable = ftOn ? _reachableFastTravel(byId)(ctx)(here) : null;
+
+  // Edges between visible rooms, deduped per pair. Most edges are
+  // orthogonal because connected rooms land on adjacent grid cells; when
+  // they don't (fallback placement / spiral), draw an L-shape via
+  // polyline. We never emit diagonal lines.
+  const edges = [];
+  const seenPair = new Set();
+  for (const n of placed) {
+    for (const ch of (byId[n.id]?.choices || [])) {
+      if (!ch.to || !posByIdVisible[ch.to]) continue;
+      const key = n.id < ch.to ? `${n.id}>${ch.to}` : `${ch.to}>${n.id}`;
+      if (seenPair.has(key)) continue;
+      seenPair.add(key);
+      edges.push({ from: n, to: posByIdVisible[ch.to] });
+    }
+  }
+  const _edge = e => {
+    if (e.from.cy === e.to.cy || e.from.cx === e.to.cx) {
+      return _svgLn({
+        x1: e.from.cx, y1: e.from.cy, x2: e.to.cx, y2: e.to.cy,
+        stroke: 'var(--border)', 'stroke-width': 1,
+      })([]);
+    }
+    // Bend at target's x then drop to target's y - always two right angles.
+    const pts = `${e.from.cx},${e.from.cy} ${e.to.cx},${e.from.cy} ${e.to.cx},${e.to.cy}`;
+    return _svgPl({ points: pts, fill: 'none', stroke: 'var(--border)', 'stroke-width': 1 })([]);
+  };
+
+  const _cell = n => {
+    const isCurrent = n.id === here;
+    const isVisited = !!visited[n.id];
+    const canTravel = ftReachable !== null && ftReachable.has(n.id);
+    const fill   = isCurrent ? 'var(--accent)'
+                 : isVisited ? 'var(--surface)'
+                 : dim       ? 'transparent'
+                 :             'var(--surface)';
+    const stroke = isCurrent ? 'var(--accent)'
+                 : isVisited ? 'var(--text-muted)'
+                 :             'var(--border)';
+    const textFill = isCurrent ? '#fff' : (isVisited ? 'var(--text)' : 'var(--text-muted)');
+    return _svgG({
+      key:     n.id,
+      ...(canTravel
+        ? {
+            style: 'cursor:pointer',
+            onclick: () => {
+              ctx.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [n.id]: 0 } }));
+              ctx.goto(n.id);
+            },
+          }
+        : {}),
+    })([
+      _svgRct({
+        x: n.x, y: n.y, width: CELL_W, height: CELL_H, rx: 3,
+        fill, stroke, 'stroke-width': isCurrent ? 1.5 : 1,
+      })([]),
+      ...(showLbl ? [_svgTxt({
+        x: n.cx, y: n.cy + 3, 'text-anchor': 'middle',
+        style: `font-size:9px; fill:${textFill}; pointer-events:none; font-family:ui-monospace,monospace`,
+      })([n.title.length > 9 ? `${n.title.slice(0, 8)}…` : n.title])] : []),
+    ]);
+  };
+
+  // SVG renders at its natural pixel size (cells × CELL_W). When zoom > 0
+  // we drop `max-width:100%` so the SVG can exceed the viewport, then wrap
+  // it in a scrolling div capped at `zoom` px on both axes. When zoom = 0
+  // we keep the original "fit container" behaviour.
+  const svgStyle = zoom > 0
+    ? `display:block; height:auto${wPx ? `; width:${wPx}px` : ''}`
+    : `display:block; max-width:100%; height:auto${wPx ? `; width:${wPx}px` : ''}`;
+  const svg = _svgEl({
+    width: W, height: H,
+    viewBox: `0 0 ${W} ${H}`,
+    xmlns:   'http://www.w3.org/2000/svg',
+    style:   svgStyle,
+  })([
+    ...edges.map(_edge),
+    ...placed.map(_cell),
+  ]);
+  const viewport = zoom > 0
+    ? div({ style: `overflow:auto; max-width:${zoom}px; max-height:${zoom}px` })([svg])
+    : svg;
+
+  return div({ style: 'margin-bottom:12px' })([
+    ...(w.label ? [h3({ style: 'margin:0 0 6px; font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em' })([w.label])] : []),
+    viewport,
+  ]);
+};
+
 const _randInt = n => (n > 0 ? Math.floor(Math.random() * (n + 1)) : 0);   // 0..N inclusive
 
 // Compute final damage for a player move/skill against the enemy.
@@ -1419,7 +2026,7 @@ const _pickEnemyAction = (actions, ctxInfo) => {
   return pool[pool.length - 1];
 };
 
-// Combat scene factory — renders the encounter, applies moves, runs enemy
+// Combat scene factory - renders the encounter, applies moves, runs enemy
 // turns, branches to winRoom / loseRoom / returnTo as configured.
 const _buildCombatSceneFn = (combat, project) => ctx => {
   const cs = ctx.state._combat;
@@ -1429,7 +2036,7 @@ const _buildCombatSceneFn = (combat, project) => ctx => {
     ] })(ctx);
   }
 
-  // Outcome screen — onWin / onLose run before navigation. linkedNpcId on win
+  // Outcome screen - onWin / onLose run before navigation. linkedNpcId on win
   // also removes the NPC from world by clearing its location.
   if (cs.outcome === 'win' || cs.outcome === 'lose') {
     const targetRoom = (cs.outcome === 'win' ? combat.winRoom : combat.loseRoom) || cs.returnTo;
@@ -1516,7 +2123,7 @@ const _buildCombatSceneFn = (combat, project) => ctx => {
     const pct = Math.max(0, Math.min(100, Number(action.hitPercent ?? 100)));
     const hit = Math.floor(Math.random() * 100) + 1 <= pct;
     if (!hit) {
-      const log = [...(cstate.log || []), `${combat.enemy.name} ${action.label || 'attacks'} — miss.`];
+      const log = [...(cstate.log || []), `${combat.enemy.name} ${action.label || 'attacks'} - miss.`];
       return { ...sBeforeEnemy, _combat: { ...cstate, log, turn: (cstate.turn || 0) + 1, lastEnemyImage: action.image || null, lastEnemyText: action.flavourText || '' } };
     }
     const damage = Math.max(0, (Number(action.damage) || 0) + _randInt(Number(action.damageRandom) || 0));
@@ -1635,23 +2242,36 @@ const buildGameConfig = rawProject => {
     project.rooms.map(r => [r.id, _withMessageOverlay(_buildSceneFn(r, project))])
   );
 
-  // Combat scenes — addressed as `_combat:<id>`; enterCombat goto's these.
+  // Combat scenes - addressed as `_combat:<id>`; enterCombat goto's these.
   for (const cb of (project.combats || [])) {
     scenes[`_combat:${cb.id}`] = _withMessageOverlay(_buildCombatSceneFn(cb, project));
   }
 
+  // Character-creation wizard scenes - one per step, addressed as
+  // `_cc:<stepId>`. The engine routes the player through these before the
+  // real start room when cc.enabled.
+  const cc = project.charCreation || { enabled: false, steps: [] };
+  const ccActive = cc.enabled && Array.isArray(cc.steps) && cc.steps.length > 0;
+  if (ccActive) {
+    for (let i = 0; i < cc.steps.length; i++) {
+      const step = cc.steps[i];
+      scenes[`_cc:${step.id}`] = _withMessageOverlay(_buildCharCreationSceneFn(step)(i)(cc.steps)(project));
+    }
+  }
+
   const npcs = Object.fromEntries(
     project.npcs.map(n => [n.id, {
-      name:      n.name,
-      locations: n.locations,
-      greeting:  n.greeting,
-      dialogue:  n.role === 'shop'
+      name:          n.name,
+      locations:     n.locations,
+      greeting:      n.greeting,
+      interactLabel: n.interactLabel || '',
+      dialogue:      n.role === 'shop'
         ? _buildShopScene(n, project)
         : _buildNpcDialogue(n, project),
     }])
   );
 
-  // Initial state — stats, flags, starting inventory, internal indices
+  // Initial state - stats, flags, starting inventory, internal indices
   const startingInv = Object.fromEntries(
     Object.entries(project.startingInventory || {})
       .filter(([id, n]) => n > 0 && project.items.find(it => it.id === id))
@@ -1660,15 +2280,23 @@ const buildGameConfig = rawProject => {
   const startingSkills = Array.isArray(project.startingSkills)
     ? project.startingSkills.filter(id => project.skills?.find(s => s.id === id))
     : [];
-  // Starting equipment — keys are slot names; values must be itemIds the
+  // Starting equipment - keys are slot names; values must be itemIds the
   // catalogue still contains. Slots referencing missing items are dropped.
   const knownIds = new Set(project.items.map(it => it.id));
   const startingEquipped = Object.fromEntries(
     Object.entries(project.startingEquipped || {})
       .filter(([slot, id]) => slot && id && knownIds.has(id))
   );
+  // Stat initials are type-aware now (number / string / array). Legacy
+  // rows missing a `type` field stay numeric.
+  const _statInitial = s => {
+    const t = s.type || 'number';
+    if (t === 'string') return typeof s.initial === 'string' ? s.initial : '';
+    if (t === 'array')  return Array.isArray(s.initial) ? s.initial.map(String) : [];
+    return Number(s.initial) || 0;
+  };
   const initial = {
-    ...Object.fromEntries(project.stats.map(s => [s.key, Number(s.initial) || 0])),
+    ...Object.fromEntries(project.stats.map(s => [s.key, _statInitial(s)])),
     flags:      Object.fromEntries(project.flags.map(f => [f.key, !!f.initial])),
     inventory:  startingInv,
     equipped:   startingEquipped,
@@ -1683,7 +2311,7 @@ const buildGameConfig = rawProject => {
     _combat:        null,
     _reading:       null,
     _lootLog:       [],   // last 8 "Loot: X x2" lines from randomLoot picks
-    _messageQueue:  [],   // pending Effect.message lines — shown as Continue overlay
+    _messageQueue:  [],   // pending Effect.message lines - shown as Continue overlay
     _msgInit:       {},   // pre-action state snapshot for init / gain / loss scope
   };
 
@@ -1691,9 +2319,9 @@ const buildGameConfig = rawProject => {
   // we wrap the dialogue function above to read state.[_npcPageIdx][npc.id]).
   // The first time you talk, idx defaults to 0; further talks resume where
   // they left off. To force a reset every talk, set idx to 0 below via an
-  // npcResetOnTalk effect — left as a v2 polish.
+  // npcResetOnTalk effect - left as a v2 polish.
 
-  // Background music resolver — picks the active room's `music` field, with
+  // Background music resolver - picks the active room's `music` field, with
   // fall-back to `meta.defaultMusic`. Asset refs are already resolved by
   // resolveAssetsForPreview upstream so `room.music` is a usable URL string
   // here. Dialogue scenes (`_dialogue:<npcId>:<returnTo>`) use the calling
@@ -1710,9 +2338,20 @@ const buildGameConfig = rawProject => {
   };
 
   const sb = project.sidebar || { enabled: false, widgets: [] };
+  // When char-creation is active, start the player INSIDE the wizard. The
+  // last step's `_ccAdvance` does the final c.goto into meta.start (or the
+  // option's startRoom override).
+  const resolvedStart = ccActive
+    ? `_cc:${cc.steps[0].id}`
+    : (project.meta.start || project.rooms[0]?.id || 'start');
+  // Seed `_cc` so the wizard scenes can read it on first paint without
+  // needing to nullcheck every access.
+  if (ccActive) {
+    initial._cc = { step: 0, picks: {}, points: {}, startRoom: null, done: false };
+  }
   return {
     title:   project.meta.title || 'Untitled RPG',
-    start:   project.meta.start || project.rooms[0]?.id || 'start',
+    start:   resolvedStart,
     state:   initial,
     scenes,
     npcs,

@@ -1,12 +1,12 @@
 /**
- * Assets panel — top-level catalogue of every uploaded image / audio / video.
+ * Assets panel - top-level catalogue of every uploaded image / audio / video.
  *
  * Fields elsewhere (item.image, page.video, room.music, …) hold an
  * `asset:<id>` reference instead of an inline data URL, so the same upload
  * can be reused across rooms/items without duplication.
  *
  * Project-wide compression defaults live here too; they're applied to every
- * new upload. To change settings on a past asset, drop it and re-upload — we
+ * new upload. To change settings on a past asset, drop it and re-upload - we
  * don't keep the lossless original around to save localStorage space.
  */
 
@@ -19,7 +19,7 @@ import { Button } from '../../src/components/Button.js';
 import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
-import { setProject, setState, toast, putAssetBlob, dropAssetBlob, IDB_MARKER } from '../store.js';
+import { setProject, setState, toast, putAssetBlob, dropAssetBlob, IDB_MARKER, updateById } from '../store.js';
 import { confirmAction } from '../components/ConfirmDialog.js';
 import { emptyAsset } from '../schema.js';
 import { onText } from '../helpers.js';
@@ -56,7 +56,7 @@ const _processUpload = async (file, project) => {
   const data = (kind === 'image' && !skipCompress)
     ? await compressImageDataUrl(raw, { quality: defaults.imageQuality, maxDimension: defaults.imageMaxDim })
     : raw;
-  // Mime comes from the FINAL data URL, not the upload — base64ToWebP rewrites
+  // Mime comes from the FINAL data URL, not the upload - base64ToWebP rewrites
   // the header to image/webp on success. If we stored rawMime here, the zip
   // export would write a .png filename around the WebP bytes (4x larger than
   // the equivalent .png and confusing for anyone inspecting the export).
@@ -75,7 +75,7 @@ const _addAssetsFromFiles = async (files, project) => {
   const processed = await Promise.all([...files].map(f => _processUpload(f, project)));
   // Push every blob to IDB BEFORE setProject. That way the synchronous strip
   // in saveProject can replace each asset.data with a marker and localStorage
-  // never sees the raw bytes — which is the whole point: a multi-MB audio
+  // never sees the raw bytes - which is the whole point: a multi-MB audio
   // upload would have blown the localStorage quota otherwise.
   try {
     await Promise.all(processed.map(a => putAssetBlob(a.id, a.data)));
@@ -95,13 +95,10 @@ const _pickFiles = (accept, onPicked) => {
   el.click();
 };
 
-const _updateAsset = (id, patch) => setProject(p => ({
-  ...p,
-  assets: p.assets.map(a => a.id === id ? { ...a, ...patch } : a),
-}));
+const _updateAsset = updateById('assets');
 
 const _deleteAsset = id => {
-  // Best-effort blob purge — failure is non-fatal (orphan blobs are cheap
+  // Best-effort blob purge - failure is non-fatal (orphan blobs are cheap
   // and clearSlot will sweep them when the slot itself is removed).
   dropAssetBlob(id).catch(e => console.warn('[assets] IDB delete failed', e));
   setProject(p => ({ ...p, assets: p.assets.filter(a => a.id !== id) }));
@@ -136,7 +133,7 @@ const AssetCard = suggestions => asset => {
         TextInput({
           label:    'Name',
           value:    asset.name,
-          onChange: onText(v => _updateAsset(asset.id, { name: v })),
+          onChange: onText(v => _updateAsset(asset.id)({ name: v })),
         }),
         div({ style: 'display:flex; flex-direction:column; gap:2px; font-size:11.5px; color:var(--text-muted); justify-content:flex-end' })([
           div({})([
@@ -154,17 +151,17 @@ const AssetCard = suggestions => asset => {
       FolderField({
         id:          `asset-folder-${asset.id}`,
         value:       asset.folder,
-        onChange:    v => _updateAsset(asset.id, { folder: v }),
+        onChange:    v => _updateAsset(asset.id)({ folder: v }),
         suggestions,
       }),
     ]),
     div({ style: 'display:flex; flex-direction:column; gap:6px' })([
       Button({ size: 'sm', variant: 'ghost', onClick: () => _pickFiles(ACCEPT_MIME[asset.kind] || '', files => {
         _processUpload(files[0], { assetDefaults: { imageQuality: asset.quality ?? 0.8, imageMaxDim: asset.maxDim ?? 1080 } }).then(async updated => {
-          // Refresh the blob too — same asset id, just new bytes.
+          // Refresh the blob too - same asset id, just new bytes.
           try { await putAssetBlob(asset.id, updated.data); }
           catch (e) { console.error('[assets] IDB save failed', e); toast(`Save failed: ${e.message}`, 'error'); return; }
-          _updateAsset(asset.id, { data: updated.data, mime: updated.mime, byteSize: updated.byteSize, quality: updated.quality, maxDim: updated.maxDim });
+          _updateAsset(asset.id)({ data: updated.data, mime: updated.mime, byteSize: updated.byteSize, quality: updated.quality, maxDim: updated.maxDim });
           toast(`Replaced ${asset.name || asset.id}.`);
         });
       }) })(['↻ Re-upload']),
@@ -195,10 +192,10 @@ const AssetsPanel = state => {
 
   return Stack({ gap: 14 })([
     h2({ style: 'margin:0' })(['Assets']),
-    p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
+    p({ className: 'gef-hint gef-hint-13' })([
       'One catalogue for every uploaded image, audio clip and video. Every field elsewhere (item image, page video, room music, …) ',
       'picks from this list, so the same ',
-      span({ style: 'font-family:ui-monospace,monospace' })(['player_eating.webp']),
+      span({ className: 'dv-mono' })(['player_eating.webp']),
       ' shows up in the kitchen and the restaurant without being stored twice.',
     ]),
 
@@ -218,9 +215,9 @@ const AssetsPanel = state => {
             onChange: v => _setDefaults({ imageMaxDim: Math.max(64, Math.min(4096, Number(v) || 1080)) }),
           }),
         ]),
-        p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
+        p({ className: 'gef-hint' })([
           'Higher quality / larger size → bigger files but better fidelity. Audio and video are stored verbatim; only images pass through ',
-          span({ style: 'font-family:ui-monospace,monospace' })(['base64ToWebP']),
+          span({ className: 'dv-mono' })(['base64ToWebP']),
           '. SVG and GIF skip recompression to preserve vectors and animation.',
         ]),
       ]),
@@ -233,7 +230,7 @@ const AssetsPanel = state => {
           Button({ onClick: () => _pickFiles('audio/*', files => _addAssetsFromFiles(files, project)) })(['↑ Upload audio']),
           Button({ onClick: () => _pickFiles('video/*', files => _addAssetsFromFiles(files, project)) })(['↑ Upload video']),
         ]),
-        p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
+        p({ className: 'gef-hint' })([
           'Multi-select is supported. Filenames become the asset name (extension stripped); rename below if needed.',
         ]),
       ]),

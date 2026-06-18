@@ -1,7 +1,7 @@
 import { div, input, p, span } from '../elements.js';
 
 /**
- * Dropzone — drag-and-drop + click-to-browse file input.
+ * Dropzone - drag-and-drop + click-to-browse file input.
  *
  * Curried: Dropzone(opts)(labelChildren)
  * Pass no children for the built-in "drop files here" label.

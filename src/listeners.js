@@ -1,5 +1,5 @@
 /**
- * dervoJS — listeners / event system
+ * dervoJS - listeners / event system
  *
  * Functional event utilities. Each factory returns a { destroy } object
  * (plus optional helpers) so tear-down is always a single call.
@@ -84,7 +84,7 @@ const createBus = () => {
 };
 
 // Simple registry for named buses so components can publish/subscribe
-// by id. This keeps buses in-memory and avoids global leaks — callers
+// by id. This keeps buses in-memory and avoids global leaks - callers
 // can destroy a bus when no longer needed via `getBus(id).destroy()`.
 const _busRegistry = new Map();
 const getBus = id => {
@@ -193,11 +193,11 @@ const onKeyup   = _mkKeyListener('keyup');
  *   // One-shot after 5 s
  *   const alarm = createAlarm(() => showToast('Session expiring'))({ delay: 5000 });
  *
- *   // Repeating every second — like setInterval but destroyable
+ *   // Repeating every second - like setInterval but destroyable
  *   const tick = createAlarm(() => setState(s => ({ t: s.t + 1 })))({ delay: 1000, repeat: true });
  *   tick.destroy();
  *
- *   // Partial application — clock factory
+ *   // Partial application - clock factory
  *   const everySecond = createAlarm(tick)({ delay: 1000, repeat: true });
  */
 const createAlarm = callback => (opts = {}) => {

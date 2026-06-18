@@ -1,5 +1,5 @@
 /**
- * CRUD demo panel — wires up `createCrud` against an inline OpenAPI 3.0
+ * CRUD demo panel - wires up `createCrud` against an inline OpenAPI 3.0
  * spec and a fake in-memory backend (so the demo works with no server).
  *
  * Real apps would replace `fakeFetch` with the global `fetch` (or an
@@ -16,7 +16,7 @@ import { doc } from '../components/doc.js';
 
 // inline OpenAPI 3.0 spec
 // Hand-written so the demo is self-contained. In real life this would come
-// from your backend at /openapi.json (3.1 specs work too — the compiler
+// from your backend at /openapi.json (3.1 specs work too - the compiler
 // handles `type: ['string', 'null']` and `examples` alongside the 3.0
 // `nullable` / `example` keys).
 
@@ -145,10 +145,10 @@ const fakeFetch = async (url, init = {}) => {
 
 // factory: each curry step is reused 
 
-const http     = createHttp(fakeFetch);              // bind 1 — auth/transport
-const withApi  = createCrud(http)('/api');           // bind 2 — base path
-const withSpec = withApi(spec);                      // bind 3 — service spec
-const Users    = withSpec('users');                  // bind 4 — resource
+const http     = createHttp(fakeFetch);              // bind 1 - auth/transport
+const withApi  = createCrud(http)('/api');           // bind 2 - base path
+const withSpec = withApi(spec);                      // bind 3 - service spec
+const Users    = withSpec('users');                  // bind 4 - resource
 
 // state slice plumbing 
 
@@ -163,7 +163,7 @@ const _initial = {
   filter: '', sort: null,
 };
 
-// scoped setState — write to state.crudDemo with merge semantics, also
+// scoped setState - write to state.crudDemo with merge semantics, also
 // supporting the (prev => patch) updater form that CrudResource uses.
 const patchCrud = patch => setState(s => {
   const cur  = s.crudDemo ?? _initial;
@@ -182,7 +182,7 @@ export const crudPanel = state => {
         'Single component renders ',
         strong({})(['list / show / new / edit / delete']),
         ' for any resource described by an OpenAPI 3.0 (or 3.1) document. ',
-        'Form components and validators are picked automatically from the schema — ',
+        'Form components and validators are picked automatically from the schema - ',
         code({})(['format: email']),
         ' -> email input + validator, ',
         code({})(['enum']),
@@ -228,14 +228,14 @@ export const crudPanel = state => {
         doc([
 `import { createHttp, createCrud } from './src/index.js';
 
-// One-time setup — each curry step gives a reusable handle
+// One-time setup - each curry step gives a reusable handle
 const http     = createHttp(myAuthedFetch);   // bind auth/transport
 const withApi  = createCrud(http)('/api');    // bind base path
 const withSpec = withApi(openapiSpec);        // bind OpenAPI spec
 const Users    = withSpec('users');           // bind resource
 const Projects = withSpec('projects');        // another resource, same spec
 
-// Per call site — pass state + setState, the rest is automatic
+// Per call site - pass state + setState, the rest is automatic
 Users({ state: s.users, setState: patchUsers, view: 'list' });
 Users({ state: s.users, setState: patchUsers, view: 'edit', id: 42 });
 Projects({ state: s.projects, setState: patchProjects, view: 'new' });`

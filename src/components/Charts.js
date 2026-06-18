@@ -1,5 +1,5 @@
 /**
- * dervoJS — Chart components
+ * dervoJS - Chart components
  *
  * Pure SVG charts. All curried, data-driven, zero framework coupling.
  * Requires the SVG-aware renderer (createElementNS + setAttribute).
@@ -12,10 +12,10 @@
  *     number[]
  *
  *  Components 
- *   PieChart(opts)(data)    — pie or donut chart with legend
- *   BarChart(opts)(data)    — vertical bar chart with Y-axis grid
- *   LineChart(opts)(data)   — line chart (fill / dots / smooth all optional)
- *   SparkLine(opts)(values) — minimal inline trend line, no axes
+ *   PieChart(opts)(data)    - pie or donut chart with legend
+ *   BarChart(opts)(data)    - vertical bar chart with Y-axis grid
+ *   LineChart(opts)(data)   - line chart (fill / dots / smooth all optional)
+ *   SparkLine(opts)(values) - minimal inline trend line, no axes
  *
  *  Hover callbacks 
  *   All charts accept onXxxHover: (item | null, index | -1) -> void
@@ -535,7 +535,7 @@ const LineChart = ({
 
 // SparkLine 
 /**
- * Minimal inline trend line. No axes, no labels — just shape and colour.
+ * Minimal inline trend line. No axes, no labels - just shape and colour.
  * Perfect for embedding in table cells or stat cards.
  *
  * @param {Object}  opts

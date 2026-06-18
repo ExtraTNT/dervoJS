@@ -42,8 +42,8 @@ export const multistepPanel = state => {
       title: 'Confirm',
       render: ({ values }) => div({})([
         p({ style: 'margin:0 0 6px' })(['Review selections:']),
-        p({ style: 'margin:6px 0' })([ `Intensity: ${values.intensity ?? '—'}` ]),
-        p({ style: 'margin:6px 0' })([ `Name: ${values.name ?? '—'}` ]),
+        p({ style: 'margin:6px 0' })([ `Intensity: ${values.intensity ?? '-'}` ]),
+        p({ style: 'margin:6px 0' })([ `Name: ${values.name ?? '-'}` ]),
       ]),
     },
   ];

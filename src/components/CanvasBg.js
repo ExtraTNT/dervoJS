@@ -1,5 +1,5 @@
 /**
- * CanvasBg — mount any canvas-based effect as a CSS background for arbitrary content.
+ * CanvasBg - mount any canvas-based effect as a CSS background for arbitrary content.
  *
  * Pure vnode component (no side effects).  The caller is responsible for starting
  * the canvas effect after the DOM renders, exactly like the GlitchImg pattern:
@@ -17,10 +17,10 @@
  *
  *  Layout 
  *
- *   .cvs-bg            wrapper — position:relative; overflow:hidden; height from prop
+ *   .cvs-bg            wrapper - position:relative; overflow:hidden; height from prop
  *     <canvas>         absolute; top:50% left:50% translate(-50%,-50%)
- *                      min-width:100% min-height:100% — "object-fit:cover" behaviour
- *     .cvs-bg-content  position:relative; z-index:1  — children live here
+ *                      min-width:100% min-height:100% - "object-fit:cover" behaviour
+ *     .cvs-bg-content  position:relative; z-index:1  - children live here
  *
  *  API 
  *   CanvasBg(opts)(children) -> vnode

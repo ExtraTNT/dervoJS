@@ -77,7 +77,7 @@ const NAV_ITEMS = [
 // Panels marked `unload: true` in NAV_ITEMS have their DOM torn down and
 // Panels marked `unload: true` get a unique key (= tab id) so the keyed
 // reconciler tears down their DOM on every route change and creates fresh
-// nodes when revisited — forcing image/media reloads.
+// nodes when revisited - forcing image/media reloads.
 // Normal panels share the stable key 'panel' so they always patch in-place.
 //
 // Both paths must be keyed: the reconciler only removes old keyed nodes when

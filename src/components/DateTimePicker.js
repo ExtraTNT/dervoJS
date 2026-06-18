@@ -62,7 +62,7 @@ const cmpDate = a => b =>
 // Component 
 
 /**
- * DateTimePicker — calendar grid with optional time selector.
+ * DateTimePicker - calendar grid with optional time selector.
  *
  * @param {Object}   opts
  * @param {string}   [opts.id]
@@ -76,7 +76,7 @@ const cmpDate = a => b =>
  * @param {function} [opts.onChange]        Called with ISO string when a date is selected.
  * @param {function} [opts.onViewChange]    Called with { year, month } when nav arrows clicked.
  *                                          If omitted the picker manages its own internal view state
- *                                          via imperatively-mutated opts — works for standalone use.
+ *                                          via imperatively-mutated opts - works for standalone use.
  * @param {string}   [opts.className='']
  * @param {string}   [opts.style='']
  * @returns {vnode}

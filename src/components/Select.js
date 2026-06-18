@@ -1,7 +1,7 @@
 import { div, label as labelEl, optgroup, option, select, span } from '../elements.js';
 
 /**
- * Select component — a styled dropdown.
+ * Select component - a styled dropdown.
  *
  * Options accept two shapes, freely mixed in the same array:
  *   - Leaf:    { value, label }                  → <option>
@@ -32,7 +32,7 @@ import { div, label as labelEl, optgroup, option, select, span } from '../elemen
  *   Select({
  *     label: 'Room',
  *     options: [
- *       { value: '', label: '— pick —' },
+ *       { value: '', label: '- pick -' },
  *       { group: 'town', options: [{ value: 'inn', label: 'Inn' }] },
  *       { group: 'wilds', options: [{ value: 'cave', label: 'Cave' }] },
  *     ],

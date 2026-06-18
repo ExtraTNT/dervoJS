@@ -1,21 +1,21 @@
 /**
- * ChoiceEditor — one choice row.
+ * ChoiceEditor - one choice row.
  *
  * Two modes, picked by the caller via the `topicCtx` prop:
  *
  *   topicCtx: false (default)
- *     Simple/legacy use — rooms and non-advanced NPCs. The Choice is
+ *     Simple/legacy use - rooms and non-advanced NPCs. The Choice is
  *     { label, to, condition, action }: navigate to `to` (or stay if to:'')
  *     after the action fires. No flow selector.
  *
  *   topicCtx: true
  *     Inside an advanced NPC topic. The Choice gets a clear 4-option Flow
  *     selector that decides what happens after the action:
- *       change      — push current topic on the stack, switch to `topicId`
- *       exitBack    — pop the topic stack (returns to the previous topic, or
+ *       change      - push current topic on the stack, switch to `topicId`
+ *       exitBack    - pop the topic stack (returns to the previous topic, or
  *                     to the calling room if the stack is empty)
- *       exitRoom    — leave the NPC entirely, goto `to` (or back if to:'')
- *       exitCombat  — leave the NPC, start combat `combatId`
+ *       exitRoom    - leave the NPC entirely, goto `to` (or back if to:'')
+ *       exitCombat  - leave the NPC, start combat `combatId`
  *     The picker for the relevant id (room / topic / combat) appears beneath
  *     the Flow select; the others are hidden.
  */
@@ -29,8 +29,8 @@ import { EffectEditor }    from './EffectEditor.js';
 import { onText } from '../helpers.js';
 
 const FLOW_OPTS = [
-  { value: 'stay',       label: 'stay — fire effect, no navigation (give item, NPC line, …)' },
-  { value: 'change',     label: 'change topic — push & switch to another topic' },
+  { value: 'stay',       label: 'stay - fire effect, no navigation (give item, NPC line, …)' },
+  { value: 'change',     label: 'change topic - push & switch to another topic' },
   { value: 'exitBack',   label: 'exit · back to previous topic (or caller)' },
   { value: 'exitRoom',   label: 'exit · to a room' },
   { value: 'exitCombat', label: 'exit · enter combat' },
@@ -75,7 +75,7 @@ const ChoiceEditor = ({
           })]
         : [Select({
             label:    'Goes to',
-            options:  [{ value: '', label: '— stay in place —' }, ...roomOpts],
+            options:  [{ value: '', label: '- stay in place -' }, ...roomOpts],
             value:    choice.to,
             onChange: onText(v => set({ to: v })),
           })]),
@@ -86,7 +86,7 @@ const ChoiceEditor = ({
       ? [div({ style: 'margin-top:8px' })([
           Select({
             label:    'Change to topic',
-            options:  [{ value: '', label: '— pick a topic —' }, ...topicOpts],
+            options:  [{ value: '', label: '- pick a topic -' }, ...topicOpts],
             value:    choice.topicId,
             onChange: onText(v => set({ topicId: v })),
           }),
@@ -96,7 +96,7 @@ const ChoiceEditor = ({
       ? [div({ style: 'margin-top:8px' })([
           Select({
             label:    'Exit to room',
-            options:  [{ value: '', label: '— return to caller —' }, ...roomOpts],
+            options:  [{ value: '', label: '- return to caller -' }, ...roomOpts],
             value:    choice.to,
             onChange: onText(v => set({ to: v })),
           }),
@@ -106,7 +106,7 @@ const ChoiceEditor = ({
       ? [div({ style: 'margin-top:8px' })([
           Select({
             label:    'Start combat',
-            options:  [{ value: '', label: '— pick a combat —' }, ...combatOpts],
+            options:  [{ value: '', label: '- pick a combat -' }, ...combatOpts],
             value:    choice.combatId,
             onChange: onText(v => set({ combatId: v })),
           }),

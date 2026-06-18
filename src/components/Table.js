@@ -4,7 +4,7 @@ import { cn } from '../utils.js';
 // Built-in filter HOFs 
 
 /**
- * filterAll — searches every column value for the query string (case-insensitive).
+ * filterAll - searches every column value for the query string (case-insensitive).
  * Use as the default `filterFn` for a free-text search across all columns.
  */
 const filterAll = (row, q) => {
@@ -14,7 +14,7 @@ const filterAll = (row, q) => {
 };
 
 /**
- * filterBy(key) — HOF: returns a (row, q) => boolean that does case-insensitive
+ * filterBy(key) - HOF: returns a (row, q) => boolean that does case-insensitive
  * substring search on one column.
  *
  * @param {string} key
@@ -29,7 +29,7 @@ const filterBy = key => (row, q) => {
 };
 
 /**
- * filterExact(key) — HOF: returns a (row, q) => boolean that tests strict equality.
+ * filterExact(key) - HOF: returns a (row, q) => boolean that tests strict equality.
  *
  * @param {string} key
  * @returns {(row: object, q: *) => boolean}
@@ -40,7 +40,7 @@ const filterExact = key => (row, q) =>
 // Built-in sort HOF 
 
 /**
- * sortBy(key) — HOF: returns a (rowA, rowB) => number comparator for a column.
+ * sortBy(key) - HOF: returns a (rowA, rowB) => number comparator for a column.
  * Numbers are compared numerically; everything else uses localeCompare.
  *
  * @param {string} key
@@ -50,7 +50,7 @@ const filterExact = key => (row, q) =>
  *   // Explicit comparator on the column def:
  *   { key: 'year', label: 'Year', sortFn: sortBy('year') }
  *
- *   // Or just set sort: true — the table derives sortBy(key) internally:
+ *   // Or just set sort: true - the table derives sortBy(key) internally:
  *   { key: 'year', label: 'Year', sort: true }
  */
 const sortBy = key => (a, b) => {
@@ -76,7 +76,7 @@ const applyColumnFilters = rows => columns => columnFilters =>
 /**
  * Apply a sort directive { key, dir } to a row list (non-mutating).
  * Flips the comparator for 'desc'.
- * Curried — `applySort(columns)(sort)` is a reusable row transformer.
+ * Curried - `applySort(columns)(sort)` is a reusable row transformer.
  */
 const applySort = columns => sort => rows => {
   if (!sort?.key) return rows;
@@ -89,7 +89,7 @@ const applySort = columns => sort => rows => {
 // Table component 
 
 /**
- * Table — filterable, sortable data table.
+ * Table - filterable, sortable data table.
  *
  * Column definition:
  *   { key, label, render?, sort?, sortFn?, filter?, filterFn? }

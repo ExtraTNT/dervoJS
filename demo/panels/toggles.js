@@ -40,7 +40,7 @@ Toggle({ on: false, disabled: true })(['Disabled (off)'])`]),
           Toggle({ on: !state.toggleD, onChange: v => setState({ toggleD: !v }) })([]),
           Toggle({ on: false, onChange: () => {}, disabled: true })([]),
         ]),
-        doc([`// No label — pass an empty array as children
+        doc([`// No label - pass an empty array as children
 Toggle({ on: state.x, onChange: v => setState({ x: v }) })([])`]),
       ]),
     ]),

@@ -1,7 +1,7 @@
 import { div, input, label, button, span } from '../elements.js';
 
 /**
- * NumberInput — labeled numeric field with decrement / increment stepper buttons.
+ * NumberInput - labeled numeric field with decrement / increment stepper buttons.
  *
  * @param {Object}   opts
  * @param {string}   [opts.id]

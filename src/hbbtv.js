@@ -1,5 +1,5 @@
 /**
- * dervoJS — HbbTV module.
+ * dervoJS - HbbTV module.
  *
  * Thin functional wrapper over the HbbTV / OIPF DOM APIs used by hybrid
  * broadcast-broadband apps running on TVs and set-top boxes. All functions
@@ -13,16 +13,16 @@
  *   <object id="video"   type="video/broadcast"></object>
  *
  * Public surface:
- *   initApp({ show? })                   — show/hide the broadcast-related app
- *   initKeys(mask)                       — request which remote keys the app receives
- *   getChannelInfo()                     — current DVB channel { name, onid, tsid, sid }
- *   getVideoBroadcast()                  — handle to the video/broadcast object + helpers
- *   onRemoteKey(handler)(opts?)          — curried; semantic key listener with optional filter
+ *   initApp({ show? })                   - show/hide the broadcast-related app
+ *   initKeys(mask)                       - request which remote keys the app receives
+ *   getChannelInfo()                     - current DVB channel { name, onid, tsid, sid }
+ *   getVideoBroadcast()                  - handle to the video/broadcast object + helpers
+ *   onRemoteKey(handler)(opts?)          - curried; semantic key listener with optional filter
  *   onStreamEvent({ targetURL, eventName })(handler)
- *                                        — curried; DSM-CC stream event subscription
- *   isHbbtvCapable()                     — boolean
- *   decodeKey(event)                     — pure: KeyboardEvent -> semantic key name
- *   KEYSET                               — bit-mask constants for initKeys
+ *                                        - curried; DSM-CC stream event subscription
+ *   isHbbtvCapable()                     - boolean
+ *   decodeKey(event)                     - pure: KeyboardEvent -> semantic key name
+ *   KEYSET                               - bit-mask constants for initKeys
  *
  * @example  (typical app startup)
  *   import { initApp, initKeys, onRemoteKey, KEYSET } from './src/index.js';
@@ -35,7 +35,7 @@ import { addListener, getBus } from './listeners.js';
 import { toMaybe, fromMaybe, bind, orElse, Just, Nothing } from '../lib/odocosjs/src/core.js';
 
 // Run a side-effecting thunk; Just(result) on success, Nothing on throw.
-// Used for HbbTV/OIPF API calls — the same DOM hooks throw on desktop and
+// Used for HbbTV/OIPF API calls - the same DOM hooks throw on desktop and
 // raise NS_ERROR on STB boxes that miss a given path.
 const _attempt = fn => { try { return toMaybe(fn()); } catch (_) { return Nothing; } };
 
@@ -142,7 +142,7 @@ const initApp = ({ show = true } = {}) =>
 /**
  * Request which TV-remote keys the running app will receive.
  * Tries the HbbTV 0.5 path (oipfcfg.keyset) and the HbbTV 1.0+ path
- * (appmgr.getOwnerApplication.privateData.keyset) — at least one will
+ * (appmgr.getOwnerApplication.privateData.keyset) - at least one will
  * succeed on any compliant device.
  *
  * @param {number} mask  bitwise-OR of KEYSET.* constants. Defaults to ALL.
@@ -326,10 +326,10 @@ const bootHbbtv = ({
   return bus;
 };
 
-// focus manager — central spatial nav for TV apps
+// focus manager - central spatial nav for TV apps
 
 /**
- * createFocusManager — central focus engine driven by spatial DOM layout.
+ * createFocusManager - central focus engine driven by spatial DOM layout.
  *
  * Model:
  *   state.<stateKey> = { id: <focusId|null> }
@@ -338,7 +338,7 @@ const bootHbbtv = ({
  *   id: <x>   ->  the focusable with `data-focus="<x>"` is highlighted;
  *                 arrows + OK + BACK are consumed by the focus manager.
  *
- * No groups, no registration of layouts — every focusable element marks
+ * No groups, no registration of layouts - every focusable element marks
  * itself with `data-focus="<id>"` (use the Focusable helper component, or
  * add it by hand). On each arrow press the manager:
  *
@@ -350,7 +350,7 @@ const bootHbbtv = ({
  *
  * Activation is decoupled via the bus: pressing OK on the focused element
  * emits `bus.emit('activated', { id })`. Subscribe and dispatch however
- * you like — no per-focusable callback registration required.
+ * you like - no per-focusable callback registration required.
  *
  *   bus.on('activated', ({ id }) => {
  *     if (id.startsWith('row-')) pushPick({ from: 'list', item: id });
@@ -381,7 +381,7 @@ const createFocusManager = ({ bus, store, stateKey = 'focus', scrollStep = 80, h
   const exit  = () => _set(null);
   const isFocused = () => Boolean(_get().id);
 
-  // BACK destination — by default just releases focus; when a `home` callback
+  // BACK destination - by default just releases focus; when a `home` callback
   // is supplied, BACK focuses whatever it returns (e.g. the current page's
   // tab). No-op when we're already there, so BACK from home doesn't escape.
   const _back = curId => {
@@ -414,7 +414,7 @@ const createFocusManager = ({ bus, store, stateKey = 'focus', scrollStep = 80, h
   // Score = primary-axis distance + perpendicular penalty (x2) so a slightly
   // off-axis neighbour still wins over a far on-axis one.
   //
-  // Row isolation: LEFT/RIGHT cannot cross `data-focus-row` boundaries —
+  // Row isolation: LEFT/RIGHT cannot cross `data-focus-row` boundaries -
   // a focusable tagged with a row only navigates left/right to other
   // focusables in the same row. UP/DOWN ignore rows so the user can still
   // move between strips (nav → subnav → content) with vertical arrows.
@@ -460,7 +460,7 @@ const createFocusManager = ({ bus, store, stateKey = 'focus', scrollStep = 80, h
     const cur = _get();
     if (!cur.id) return;
     const el = document.querySelector(`[data-focus="${cur.id}"]`);
-    if (!el) { _set(null); return; }     // focused element is gone — release
+    if (!el) { _set(null); return; }     // focused element is gone - release
 
     if (key === 'left' || key === 'right' || key === 'up' || key === 'down') {
       // 1) scroll the container if it can take more in this direction
@@ -480,12 +480,12 @@ const createFocusManager = ({ bus, store, stateKey = 'focus', scrollStep = 80, h
 //  key combo detector
 
 /**
- * onKeyCombo — fire a handler when a sequence of remote-key names is
+ * onKeyCombo - fire a handler when a sequence of remote-key names is
  * pressed within `window` ms. Reads `key` events off the bus, keeps a
  * tiny rolling buffer keyed by timestamp, and triggers when the buffer's
  * tail matches the target sequence.
  *
- * Curried for partial application — matches the rest of the HbbTV module:
+ * Curried for partial application - matches the rest of the HbbTV module:
  *
  *   onKeyCombo(bus)('991')(handler)              // shortest
  *   onKeyCombo(bus)(['red','green','blue'])(fn)({ window: 2000 })
@@ -529,7 +529,7 @@ const _installCombo = (bus, combo, handler, { window: win = 1000, busEvent = 'ke
   });
 };
 
-// onKeyCombo — accepts both the curried shape and the legacy positional one.
+// onKeyCombo - accepts both the curried shape and the legacy positional one.
 // Dispatch happens on the type of the second argument so existing callers
 // (demoHbbtv/main.js uses `onKeyCombo(bus, '991', toggleProfiler)`) keep working.
 const onKeyCombo = (bus, combo, handler, opts) => {

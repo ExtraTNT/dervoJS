@@ -47,9 +47,9 @@ const onRszUp = () => {
 // Component 
 
 /**
- * FloatingPanel — draggable, resizable floating window.
+ * FloatingPanel - draggable, resizable floating window.
  *
- * Usage (curried — matches the rest of dervoJS):
+ * Usage (curried - matches the rest of dervoJS):
  *   FloatingPanel({ id, title, open, onClose, initialX, initialY, initialW, initialH })(children)
  *
  * - Drag: grab the title bar

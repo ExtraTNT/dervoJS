@@ -1,5 +1,5 @@
 /**
- * NPC + enemy data for the demo. Plain definitions only — the engine
+ * NPC + enemy data for the demo. Plain definitions only - the engine
  * handles dialogue routing and the world tick (see createGame's `npcs`
  * config and ctx.npcsAt / ctx.tickWorld / ctx.talkTo).
  */
@@ -16,7 +16,7 @@ export const NPCS = {
       return Scene({
         title: 'Eldra the Merchant',
         body: [
-          p({})(['"Word travels," she says with a glance at your boots. "There\'s coin in courier work — the inn keeps a list of names."']),
+          p({})(['"Word travels," she says with a glance at your boots. "There\'s coin in courier work - the inn keeps a list of names."']),
           p({})(['(She slips you 5 gold for the rumour.)']),
         ],
         choices: [
@@ -60,7 +60,7 @@ export const NPCS = {
         body: [
           p({})(['"Few find their way here. You came to listen, or to ask?"']),
           p({})([ctx.state.flags.metHermit
-            ? 'She studies you. "The cave key — you still need it. Look in the forest."'
+            ? 'She studies you. "The cave key - you still need it. Look in the forest."'
             : 'She presses something cold into your palm. "An old key. There\'s a place that won\'t open without it."']),
         ],
         choices: [

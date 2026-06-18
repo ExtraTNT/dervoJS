@@ -21,8 +21,8 @@ const _log = scope => key => action => s => ({
 const _active = () => getState().activeTab === 'keymap';
 
 // Global bindings 
-//  ?         — toggle help overlay
-//  Ctrl+L    — clear event log
+//  ?         - toggle help overlay
+//  Ctrl+L    - clear event log
 
 _km.addGlobal('?')(_el => e => {
   if (!_active()) return;
@@ -45,9 +45,9 @@ _km.addGlobal('ctrl+l')(_el => e => {
 });
 
 // Zone A scoped bindings 
-//  ↑        — increment counter
-//  ↓        — decrement counter
-//  R        — reset counter to 0
+//  ↑        - increment counter
+//  ↓        - decrement counter
+//  R        - reset counter to 0
 
 _km.addScoped('zone-a')('arrowup')(_el => e => {
   e.preventDefault();
@@ -71,9 +71,9 @@ _km.addScoped('zone-a')('r')(_el => e => {
 });
 
 // Zone B scoped bindings 
-//  Enter    — ping (uses the focused element's tag name)
-//  Ctrl+↑   — bulk +5 pings
-//  Ctrl+↓   — bulk -5 pings (floor 0)
+//  Enter    - ping (uses the focused element's tag name)
+//  Ctrl+↑   - bulk +5 pings
+//  Ctrl+↓   - bulk -5 pings (floor 0)
 
 _km.addScoped('zone-b')('enter')(el => e => {
   e.preventDefault();
@@ -125,7 +125,7 @@ const BindingRow = combo => desc =>
     span({ style: 'font-size:12px; color:var(--text-muted)' })([desc]),
   ]);
 
-// Focus zone wrapper — tabIndex (camelCase) is required for dervoJS prop assignment;
+// Focus zone wrapper - tabIndex (camelCase) is required for dervoJS prop assignment;
 // onclick calls .focus() explicitly so pointer events reliably activate the scope.
 const FocusZone = isFocused => onFocus => onBlur => children =>
   div({
@@ -156,7 +156,7 @@ const LogEntry = entry =>
 // Help overlay content
 const HelpOverlay = () =>
   div({ style: 'display:flex; flex-direction:column; gap:16px; padding:16px; background:var(--surface-2); border-radius:var(--radius); border:1px solid var(--border)' })([
-    div({ style: 'font-weight:700; font-size:13px' })(['⌘ KeyMap — binding reference']),
+    div({ style: 'font-weight:700; font-size:13px' })(['⌘ KeyMap - binding reference']),
     div({ style: 'display:grid; grid-template-columns:1fr 1fr; gap:16px 32px' })([
       div({})([
         div({ style: 'font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-bottom:8px' })(['Global (always active)']),
@@ -269,7 +269,7 @@ export const keymapPanel = state => {
         ]),
         isZoneB
           ? span({ style: 'font-size:11px; color:var(--text-muted); font-style:italic' })([
-              'handler receives the focused <div> — tag name appears in log',
+              'handler receives the focused <div> - tag name appears in log',
             ])
           : div({})([]),
       ]),
@@ -280,7 +280,7 @@ export const keymapPanel = state => {
     Card({ title: 'Event log' })([
       div({ style: 'display:flex; align-items:center; gap:8px; margin-bottom:10px' })([
         span({ style: 'font-size:12px; color:var(--text-muted)' })([
-          log.length === 0 ? 'No events yet — try pressing ? or focusing a zone.' : `${log.length} event${log.length === 1 ? '' : 's'} (newest first, max 50)`,
+          log.length === 0 ? 'No events yet - try pressing ? or focusing a zone.' : `${log.length} event${log.length === 1 ? '' : 's'} (newest first, max 50)`,
         ]),
         div({ style: 'flex:1' })([]),
         button({
@@ -304,13 +304,13 @@ export const keymapPanel = state => {
 
 const km = createKeymap({ debug: true });
 
-// Global — fires regardless of focus
+// Global - fires regardless of focus
 km.addGlobal('ctrl+k')(el => e => {
   e.preventDefault();
   openSearch();
 });
 
-// Scoped — fires only when 'editor' scope is active
+// Scoped - fires only when 'editor' scope is active
 km.addScoped('editor')('ctrl+s')(el => e => {
   e.preventDefault();
   save(el.dataset.docId);  // el is the focused element

@@ -1,5 +1,5 @@
 /**
- * AssetInput — picker for an `asset:<id>` reference (or a plain URL).
+ * AssetInput - picker for an `asset:<id>` reference (or a plain URL).
  *
  *   AssetInput({
  *     label:    'Image (pick or upload)',
@@ -11,7 +11,7 @@
  * Reads the current store via getState so the asset catalogue is always live;
  * onChange writes a string (asset ref or URL) so consumers don't change.
  *
- * Three input modes — pick from existing, upload new (auto-added to the
+ * Three input modes - pick from existing, upload new (auto-added to the
  * Assets catalogue and the field then references it), or paste a URL.
  */
 
@@ -124,10 +124,10 @@ const AssetInput = ({
     div({ style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap' })([
       Select({
         options: [
-          { value: '',    label: assets.length ? '— pick from catalogue —' : '(no assets yet)' },
+          { value: '',    label: assets.length ? '- pick from catalogue -' : '(no assets yet)' },
           ...groupedOptions(assets)(a => ({ value: idToRef(a.id), label: `${a.name || a.id} · ${formatBytes(a.byteSize)}` })),
-          ...(isUrl  ? [{ value: '__url__',  label: '(URL reference — keep as-is)' }] : []),
-          ...(isData ? [{ value: '__data__', label: '(legacy inline upload — keep as-is)' }] : []),
+          ...(isUrl  ? [{ value: '__url__',  label: '(URL reference - keep as-is)' }] : []),
+          ...(isData ? [{ value: '__data__', label: '(legacy inline upload - keep as-is)' }] : []),
         ],
         value: refId ? idToRef(refId) : (isUrl ? '__url__' : isData ? '__data__' : ''),
         onChange: onText(v => {
@@ -141,7 +141,7 @@ const AssetInput = ({
         ? [Button({ size: 'sm', variant: 'ghost', onClick: () => onChange && onChange('') })(['Clear'])]
         : []),
     ]),
-    // Plain URL field — visible when not using a catalogue ref
+    // Plain URL field - visible when not using a catalogue ref
     ...(!refId
       ? [input({
           type:        'text',

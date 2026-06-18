@@ -8,7 +8,7 @@ const ICONS = {
 };
 
 /**
- * Alert component — coloured banner for feedback messages.
+ * Alert component - coloured banner for feedback messages.
  *
  * @param {Object}  opts
  * @param {'info'|'success'|'warning'|'error'} [opts.variant='info']

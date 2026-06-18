@@ -1,10 +1,10 @@
 /**
- * dervoJS — HTTP client
+ * dervoJS - HTTP client
  *
  * A small curried HTTP client built on top of odocosJS's `httpUtils`. The
  * exported `defaultHttp` is the no-config client used by `CrudResource` when
  * the caller doesn't pass one. To add auth/headers/base URL, build your own
- * client with `createHttp(fetchImpl)` — anything that matches the same shape
+ * client with `createHttp(fetchImpl)` - anything that matches the same shape
  * works (the dervoJS code only knows the contract, not the implementation).
  *
  *   HttpClient = {
@@ -21,7 +21,7 @@
  * the json-server convention.
  *
  * @example
- *   // Auth — wrap fetch and pass it to createHttp
+ *   // Auth - wrap fetch and pass it to createHttp
  *   const authedFetch = (url, init = {}) => fetch(url, {
  *     ...init,
  *     headers: { ...init.headers, Authorization: `Bearer ${token}` },
@@ -29,7 +29,7 @@
  *   const http = createHttp(authedFetch);
  *
  * @example
- *   // Fully custom client — implement the shape yourself
+ *   // Fully custom client - implement the shape yourself
  *   const http = {
  *     get:    url => async opts => myApi.read(url, opts),
  *     list:   url => async opts => [await myApi.list(url, opts), 0],
@@ -53,7 +53,7 @@ const _parseBody = async response => {
 
 /**
  * Build an HttpClient from a fetch implementation.
- * `extraHeaders` is merged on every request — useful for static API keys.
+ * `extraHeaders` is merged on every request - useful for static API keys.
  * For dynamic headers (e.g. rotating tokens), wrap `fetch` yourself.
  *
  * @param {typeof fetch} [fetchImpl=globalThis.fetch]
@@ -89,7 +89,7 @@ const createHttp = (fetchImpl = globalThis.fetch, extraHeaders = {}) => {
   return { get, list, post, put, patch, remove };
 };
 
-/** Bare-bones default — uses global fetch, JSON content type, no auth. */
+/** Bare-bones default - uses global fetch, JSON content type, no auth. */
 const defaultHttp = createHttp();
 
 export { createHttp, defaultHttp };

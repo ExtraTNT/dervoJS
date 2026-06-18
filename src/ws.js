@@ -1,5 +1,5 @@
 /**
- * dervoJS — WebSocket factory
+ * dervoJS - WebSocket factory
  *
  * Pure-functional, curried WebSocket API. A single call to createWS returns
  * a controller; all handlers are plain callbacks, all state lives outside
@@ -7,7 +7,7 @@
  *
  * Design principles:
  *   - Curried factory:  createWS(opts)(handlers)
- *   - No implicit state — status/messages must be tracked by the caller
+ *   - No implicit state - status/messages must be tracked by the caller
  *   - destroy() is always safe to call (idempotent, no-ops on closed socket)
  *   - Reconnect is opt-in, capped by maxRetries, with exponential back-off
  *   - send() is typed: plain strings AND objects (-> JSON.stringify)
@@ -32,7 +32,7 @@
  *     url:        'wss://api.example.com/events',
  *     reconnect:  true,
  *     maxRetries: 10,
- *     baseDelay:  500,   // ms — doubles each attempt, capped at 30 s
+ *     baseDelay:  500,   // ms - doubles each attempt, capped at 30 s
  *   })({
  *     onOpen:       ()   => setState({ wsStatus: 'open', wsRetries: 0 }),
  *     onClose:      code => setState({ wsStatus: code === 1000 ? 'closed' : 'reconnecting' }),
@@ -72,7 +72,7 @@
 import { toMaybe, fromMaybe, Nothing } from '../lib/odocosjs/src/core.js';
 
 // Parse a frame as JSON; fall back to the raw string on failure.
-// The caller's onMessage still sees one value either way — kept identical to
+// The caller's onMessage still sees one value either way - kept identical to
 // the previous let-then-try shape, just without the let.
 const _safeJson = s => { try { return toMaybe(JSON.parse(s)); } catch (_) { return Nothing; } };
 

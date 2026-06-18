@@ -1,5 +1,5 @@
 /**
- * dervoJS — client-side router
+ * dervoJS - client-side router
  *
  * Hash-based (#/path) OR History API (pushState) routing. Pure functional,
  * zero coupling to the framework: the router fires callbacks; you decide
@@ -8,20 +8,20 @@
  *
  *  Overview 
  *
- *   createRouter(routes)(handlers)  — attach router to the browser; returns controller
- *   Link(opts)(children)            — curried <a> that navigates without page reload
- *   NavLink(opts)(children)         — Link that adds 'active' class when route matches
- *   NavBar(opts)(children)          — horizontal navigation bar container
- *   NavMenu(opts)(children)         — vertical sidebar navigation container
+ *   createRouter(routes)(handlers)  - attach router to the browser; returns controller
+ *   Link(opts)(children)            - curried <a> that navigates without page reload
+ *   NavLink(opts)(children)         - Link that adds 'active' class when route matches
+ *   NavBar(opts)(children)          - horizontal navigation bar container
+ *   NavMenu(opts)(children)         - vertical sidebar navigation container
  *
  *  Route matching 
  *
  *   Routes are plain objects: { path, handler }
  *   Paths support:
- *     '/about'            — exact segment match
- *     '/user/:id'         — named param (available as params.id)
- *     '/files/*'          — wildcard (greedy; available as params.*)
- *   Order matters — first match wins.
+ *     '/about'            - exact segment match
+ *     '/user/:id'         - named param (available as params.id)
+ *     '/files/*'          - wildcard (greedy; available as params.*)
+ *   Order matters - first match wins.
  *
  *  Minimal setup 
  *
@@ -43,19 +43,19 @@
  *
  *  Navigation components 
  *
- *   // Link — renders an <a> that uses router.push instead of page reload
+ *   // Link - renders an <a> that uses router.push instead of page reload
  *   Link({ href: '/about', push: router.push })(['About'])
  *
- *   // NavLink — adds className 'active' (or custom) when route matches
+ *   // NavLink - adds className 'active' (or custom) when route matches
  *   NavLink({ href: '/user/42', current: state.route, push: router.push })(['Profile'])
  *
- *   // NavBar — horizontal bar (e.g. top navigation)
+ *   // NavBar - horizontal bar (e.g. top navigation)
  *   NavBar({ gap: 8 })([
  *     NavLink({ href: '/',      current: state.path, push: router.push })(['Home']),
  *     NavLink({ href: '/about', current: state.path, push: router.push })(['About']),
  *   ])
  *
- *   // NavMenu — vertical sidebar list
+ *   // NavMenu - vertical sidebar list
  *   NavMenu({ width: '220px' })([
  *     NavLink({ href: '/dashboard', current: state.path, push: router.push })(['Dashboard']),
  *     NavLink({ href: '/settings',  current: state.path, push: router.push })(['Settings']),
@@ -102,7 +102,7 @@ const _parseQuery = search => {
 };
 
 /** Match a path against compiled routes. Returns Maybe<{ route, params }>.
- *  The Maybe is propagated to the caller; never flatten to null here — that
+ *  The Maybe is propagated to the caller; never flatten to null here - that
  *  forces a separate truthy check downstream, which is what Maybe exists to
  *  remove. Consumers chain with bind/either and decide their own default. */
 const _match = compiled => path =>
@@ -220,12 +220,12 @@ const createRouter = (routes = [], { mode = 'history', base = '' } = {}) => (han
 // Navigation components 
 
 /**
- * Link — curried navigation anchor.
+ * Link - curried navigation anchor.
  * Prevents the default page reload and calls push(href) instead.
  *
  * @param {Object}   opts
  * @param {string}   opts.href         Target path (e.g. '/about')
- * @param {function} opts.push         router.push — or any (path) => void
+ * @param {function} opts.push         router.push - or any (path) => void
  * @param {string}   [opts.className]
  * @param {string}   [opts.style]
  * @returns {(children: vnode[]) => vnode}
@@ -242,7 +242,7 @@ const Link = ({ href = '/', push, className = '', style = '' } = {}) => children
   })(children);
 
 /**
- * NavLink — Link that marks itself active when the current path matches.
+ * NavLink - Link that marks itself active when the current path matches.
  *
  * Matching is prefix-based by default (so '/user' matches '/user/42').
  * Set exact: true for exact-only matching.
@@ -279,7 +279,7 @@ const NavLink = ({
 };
 
 /**
- * NavBar — horizontal navigation container.
+ * NavBar - horizontal navigation container.
  * Renders a <nav> with flex-row layout for use as a top bar or tab strip.
  *
  * @param {Object} opts
@@ -302,7 +302,7 @@ const NavBar = ({ gap = 0, align = 'center', className = '', style = '' } = {}) 
   })(children);
 
 /**
- * NavMenu — vertical sidebar navigation container.
+ * NavMenu - vertical sidebar navigation container.
  * Renders a <nav> with flex-column layout.
  *
  * @param {Object} opts
@@ -325,7 +325,7 @@ const NavMenu = ({ width, gap = 4, className = '', style = '' } = {}) => childre
   })(children);
 
 /**
- * Breadcrumbs — renders a list of { label, href } crumbs separated by a divider.
+ * Breadcrumbs - renders a list of { label, href } crumbs separated by a divider.
  * The last crumb is never a link (current page).
  *
  * @param {Object}   opts

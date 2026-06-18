@@ -6,7 +6,7 @@ const HERO = 'https://picsum.photos/seed/a11y/1200/600';
 
 export const a11yPanel = () =>
   div({})([
-    // Skip link placed at top of page — becomes visible when focused
+    // Skip link placed at top of page - becomes visible when focused
     SkipLink({ target: '.page-layout-main' })(),
 
     // Simple hero using ImageBg to demonstrate accessible headings + hidden text

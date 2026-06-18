@@ -1,7 +1,7 @@
 import { div, img } from '../elements.js';
 
 /**
- * Img — image wrapper with aspect ratio, object-fit, lazy loading, and shape variants.
+ * Img - image wrapper with aspect ratio, object-fit, lazy loading, and shape variants.
  *
  * @param {Object}   opts
  * @param {string}   opts.src                  Image URL.

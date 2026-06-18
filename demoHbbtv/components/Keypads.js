@@ -1,5 +1,5 @@
 /**
- * Visual pads — colour, navigation, VCR, numerics. Each is a pure function
+ * Visual pads - colour, navigation, VCR, numerics. Each is a pure function
  * of the most recent key so the active button stands out.
  */
 

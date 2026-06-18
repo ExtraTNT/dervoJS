@@ -1,5 +1,5 @@
 /**
- * LootTableEditor — UI for a weighted-pick loot bag.
+ * LootTableEditor - UI for a weighted-pick loot bag.
  *
  * Shape (mirrors gameEditor/schema.js):
  *   LootTable {
@@ -14,7 +14,7 @@
  *   gold    state.gold += randInt(countMin..countMax)
  *   stat    state[statKey] += randInt(statMin..statMax)
  *   flag    state.flags[flagKey] = flagValue
- *   nothing no award — use to model "X% chance of nothing"
+ *   nothing no award - use to model "X% chance of nothing"
  *   js      free-form body with `c` in scope, for anything else
  *
  * Curried throughout.
@@ -32,19 +32,19 @@ import { emptyLootEntry } from '../schema.js';
 import { WeightBonusList } from './WeightBonusEditor.js';
 import { groupedOptions } from './FolderedList.js';
 
-// Kind options — `stat` covers any currency (gold / silver / gems / etc.) so
+// Kind options - `stat` covers any currency (gold / silver / gems / etc.) so
 // there's no dedicated `gold` kind. `navigate` / `learnSkill` / `talkNpc` let
 // the same random-table machinery drive non-loot decisions (random room, random
 // skill, random NPC).
 const KIND_OPTS = [
-  { value: 'item',       label: 'item — give X count'              },
-  { value: 'stat',       label: 'stat — add to stat (any currency)' },
-  { value: 'flag',       label: 'flag — set flag'                  },
-  { value: 'navigate',   label: 'navigate — go to a room'          },
-  { value: 'learnSkill', label: 'learnSkill — add to state.skills' },
-  { value: 'talkNpc',    label: 'talkNpc — open NPC dialogue'      },
-  { value: 'nothing',    label: 'nothing — no outcome'             },
-  { value: 'js',         label: 'js — free-form'                   },
+  { value: 'item',       label: 'item - give X count'              },
+  { value: 'stat',       label: 'stat - add to stat (any currency)' },
+  { value: 'flag',       label: 'flag - set flag'                  },
+  { value: 'navigate',   label: 'navigate - go to a room'          },
+  { value: 'learnSkill', label: 'learnSkill - add to state.skills' },
+  { value: 'talkNpc',    label: 'talkNpc - open NPC dialogue'      },
+  { value: 'nothing',    label: 'nothing - no outcome'             },
+  { value: 'js',         label: 'js - free-form'                   },
 ];
 
 // Curried set-helper: takes the existing table and produces a new table with
@@ -59,7 +59,7 @@ const _moveEntry = entries => i => dir => {
   return out;
 };
 
-// One row of count fields — used by both `item` and `gold` entries.
+// One row of count fields - used by both `item` and `gold` entries.
 const _countFields = entry => onPatch => Grid({ cols: 2, gap: 8 })([
   NumberInput({
     label: 'Count min',
@@ -81,14 +81,14 @@ const _entryRow = vars => entries => index => onChange => {
   const onDelete = () => onChange(_removeEntry(entries)(index));
   const onMove = dir => onChange(_moveEntry(entries)(index)(dir));
 
-  const itemOpts  = [{ value: '', label: '— pick item —' }, ...groupedOptions(vars.items  || [])(it => ({ value: it.id, label: it.name || it.id }))];
-  const statOpts  = [{ value: '', label: '— pick stat —' }, ...(vars.stats  || []).map(k => ({ value: k, label: k }))];
-  const flagOpts  = [{ value: '', label: '— pick flag —' }, ...(vars.flags  || []).map(k => ({ value: k, label: k }))];
-  const roomOpts  = [{ value: '', label: '— pick room —' }, ...groupedOptions(vars.rooms  || [])(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}` }))];
-  const skillOpts = [{ value: '', label: '— pick skill —' }, ...(vars.skills || []).map(s => ({ value: s.id, label: s.name || s.id }))];
-  const npcOpts   = [{ value: '', label: '— pick NPC —' }, ...groupedOptions(vars.npcs   || [])(n => ({ value: n.id, label: n.name || n.id }))];
+  const itemOpts  = [{ value: '', label: '- pick item -' }, ...groupedOptions(vars.items  || [])(it => ({ value: it.id, label: it.name || it.id }))];
+  const statOpts  = [{ value: '', label: '- pick stat -' }, ...(vars.numStats || vars.stats  || []).map(k => ({ value: k, label: k }))];
+  const flagOpts  = [{ value: '', label: '- pick flag -' }, ...(vars.flags  || []).map(k => ({ value: k, label: k }))];
+  const roomOpts  = [{ value: '', label: '- pick room -' }, ...groupedOptions(vars.rooms  || [])(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}` }))];
+  const skillOpts = [{ value: '', label: '- pick skill -' }, ...(vars.skills || []).map(s => ({ value: s.id, label: s.name || s.id }))];
+  const npcOpts   = [{ value: '', label: '- pick NPC -' }, ...groupedOptions(vars.npcs   || [])(n => ({ value: n.id, label: n.name || n.id }))];
 
-  return div({ style: 'border:1px solid var(--border); border-radius:var(--radius); padding:10px; background:var(--surface)' })([
+  return div({ className: 'gef-surface-card' })([
     div({ style: 'display:flex; align-items:center; gap:8px; margin-bottom:8px' })([
       span({ style: 'font-weight:600; font-size:12px' })([`Entry ${index + 1}`]),
       span({ style: 'font-family:ui-monospace,monospace; font-size:11px; color:var(--text-muted)' })([`#${entry.id.slice(-5)}`]),
@@ -195,9 +195,9 @@ const _entryRow = vars => entries => index => onChange => {
         ? [div({})([
             span({ style: 'font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px' })([
               'Fires when this entry is picked. Receives ',
-              span({ style: 'font-family:ui-monospace,monospace' })(['c']),
+              span({ className: 'dv-mono' })(['c']),
               ' (the game ctx). Use ',
-              span({ style: 'font-family:ui-monospace,monospace' })(['c.setState(...)']), '.',
+              span({ className: 'dv-mono' })(['c.setState(...)']), '.',
             ]),
             textarea({
               value: entry.jsBody || '',
@@ -210,20 +210,20 @@ const _entryRow = vars => entries => index => onChange => {
           ])]
         : []),
 
-      // Weight bonuses — extracted into a shared WeightBonusList component
+      // Weight bonuses - extracted into a shared WeightBonusList component
       // so loot-entry bonuses and oneOf-option bonuses share one UI.
       WeightBonusList({
         bonuses:  entry.bonuses || [],
         vars,
         onChange: next => onPatch({ bonuses: next }),
-        label:    'Weight bonuses — raise odds dynamically',
+        label:    'Weight bonuses - raise odds dynamically',
       }),
 
       // Optional per-pick message. Pushed to state._messageQueue when THIS
       // entry is picked; the next scene render shows the buffer + Continue.
       // Multi-pick tables accumulate one entry per roll.
       div({ style: 'border-top:1px dashed var(--border-2); padding-top:8px; margin-top:4px' })([
-        span({ style: 'font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600; display:block; margin-bottom:4px' })([
+        span({ className: 'gef-kbd-label', style: 'display:block; margin-bottom:4px' })([
           'Message (optional, ${…} template)',
         ]),
         textarea({
@@ -239,7 +239,7 @@ const _entryRow = vars => entries => index => onChange => {
   ]);
 };
 
-// Live probability preview — convert weights to percentages so the author can
+// Live probability preview - convert weights to percentages so the author can
 // sanity-check the bag at a glance.
 const _probabilityLine = table => {
   const entries = table.entries || [];

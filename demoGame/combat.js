@@ -36,10 +36,10 @@ const _logLines = (log, max = 5) => log.slice(-max);
 //  public: start a fight 
 
 /**
- * @param {object} ctx       — engine ctx
- * @param {string} enemyId   — key in ENEMIES
- * @param {string} returnTo  — scene id to return to on flee/victory/defeat
- * @param {object} [reward]  — { gold?, item?, onWin?(setState), onLose?(setState) }
+ * @param {object} ctx       - engine ctx
+ * @param {string} enemyId   - key in ENEMIES
+ * @param {string} returnTo  - scene id to return to on flee/victory/defeat
+ * @param {object} [reward]  - { gold?, item?, onWin?(setState), onLose?(setState) }
  */
 export const startCombat = (ctx, enemyId, returnTo, reward = {}) => {
   const enemy = ENEMIES[enemyId];
@@ -116,11 +116,11 @@ const _flee = ctx => {
     ctx.setState({ _scene: c.returnTo, combat: null });
     return;
   }
-  // Failed flee — enemy gets a free hit
+  // Failed flee - enemy gets a free hit
   const enemy    = ENEMIES[c.enemyId];
   const incoming = _rollEnemyAttack(enemy, false);
   const playerHP = Math.max(0, ctx.state.HP - incoming);
-  const log      = [...c.log, `You scramble to flee — ${enemy.name} catches you for ${incoming}.`];
+  const log      = [...c.log, `You scramble to flee - ${enemy.name} catches you for ${incoming}.`];
   if (playerHP <= 0) { _defeat(ctx, log); return; }
   ctx.setState({
     HP: playerHP,
@@ -148,7 +148,7 @@ const _victory = (ctx, log) => {
 
 const _defeat = (ctx, log) => {
   const c = ctx.state.combat;
-  // Send the player back to the safest place with 1 HP — losing money rather than a hard game-over keeps the demo moving.
+  // Send the player back to the safest place with 1 HP - losing money rather than a hard game-over keeps the demo moving.
   const lostGold = Math.min(ctx.state.gold, 20);
   ctx.setState(s => ({
     HP: 1,
@@ -198,7 +198,7 @@ const _enemyArt = enemy =>
 export const combatScene = ctx => {
   const c = ctx.state.combat;
   if (!c) {
-    // Defensive — render nothing useful, send back to town
+    // Defensive - render nothing useful, send back to town
     return div({})([
       p({})(['(no fight in progress)']),
       Button({ onClick: () => ctx.goto('town') })(['Return to town']),

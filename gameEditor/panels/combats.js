@@ -1,5 +1,5 @@
 /**
- * Combats panel — define encounters that the game routes to via the
+ * Combats panel - define encounters that the game routes to via the
  * `enterCombat` choice effect.
  *
  * Player moves come from state.skills (the Skills tab catalogue + per-player
@@ -19,29 +19,18 @@ import { Button } from '../../src/components/Button.js';
 import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
-import { setProject, setState } from '../store.js';
+import { setProject, setState, updateById } from '../store.js';
 import { emptyCombat, emptyCombatMove, emptyEnemyAction } from '../schema.js';
-import { onText } from '../helpers.js';
+import { onText, projectVars, updateAt, removeAt, swapAt } from '../helpers.js';
 import { EffectEditor } from '../components/EffectEditor.js';
 import { AssetInput }   from '../components/AssetInput.js';
 import { FolderedList, groupedOptions } from '../components/FolderedList.js';
 import { getState } from '../store.js';
 import { confirmAction } from '../components/ConfirmDialog.js';
 
-const _vars = project => ({
-  stats:   project.stats.map(s => s.key).filter(Boolean),
-  flags:   project.flags.map(f => f.key).filter(Boolean),
-  items:   project.items,
-  skills:  project.skills || [],
-  npcs:    project.npcs,
-  rooms:   project.rooms,
-  combats: project.combats || [],
-});
+const _vars = projectVars;
 
-const _updateCombat = (id, mut) => setProject(p => ({
-  ...p,
-  combats: p.combats.map(c => c.id === id ? (typeof mut === 'function' ? mut(c) : { ...c, ...mut }) : c),
-}));
+const _updateCombat = updateById('combats');
 
 const _addCombat = () => setProject(p => ({ ...p, combats: [...p.combats, emptyCombat()] }));
 const _deleteCombat = id => setProject(p => ({ ...p, combats: p.combats.filter(c => c.id !== id) }));
@@ -108,7 +97,7 @@ const EnemyActionCard = ({ action, onChange, onDelete, onMoveUp, onMoveDown, isF
       ...(action.useWhen === 'js'
         ? [div({ style: 'margin-top:8px' })([
             span({ style: 'font-size:11px; color:var(--text-muted)' })([
-              'Body receives ', span({ style: 'font-family:ui-monospace,monospace' })(['{ enemyHp, enemyMaxHp, state, lastResult }']),
+              'Body receives ', span({ className: 'dv-mono' })(['{ enemyHp, enemyMaxHp, state, lastResult }']),
               '. Return truthy to allow.',
             ]),
             textarea({
@@ -142,14 +131,14 @@ const ExtraMoveCard = ({ move, items, stats, onChange, onDelete }) => {
     Grid({ cols: 3, gap: 8 })([
       Select({
         label: 'Cost stat',
-        options: [{ value: '', label: '— none —' }, ...stats.map(k => ({ value: k, label: k }))],
+        options: [{ value: '', label: '- none -' }, ...stats.map(k => ({ value: k, label: k }))],
         value: move.costStat || '',
         onChange: onText(v => set({ costStat: v })),
       }),
       NumberInput({ label: 'Stat cost', value: Number(move.costValue) || 0, onChange: v => set({ costValue: Number(v) || 0 }) }),
       Select({
         label: 'Consumes item',
-        options: [{ value: '', label: '— none —' }, ...groupedOptions(items)(it => ({ value: it.id, label: it.name || it.id }))],
+        options: [{ value: '', label: '- none -' }, ...groupedOptions(items)(it => ({ value: it.id, label: it.name || it.id }))],
         value: move.costItem || '',
         onChange: onText(v => set({ costItem: v })),
       }),
@@ -214,24 +203,20 @@ const CombatList = (project, selectedId) =>
 
 const CombatEditor = (combat, project) => {
   const vars = _vars(project);
-  const roomOpts = [{ value: '', label: '— return to caller —' }, ...groupedOptions(project.rooms)(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}` }))];
-  const set = patch => _updateCombat(combat.id, patch);
-  const setEnemy = patch => _updateCombat(combat.id, c => ({ ...c, enemy: { ...c.enemy, ...patch } }));
+  const roomOpts = [{ value: '', label: '- return to caller -' }, ...groupedOptions(project.rooms)(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}` }))];
+  const set = patch => _updateCombat(combat.id)(patch);
+  const setEnemy = patch => _updateCombat(combat.id)(c => ({ ...c, enemy: { ...c.enemy, ...patch } }));
 
-  const _setAction = (i, next) => setEnemy({ actions: combat.enemy.actions.map((a, k) => k === i ? next : a) });
-  const _addAction = () => setEnemy({ actions: [...combat.enemy.actions, emptyEnemyAction()] });
-  const _deleteAction = i => setEnemy({ actions: combat.enemy.actions.filter((_, k) => k !== i) });
-  const _moveAction = (i, dir) => {
-    const j = i + dir;
-    if (j < 0 || j >= combat.enemy.actions.length) return;
-    const arr = [...combat.enemy.actions];
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-    setEnemy({ actions: arr });
-  };
+  const _overActions = fn => setEnemy({ actions: fn(combat.enemy.actions || []) });
+  const _setAction    = i => next => _overActions(updateAt(i)(next));
+  const _addAction    = ()         => _overActions(arr => [...arr, emptyEnemyAction()]);
+  const _deleteAction = i          => _overActions(removeAt(i));
+  const _moveAction   = i => dir   => _overActions(swapAt(i)(dir));
 
-  const _setExtra = (i, next) => set({ extraMoves: (combat.extraMoves || []).map((m, k) => k === i ? next : m) });
-  const _addExtra = () => set({ extraMoves: [...(combat.extraMoves || []), emptyCombatMove()] });
-  const _deleteExtra = i => set({ extraMoves: (combat.extraMoves || []).filter((_, k) => k !== i) });
+  const _overExtra  = fn => set({ extraMoves: fn(combat.extraMoves || []) });
+  const _setExtra    = i => next => _overExtra(updateAt(i)(next));
+  const _addExtra    = ()         => _overExtra(arr => [...arr, emptyCombatMove()]);
+  const _deleteExtra = i          => _overExtra(removeAt(i));
 
   return Stack({ gap: 14 })([
     Card({ title: 'Combat basics' })([
@@ -261,13 +246,13 @@ const CombatEditor = (combat, project) => {
         Grid({ cols: 2, gap: 10 })([
           Select({
             label: 'Player damage taken from which stat?',
-            options: vars.stats.map(k => ({ value: k, label: k })),
+            options: vars.numStats.map(k => ({ value: k, label: k })),
             value: combat.playerStat || 'hp',
             onChange: onText(v => set({ playerStat: v })),
           }),
           Select({
             label: 'Linked NPC (removed from world on win)',
-            options: [{ value: '', label: '— none —' }, ...groupedOptions(project.npcs)(n => ({ value: n.id, label: n.name || n.id }))],
+            options: [{ value: '', label: '- none -' }, ...groupedOptions(project.npcs)(n => ({ value: n.id, label: n.name || n.id }))],
             value: combat.linkedNpcId || '',
             onChange: onText(v => set({ linkedNpcId: v })),
           }),
@@ -289,17 +274,17 @@ const CombatEditor = (combat, project) => {
           div({ style: 'font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px' })(['AI actions']),
           p({ style: 'margin:0 0 8px; font-size:12px; color:var(--text-muted)' })([
             'Each enemy turn the engine filters actions by their selection rule (always, low HP, after player missed, JS predicate), then weighted-random picks one of the survivors. ',
-            'Higher weight → picked more often. Pattern: a heal that\'s only available below 30% HP plus a default attack — the enemy heals when hurt and swings otherwise.',
+            'Higher weight → picked more often. Pattern: a heal that\'s only available below 30% HP plus a default attack - the enemy heals when hurt and swings otherwise.',
           ]),
           ...combat.enemy.actions.map((a, i) =>
             EnemyActionCard({
               action:     a,
               isFirst:    i === 0,
               isLast:     i === combat.enemy.actions.length - 1,
-              onChange:   next => _setAction(i, next),
+              onChange:   _setAction(i),
               onDelete:   () => _deleteAction(i),
-              onMoveUp:   () => _moveAction(i, -1),
-              onMoveDown: () => _moveAction(i,  1),
+              onMoveUp:   () => _moveAction(i)(-1),
+              onMoveDown: () => _moveAction(i)(+1),
             })
           ),
           Button({ size: 'sm', variant: 'ghost', onClick: _addAction })(['+ Add AI action']),
@@ -317,15 +302,15 @@ const CombatEditor = (combat, project) => {
 
     Card({ title: `Extra moves (${(combat.extraMoves || []).length})` })([
       Stack({ gap: 6 })([
-        p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
+        p({ className: 'gef-hint' })([
           'Available ONLY in this fight. The player\'s learned skills (Skills tab → starting skills or learned via effects) appear automatically as moves.',
         ]),
         ...(combat.extraMoves || []).map((m, i) =>
           ExtraMoveCard({
             move:     m,
             items:    project.items,
-            stats:    vars.stats,
-            onChange: next => _setExtra(i, next),
+            stats:    vars.numStats,
+            onChange: _setExtra(i),
             onDelete: () => _deleteExtra(i),
           })
         ),
@@ -345,7 +330,7 @@ const CombatEditor = (combat, project) => {
           TextInput({ label: 'Flavour text', value: combat.winText, onChange: onText(v => set({ winText: v })) }),
         ]),
         AssetInput({
-          label:       'Win image (optional — shown on the outcome screen)',
+          label:       'Win image (optional - shown on the outcome screen)',
           value:       combat.winImage || '',
           onChange:    v => set({ winImage: v }),
           accept:      'image',
@@ -375,7 +360,7 @@ const CombatEditor = (combat, project) => {
           TextInput({ label: 'Flavour text', value: combat.loseText, onChange: onText(v => set({ loseText: v })) }),
         ]),
         AssetInput({
-          label:       'Lose image (optional — game-over art)',
+          label:       'Lose image (optional - game-over art)',
           value:       combat.loseImage || '',
           onChange:    v => set({ loseImage: v }),
           accept:      'image',
@@ -395,7 +380,7 @@ const CombatEditor = (combat, project) => {
 
     Card({ title: 'Use this combat' })([
       p({ style: 'margin:0; font-size:13px' })([
-        'Add a Choice with the ', span({ style: 'font-family:ui-monospace,monospace' })(['open combat']), ' effect, ',
+        'Add a Choice with the ', span({ className: 'dv-mono' })(['open combat']), ' effect, ',
         'or set it as a room\'s On enter (gated behind a flag so it doesn\'t repeat). The engine remembers the caller; blank win/lose rooms fall back to it.',
       ]),
     ]),

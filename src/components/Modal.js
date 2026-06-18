@@ -1,7 +1,7 @@
 import { button, div, h2 } from '../elements.js';
 
 /**
- * Modal component — a full-screen-overlay dialog.
+ * Modal component - a full-screen-overlay dialog.
  *
  * Renders nothing (returns an empty div) when `open` is false, so it
  * can be included unconditionally in the vnode tree.

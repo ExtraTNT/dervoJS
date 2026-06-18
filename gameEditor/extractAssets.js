@@ -1,5 +1,5 @@
 /**
- * extractAssets / resolveAssetsForPreview — twin operations that walk a
+ * extractAssets / resolveAssetsForPreview  twin operations that walk a
  * project's media fields:
  *
  *   extractAssets(project)              → { project, files }
@@ -22,7 +22,7 @@ import {
 
 const _sanitise = s => String(s || '').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
 
-// — Walker scaffold ————————————————————————————————————————————
+//  Walker scaffold 
 
 // A walker takes (value, idHint) and returns a (possibly rewritten) string.
 const _walkProject = (project, walk) => {
@@ -109,15 +109,15 @@ const _walkProject = (project, walk) => {
   };
 };
 
-// — Export side ————————————————————————————————————————————
+//  Export side 
 
 const extractAssets = project => {
   if (!project) return { project, files: {} };
   const files  = {};
   const assets = project.assets || [];
-  // 1. Catalogue → real files. Build refId → path map.
+  // 1. Catalogue -> real files. Build refId -> path map.
   const refToPath = new Map();
-  const used = new Map();   // base+folder → next disambig idx
+  const used = new Map();   // base+folder -> next disambig idx
   for (const a of assets) {
     if (!a.data) continue;
     const bytes = dataUrlToBytes(a.data);
@@ -137,7 +137,7 @@ const extractAssets = project => {
     refToPath.set(a.id, `./${path}`);
   }
 
-  // 2. Legacy inline data: URL handling — dedupe by data string.
+  // 2. Legacy inline data: URL handling, dedupe by data string.
   const dataDedupe = new Map();
   const pullInline = (dataUrl, idHint) => {
     if (dataDedupe.has(dataUrl)) return dataDedupe.get(dataUrl);
@@ -172,18 +172,18 @@ const extractAssets = project => {
   };
 
   const next = _walkProject(project, walk);
-  // Strip the catalogue from the emitted project — codegen doesn't need it
+  // Strip the catalogue from the emitted project  codegen doesn't need it
   // and we don't want the data: URLs leaking into the JS source files.
   delete next.assets;
   delete next.assetDefaults;
   return { project: next, files };
 };
 
-// — Preview side ————————————————————————————————————————————
+//  Preview side 
 
 const resolveAssetsForPreview = project => {
   if (!project) return project;
-  // Skip IDB-hydration markers (__idb__) — they're not real data URLs and
+  // Skip IDB-hydration markers (__idb__)  they're not real data URLs and
   // would render as broken <img>/<audio>/<video>. Empty string here means
   // "show placeholder / play nothing" until hydration completes and a
   // fresh resolveAssetsForPreview pass picks up the real bytes.

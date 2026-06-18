@@ -56,11 +56,11 @@ const memoLeaf = memoize();
 /**
  * Stamp `memo: true` onto a vnode's props. The reconciler reads this flag
  * and short-circuits patching when the same vnode object reference comes
- * back on the next render — turning O(subtree-size) into O(1) for cached
+ * back on the next render - turning O(subtree-size) into O(1) for cached
  * trees. Pair with memoize() / memoLeaf() / memoComponent() so the cached
  * factory returns ===-stable refs.
  *
- * Vnode shape is unchanged: same { tag, props, children } — `memo` is just
+ * Vnode shape is unchanged: same { tag, props, children } - `memo` is just
  * a prop, treated like `key` (not rendered to a DOM attribute).
  *
  * @example

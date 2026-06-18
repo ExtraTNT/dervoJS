@@ -1,5 +1,5 @@
 /**
- * assetBlobs — IndexedDB-backed store for the bytes of uploaded assets.
+ * assetBlobs - IndexedDB-backed store for the bytes of uploaded assets.
  *
  * Why a separate store: localStorage caps at ~5 MB per origin, which one
  * audio or video file can blow through. We keep the project SHAPE in
@@ -24,7 +24,7 @@ const IDB_MARKER = '__idb__';
 
 const _blobKey = slot => assetId => `${slot}:${assetId}`;
 
-// Write a blob for an asset in a slot. Idempotent — same key just overwrites.
+// Write a blob for an asset in a slot. Idempotent - same key just overwrites.
 const saveBlob = slot => assetId => data =>
   _store.set(_blobKey(slot)(assetId))(data);
 

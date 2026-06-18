@@ -67,7 +67,7 @@ stopwatch.stop();
       ]),
         Col({ span: 12, md: 6 })([
           Card({
-            title: 'createInterval — event feed',
+            title: 'createInterval - event feed',
             footer: [
               span({ style: 'font-size:12px; color:var(--text-muted)' })(['ticks every 2 s · last 8 events']),
             ],
@@ -91,7 +91,7 @@ stopwatch.stop();
                 'Start the feed to see events appear every 2 seconds.',
               ]),
             }),
-            doc([`// createInterval — curried: createInterval(fn)(opts)
+            doc([`// createInterval - curried: createInterval(fn)(opts)
 const feed = createInterval(
   () => setState(s => ({ feedItems: [newItem(), ...s.feedItems.slice(0, 7)] }))
 )({ ms: 2000 });
@@ -105,10 +105,10 @@ feed.isRunning(); // boolean`]),
       ]),
     ]),
       Card({
-        title: 'createTimer — Task-based store-slice timer',
+        title: 'createTimer - Task-based store-slice timer',
         footer: [
           span({ style: 'font-size:12px; color:var(--text-muted)' })([
-            'Driven by a lazy Task chain — no setInterval handle.',
+            'Driven by a lazy Task chain - no setInterval handle.',
           ]),
         ],
       })([

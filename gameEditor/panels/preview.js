@@ -1,5 +1,5 @@
 /**
- * Preview panel — controls + a fullscreen overlay that hosts the live game.
+ * Preview panel - controls + a fullscreen overlay that hosts the live game.
  *
  * The game mounts into a DOM node we create at document.body level so dervo's
  * editor reconciler never touches it. We track the open game in a module
@@ -48,6 +48,12 @@ const _play = project => {
     background: var(--bg);
     display: flex; flex-direction: column;
   `;
+  // Project-level sidebar width - scoped to the overlay via the custom
+  // property so the editor's own sidebar (covered but still rendered)
+  // doesn't get rewritten. Empty string clears any prior value.
+  if (project.sidebar && typeof project.sidebar.width === 'string' && project.sidebar.width.trim()) {
+    _overlay.style.setProperty('--sidebar-width', project.sidebar.width.trim());
+  }
   const bar = document.createElement('div');
   bar.style.cssText = `
     display:flex; align-items:center; gap:8px; padding:8px 16px;
@@ -73,7 +79,7 @@ const _play = project => {
   const game = createGame(cfg);
   _handle = game.mount(_host);
   if (!_handle || typeof _handle.destroy !== 'function') {
-    // mount() in this lib returns { destroy } from state.js — if not, fall back
+    // mount() in this lib returns { destroy } from state.js - if not, fall back
     // to noop and just hide. Better than throwing.
     _handle = { destroy: () => {} };
   }
@@ -99,7 +105,7 @@ const PreviewPanel = state => {
   return Stack({ gap: 14 })([
     h2({ style: 'margin:0' })(['Preview']),
     p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
-      'Runs the current project as a live game in a fullscreen overlay. The preview is separate from your editor state — closing it discards play-state.',
+      'Runs the current project as a live game in a fullscreen overlay. The preview is separate from your editor state - closing it discards play-state.',
     ]),
 
     Card({ title: 'Run' })([
@@ -109,7 +115,7 @@ const PreviewPanel = state => {
           ...(live ? [Button({ variant: 'ghost', onClick: _close })(['x Stop'])] : []),
         ]),
         ...(startRoom
-          ? [p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
+          ? [p({ className: 'gef-hint gef-hint-13' })([
               'Will start at: ',
               span({ style: 'font-family:ui-monospace,monospace; color:var(--text)' })([startRoom.id]),
               span({})([` · ${startRoom.title}`]),
@@ -137,7 +143,7 @@ const PreviewPanel = state => {
       Stack({ gap: 6 })([
         p({ style: 'margin:0; font-size:13px' })([
           'The interpreter walks pages, resolves conditions, applies effects and auto-builds shop buy buttons from each shop NPC\'s stock list. ',
-          'JS-mode conditions and effects evaluate inside ', span({ style: 'font-family:ui-monospace,monospace' })(['Function(\'c\', body)']), '. ',
+          'JS-mode conditions and effects evaluate inside ', span({ className: 'dv-mono' })(['Function(\'c\', body)']), '. ',
           'The exported source from the Export tab uses the same semantics but as static JS.',
         ]),
       ]),

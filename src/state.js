@@ -64,7 +64,7 @@ const _SVG_SET = new Set([
 // Props whose IDL counterpart is read-only or doesn't reflect to the HTML
 // attribute the browser actually parses. These have to go through
 // setAttribute / removeAttribute rather than direct property assignment.
-// HTMLInputElement.list is a read-only getter — without this we'd crash on
+// HTMLInputElement.list is a read-only getter - without this we'd crash on
 // `node.list = id` when wiring an <input list="…"> to a <datalist>.
 const _ATTR_ONLY = new Set(['list']);
 
@@ -140,7 +140,7 @@ const _patchProps = el => newProps => {
   _prevProps.set(el, newProps);
 };
 
-/** Curried: _patch(parent)(oldNode)(newVnode) — recursive vnode reconciler */
+/** Curried: _patch(parent)(oldNode)(newVnode) - recursive vnode reconciler */
 const _patch = parent => oldNode => newVnode => {
   if (_profiling) _ops.vnodes++;
   if (typeof newVnode === 'number') newVnode = String(newVnode);
@@ -249,7 +249,7 @@ const _patch = parent => oldNode => newVnode => {
 
 // Renderer 
 
-/** Curried: _render(root)(newVnodes) — patch or initial-render a list of root vnodes */
+/** Curried: _render(root)(newVnodes) - patch or initial-render a list of root vnodes */
 const _render = root => newVnodes => {
   const list = Array.isArray(newVnodes) ? newVnodes : [newVnodes];
   const snap = snapFocus(document.activeElement);
@@ -293,7 +293,7 @@ const createStore = initial => {
  * @example
  *   mount(store)(document.body)(s => div({})([`count: ${s.count}`]));
  *
- *   // Partial application — one store, multiple roots:
+ *   // Partial application - one store, multiple roots:
  *   const mountTo = mount(store);
  *   mountTo(document.getElementById('header'))(HeaderView);
  *   mountTo(document.getElementById('main'))(MainView);
@@ -303,7 +303,7 @@ const mount = store => root => view => {
   const toList = v => Array.isArray(v) ? v : [v];
   let pending = false;
 
-  // Two render runners — swapped by enableProfiler / disableProfiler.
+  // Two render runners - swapped by enableProfiler / disableProfiler.
   // _runFast is the hot path: zero overhead, no timing calls.
   // _runProfiled measures compute + patch and feeds the ring buffer.
   let _prevRenderState = null;   // snapshot from last completed render, for changedKeys diff
@@ -341,7 +341,7 @@ const mount = store => root => view => {
   // can toggle every mounted store live. Removing it on destroy() avoids
   // a slow leak for apps that mount/unmount dynamically. The store subscriber
   // can't be undone (Observable's onChange returns nothing), so we gate
-  // schedule() on _active too — the orphan callback becomes a no-op.
+  // schedule() on _active too - the orphan callback becomes a no-op.
   let _active = true;
   const runner = {
     enable:  () => { if (_active) _run = _runProfiled; },
@@ -376,7 +376,7 @@ let   _profiling = false;
 let   _frameIdx  = 0;
 const _renderLog = [];   // [{ frame, computeMs, patchMs, totalMs, ts, ops, changedKeys }], newest-first, max 100
 
-// Per-frame DOM operation counters — only incremented when _profiling is on.
+// Per-frame DOM operation counters - only incremented when _profiling is on.
 let _ops = { vnodes:0, creates:0, replaces:0, removes:0, inserts:0, propPatches:0, textUpdates:0, skips:0 };
 const _resetOps = () => {
   _ops.vnodes = _ops.creates = _ops.replaces = _ops.removes =

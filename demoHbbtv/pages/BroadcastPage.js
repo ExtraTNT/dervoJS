@@ -1,5 +1,5 @@
 /**
- * Page 2 — DVB channel info + DSM-CC stream events log.
+ * Page 2 - DVB channel info + DSM-CC stream events log.
  */
 
 import { div, Card } from '../../src/index.js';

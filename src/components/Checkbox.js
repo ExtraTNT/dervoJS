@@ -1,7 +1,7 @@
 import { div, input, label } from '../elements.js';
 
 /**
- * Checkbox component — a labelled checkbox.
+ * Checkbox component - a labelled checkbox.
  *
  * @param {Object}   opts
  * @param {string}   [opts.id]       - Input id (links label).

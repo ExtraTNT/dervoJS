@@ -1,6 +1,6 @@
 /**
  * Direct-jump shortcuts. Arrow keys / OK / BACK are entirely owned by the
- * focus manager now that the page tabs are real focusables — the router
+ * focus manager now that the page tabs are real focusables - the router
  * only handles the always-on shortcuts that bypass spatial nav.
  *
  *   RED / GREEN / YELLOW / BLUE  -> colour-button shortcut to specific pages
@@ -27,7 +27,7 @@ const _jumpTo = (fm, pageId) => {
 
 /**
  * @param {Bus}            bus
- * @param {FocusManager}   fm   — focus moves to the target page's tab on jump
+ * @param {FocusManager}   fm   - focus moves to the target page's tab on jump
  */
 export const wireRouter = (bus, fm) => {
   bus.on('key', ({ key }) => {

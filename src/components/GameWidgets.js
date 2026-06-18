@@ -1,17 +1,17 @@
 /**
- * dervoJS — game widgets.
+ * dervoJS - game widgets.
  *
  * Higher-level building blocks for games on top of `createGame`.
  * Compose these in your sidebar / scenes so almost all the styling lives here.
  *
- *   Stats     — labelled rows with values + bonus + bar
- *   Resources — gold / energy / HP rows (bars when `max` provided)
- *   Inventory — slot-based equip widget; pre-built scene shape
- *   Shop      — buy-from-stock grid; pre-built scene shape
+ *   Stats     - labelled rows with values + bonus + bar
+ *   Resources - gold / energy / HP rows (bars when `max` provided)
+ *   Inventory - slot-based equip widget; pre-built scene shape
+ *   Shop      - buy-from-stock grid; pre-built scene shape
  *
  * Visual treatment uses the `dv-*` utility classes from dervo.css so the
  * reconciler isn't re-writing long inline-style strings every frame. Only
- * truly dynamic bits (bar width, bonus colour) stay inline — and bar width
+ * truly dynamic bits (bar width, bonus colour) stay inline - and bar width
  * goes through a CSS custom property so the style attr stays short.
  */
 
@@ -28,12 +28,10 @@ const _formatBonuses = bonuses =>
   Object.entries(bonuses || {})
     .filter(([, v]) => v !== 0)
     .map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${v}`)
-    .join(' · ') || '—';
+    .join(' · ') || '-';
 
 const _capitalise = s => s ? s[0].toUpperCase() + s.slice(1) : '';
 
-// Bar gauge — width as a CSS custom property keeps the style string short
-// even when pct re-computes every frame.
 const _bar = (pct, color) =>
   div({ className: 'dv-bar-track' })([
     div({
@@ -45,7 +43,7 @@ const _bar = (pct, color) =>
 //  Stats
 
 /**
- * Stats — render a vertical list of stat rows. Each row shows label,
+ * Stats - render a vertical list of stat rows. Each row shows label,
  * total (base + bonus), with a bar that fills relative to `max`.
  *
  * @param {Object} opts
@@ -79,7 +77,7 @@ const Stats = ({ values = {}, bonuses = {}, max = 25 } = {}) =>
 //  Resources
 
 /**
- * Resources — list of resource rows. Items with `max` get a bar (HP, energy);
+ * Resources - list of resource rows. Items with `max` get a bar (HP, energy);
  * items without get a simple `label · value[suffix]` line (gold, gems).
  *
  * @param {Array<Object>} items
@@ -110,7 +108,7 @@ const _resBar = ({ label, value, max, color }) => {
 //  Inventory (wardrobe)
 
 /**
- * Inventory — slot-based equip scene. One Card per slot; lists currently
+ * Inventory - slot-based equip scene. One Card per slot; lists currently
  * equipped item plus a button per owned-but-unequipped item in that slot.
  *
  * @param {Object} opts
@@ -180,7 +178,7 @@ const _slotCard = (slot, state, items, equip, unequip, equippedKey, inventoryKey
 //  Shop
 
 /**
- * Shop — buy-from-stock scene. Items grouped by slot; each card shows
+ * Shop - buy-from-stock scene. Items grouped by slot; each card shows
  * the name + bonuses + price + Buy button (auto-disabled when broke).
  *
  * @param {Object} opts

@@ -1,5 +1,5 @@
 /**
- * lockedDoor builder — scaffolds a one-way locked passage:
+ * lockedDoor builder - scaffolds a one-way locked passage:
  *   - A key item (pick existing or create new).
  *   - A new Choice on the "from" room: gated by hasItem(key, 1+), navigates to
  *     the "to" room. Optionally consumes the key on use.
@@ -18,7 +18,7 @@ import { onText } from '../../helpers.js';
 import {
   emptyChoice, emptyCondition, emptyEffect, emptyPrice,
 } from '../../schema.js';
-import { slug, uniqueId, idsOf } from './_helpers.js';
+import { slug, uniqueId, idsOf } from '../../helpers.js';
 
 const defaults = project => {
   const rooms = project.rooms.filter(r => r.kind !== 'story');
@@ -57,7 +57,7 @@ const steps = [
     validate: _validateDoor,
     render: ({ values, setValue, project }) => {
       const rooms = project.rooms.filter(r => r.kind !== 'story');
-      const roomOpts = [{ value: '', label: '— pick room —' }, ...rooms.map(r => ({ value: r.id, label: r.title || r.id }))];
+      const roomOpts = [{ value: '', label: '- pick room -' }, ...rooms.map(r => ({ value: r.id, label: r.title || r.id }))];
       return Stack({ gap: 10 })([
         p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
           'Adds a Choice on the "from" room that\'s only shown when the player carries the key.',
@@ -107,8 +107,8 @@ const steps = [
           ? [Select({
               label: 'Key item',
               options: itemOpts.length === 0
-                ? [{ value: '', label: '(no items in project — switch to "create new")' }]
-                : [{ value: '', label: '— pick item —' }, ...itemOpts],
+                ? [{ value: '', label: '(no items in project - switch to "create new")' }]
+                : [{ value: '', label: '- pick item -' }, ...itemOpts],
               value: values.existingKey || '',
               onChange: onText(v => setValue('existingKey', v)),
             })]
@@ -138,7 +138,7 @@ const steps = [
           div({})([`Choice on "${fromRoom?.title || values.fromRoom || '?'}" → "${toRoom?.title || values.toRoom || '?'}"`]),
           div({})([`Label: ${values.label || '(unset)'}`]),
           div({})([`Key: ${keyName} ${values.keyMode === 'new' ? '(will be created)' : ''}`]),
-          div({})([values.consume ? 'Consumes the key on use (single-shot door).' : 'Key is kept — door can be reused.']),
+          div({})([values.consume ? 'Consumes the key on use (single-shot door).' : 'Key is kept - door can be reused.']),
         ]),
       ]);
     },
@@ -168,14 +168,14 @@ const build = (project, values) => {
     next = { ...next, items: [...next.items, newKey] };
   }
   if (!keyId) {
-    return { project, summary: 'Locked door not created — no key picked.' };
+    return { project, summary: 'Locked door not created - no key picked.' };
   }
   if (!values.fromRoom || !values.toRoom) {
-    return { project, summary: 'Locked door not created — pick both rooms.' };
+    return { project, summary: 'Locked door not created - pick both rooms.' };
   }
 
   // ── 2. Build the door choice ──
-  // hasItem condition lets the engine compile to its existing helper —
+  // hasItem condition lets the engine compile to its existing helper -
   // simpler than a js expression and renders nicely in the editor.
   const doorChoice = {
     ...emptyChoice(),

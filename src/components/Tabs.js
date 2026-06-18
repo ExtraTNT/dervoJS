@@ -1,7 +1,7 @@
 import { button, div } from '../elements.js';
 
 /**
- * Tabs component — a tab strip paired with tab panel content.
+ * Tabs component - a tab strip paired with tab panel content.
  *
  * @param {Object}   opts
  * @param {Array}    opts.tabs              - Array of { id, label } tab descriptors.

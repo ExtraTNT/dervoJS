@@ -1,5 +1,5 @@
 /**
- * ConfirmDialog — reusable centered confirmation modal driven by the editor
+ * ConfirmDialog - reusable centered confirmation modal driven by the editor
  * store. Replaces window.confirm() in the editor with something themable.
  *
  * Usage:
@@ -17,7 +17,7 @@
  * Escape cancels via window-level keydown (wired below in `ConfirmDialog`
  * the first time it mounts). Confirm fires `onConfirm` then closes.
  *
- * Multiple stacked confirms aren't supported — the second call replaces the
+ * Multiple stacked confirms aren't supported - the second call replaces the
  * first. That matches plain confirm() semantics closely enough.
  */
 
@@ -39,7 +39,7 @@ const _confirm = () => {
   }
 };
 
-// Public helper — call site doesn't need to touch setState directly.
+// Public helper - call site doesn't need to touch setState directly.
 const confirmAction = ({
   title        = 'Are you sure?',
   message      = '',
@@ -51,7 +51,7 @@ const confirmAction = ({
   confirmDialog: { open: true, title, message, confirmLabel, cancelLabel, danger, onConfirm },
 });
 
-// ── Escape-to-cancel — wired once per page load ──────────────────────────────
+// ── Escape-to-cancel - wired once per page load ──────────────────────────────
 
 let _keyboardWired = false;
 const _wireKeyboard = () => {

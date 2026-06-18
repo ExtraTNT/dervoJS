@@ -1,4 +1,4 @@
-/* dervoJS — component stylesheet. Call initStyles() to inject. */
+/* dervoJS - component stylesheet. Call initStyles() to inject. */
 
 /*  GlitchImg  */
 .glitch-canvas { display:block; }
@@ -54,7 +54,7 @@
   pointer-events: auto;
 }
 
-/*  Design tokens — light  */
+/*  Design tokens - light  */
 :root {
   /* Palette */
   --clr-blue-50:#eff6ff; --clr-blue-100:#dbeafe; --clr-blue-500:#3b82f6;
@@ -865,7 +865,7 @@ body {
    strings found in the audit. The reconciler re-assigns the entire `style`
    attribute on every patch (state.js:122 short-circuits the equality check
    on `style`) so moving these into the cascade saves a per-frame write per
-   site. Use sparingly — composing classes for one-off layouts beats inline
+   site. Use sparingly - composing classes for one-off layouts beats inline
    styles, but a 12-token utility class for a unique component is worse. */
 .dv-muted       { color:var(--text-muted); }
 .dv-subtle      { color:var(--text-subtle); }
@@ -889,7 +889,7 @@ body {
 .dv-mt-16       { margin-top:16px; }
 .dv-mb-8        { margin-bottom:8px; }
 .dv-mb-12       { margin-bottom:12px; }
-/* Bar gauge — width comes from --dv-pct, colour from --dv-bar (defaults to accent).
+/* Bar gauge - width comes from --dv-pct, colour from --dv-bar (defaults to accent).
    The bar background is the row background so the reconciler never writes the
    long inline-style string. Used by GameWidgets (Stats/Resources) and elsewhere. */
 .dv-bar-track   { height:5px; background:var(--surface-2); border-radius:3px; overflow:hidden; }

@@ -1,7 +1,7 @@
 import { div, span } from '../elements.js';
 
 /**
- * Toggle — an on/off switch (alternatives to a checkbox for boolean settings).
+ * Toggle - an on/off switch (alternatives to a checkbox for boolean settings).
  *
  * Curried: Toggle(opts)(labelChildren)
  * Pass no children for a label-less toggle.

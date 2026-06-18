@@ -1,5 +1,5 @@
 /**
- * dervoJS — game module
+ * dervoJS - game module
  *
  * Twine-style scene engine with dervoJS's curried, pure-functional style.
  * The author supplies an initial state object and a map of scene render
@@ -26,11 +26,11 @@
  *   game.mount(document.body);
  *
  * State keys reserved by the engine:
- *   _scene        — id of the currently rendered scene
- *   _history      — stack of prior scene ids (for back())
- *   _sidebarOpen  — whether the sidebar is expanded
- *   _debugOpen    — whether the floating debug panel is open (debug: true only)
- *   npcLocations  — { npcId: sceneId, ... }   (only when `npcs` is configured)
+ *   _scene        - id of the currently rendered scene
+ *   _history      - stack of prior scene ids (for back())
+ *   _sidebarOpen  - whether the sidebar is expanded
+ *   _debugOpen    - whether the floating debug panel is open (debug: true only)
+ *   npcLocations  - { npcId: sceneId, ... }   (only when `npcs` is configured)
  *
  * The context passed to every scene / sidebar / topBar function:
  *   { state, setState, getState, goto, back, restart, scene, history }
@@ -124,7 +124,7 @@ const createGame = ({
   npcs     = {},
   sidebar,
   topBar,
-  music,                       // ctx => url|'' — invoked on every state change; engine swaps the bgm <audio> src when the URL changes
+  music,                       // ctx => url|'' - invoked on every state change; engine swaps the bgm <audio> src when the URL changes
   musicVolume = 0.5,           // 0..1, applied once on element creation
   debug    = true,
   notFound = _defaultNotFound,
@@ -152,7 +152,7 @@ const createGame = ({
   // store.subscribe whenever music(ctx) returns a different URL than last
   // render. Empty / falsy URLs pause + clear the src so we never leak the
   // last room's track into a quiet area. Browsers block autoplay until the
-  // page sees a user gesture — we catch the rejected play() and retry on
+  // page sees a user gesture - we catch the rejected play() and retry on
   // the first click/keydown that lands.
   let _bgmEl       = null;
   let _bgmLastUrl  = null;
@@ -239,7 +239,7 @@ const createGame = ({
     return { _scene: prev, _history: s._history.slice(0, -1) };
   });
 
-  // Reset to the initial state. Keys added at runtime persist as-is —
+  // Reset to the initial state. Keys added at runtime persist as-is -
   // author should clear them explicitly if a true fresh start is needed.
   const restart = () => setState(_initial);
 
@@ -308,7 +308,7 @@ const createGame = ({
     return (typeof topBar === 'function' ? topBar : _defaultTopBar(title))(ctx);
   };
 
-  // Floating debug panel — mirrors demo/app.js.
+  // Floating debug panel - mirrors demo/app.js.
   const _renderDebugPanel = s =>
     FloatingPanel({
       id:       'game-debugger',
@@ -325,9 +325,10 @@ const createGame = ({
 
   const view = s => [
     AppShell({
-      topBar:      _renderTopBar(s),
-      sidebar:     _renderSidebar(s),
-      sidebarOpen: s._sidebarOpen,
+      topBar:       _renderTopBar(s),
+      sidebar:      _renderSidebar(s),
+      sidebarOpen:  s._sidebarOpen,
+      sidebarWidth: 'inherit',
     })([
       _renderScene(s),
     ]),
@@ -361,7 +362,7 @@ const createGame = ({
 //  Twine-style helpers 
 
 /**
- * Scene — render a Twine-style descriptor as a vnode.
+ * Scene - render a Twine-style descriptor as a vnode.
  * Curried: Scene(opts)(ctx).
  *
  * @param {Object}  opts
@@ -378,12 +379,12 @@ const Scene = ({ title, body = [], choices = [] } = {}) => ctx =>
   ]);
 
 /**
- * Choice — single Twine-style choice. Curried: Choice(opts)(ctx).
+ * Choice - single Twine-style choice. Curried: Choice(opts)(ctx).
  *
  * @param {Object}    opts
  * @param {string}    opts.label
  * @param {string}    [opts.to]        Scene id to navigate to.
- * @param {function}  [opts.action]    (ctx) => void — runs before navigation.
+ * @param {function}  [opts.action]    (ctx) => void - runs before navigation.
  * @param {boolean}   [opts.disabled]
  * @param {boolean|function} [opts.if=true]  Boolean or (ctx) => boolean predicate.
  * @returns {function} ctx => vnode | null
@@ -401,7 +402,7 @@ const Choice = ({ label, to, action, disabled, if: cond = true } = {}) => ctx =>
 };
 
 /**
- * ChoiceList — render a stack of Choice buttons. Each entry can be a
+ * ChoiceList - render a stack of Choice buttons. Each entry can be a
  * Choice descriptor object or an already-curried function (e.g. Choice(...)).
  *
  * @param {Array} choices
@@ -415,7 +416,7 @@ const ChoiceList = (choices = []) => ctx =>
   );
 
 /**
- * withTick — wrap an action so the world ticks (NPCs move) after it runs.
+ * withTick - wrap an action so the world ticks (NPCs move) after it runs.
  * Pure helper; uses ctx.tickWorld() at call time.
  *
  * @example
@@ -427,7 +428,7 @@ const withTick = action => ctx => {
 };
 
 /**
- * NpcChoices — generate "Talk to <name>" choice descriptors for every NPC
+ * NpcChoices - generate "Talk to <name>" choice descriptors for every NPC
  * currently at the given scene. Spread into a Scene's choices array.
  *
  * @example
@@ -438,12 +439,14 @@ const withTick = action => ctx => {
  */
 const NpcChoices = (ctx, sceneId = ctx.scene) =>
   ctx.npcsAt(sceneId).map(npc => ({
-    label:  `Talk to ${npc.name}`,
+    // `interactLabel` lets an NPC config override the default verb - useful
+    // for non-conversational NPCs ("Use workbench" / "Read tome" / …).
+    label:  npc.interactLabel || `Talk to ${npc.name}`,
     action: c => c.talkTo(npc.id, sceneId),
   }));
 
 /**
- * NpcLine — render the greeting line(s) for NPCs currently at the scene.
+ * NpcLine - render the greeting line(s) for NPCs currently at the scene.
  * Returns an array (possibly empty) of vnodes, ready to spread into a body.
  *
  * @example

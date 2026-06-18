@@ -1,5 +1,5 @@
 /**
- * Export panel — preview generated source per file, download any single file
+ * Export panel - preview generated source per file, download any single file
  * or all five as a project.zip, and import/export the raw project.json.
  *
  * The zip uses a minimal in-browser STORE-method ZIP writer (no DEFLATE) so
@@ -35,8 +35,8 @@ const _crc32 = bytes => {
 };
 
 // Minimal STORE-method ZIP. Good enough for source export; no compression.
-// `content` is either a string (JS sources) — encoded as UTF-8 — or a
-// Uint8Array (binary assets) — passed through verbatim. The previous
+// `content` is either a string (JS sources) - encoded as UTF-8 - or a
+// Uint8Array (binary assets) - passed through verbatim. The previous
 // `TextEncoder.encode(content)` blindly stringified Uint8Array inputs to
 // `"137,80,78,…"` form, inflating binary assets ~4x and corrupting them.
 const _zip = files => {
@@ -139,7 +139,7 @@ const ExportPanel = state => {
   // Pull uploaded data: URLs out into real binary entries (under img/ audio/
   // video/), and codegen against a project whose fields now hold relative
   // paths instead of giant base64 blobs. For the preview pane we only show
-  // the JS sources — the binary file list goes into the zip download.
+  // the JS sources - the binary file list goes into the zip download.
   const { project: emitProject, files: assetFiles } = extractAssets(project);
   const files = emitAll(emitProject);
   const fileKey = state.exportFile || 'main.js';
@@ -192,19 +192,22 @@ const ExportPanel = state => {
   return Stack({ gap: 14 })([
     h2({ style: 'margin:0' })(['Export']),
     p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
-      'The editor emits real JS source against dervoJS — drop the exported folder next to ', span({ style: 'font-family:ui-monospace,monospace' })(['src/']), ' (parallel to ', span({ style: 'font-family:ui-monospace,monospace' })(['demoGame/']), ') and serve it.',
+      'The editor emits real JS source against dervoJS - drop the exported folder next to ', span({ className: 'dv-mono' })(['src/']), ' (parallel to ', span({ className: 'dv-mono' })(['demoGame/']), ') and serve it.',
     ]),
 
     Card({ title: 'Download' })([
       Stack({ gap: 8 })([
+        p({ className: 'gef-hint' })([
+          (Object.entries(files).reduce((acc, [key, value]) => acc + value.length, 0) / 1024).toFixed(1) + ' kb'
+        ]),
         div({ style: 'display:flex; gap:8px; flex-wrap:wrap' })([
           Button({ variant: 'primary', onClick: _downloadAllZip })(['↓ Download all as .zip']),
           Button({ onClick: () => _download(fileKey, files[fileKey]) })([`↓ Download ${fileKey}`]),
-          Button({ variant: 'ghost', onClick: _downloadProjectJson })(['↓ project.json']),
+          Button({ variant: 'ghost', onClick: _downloadProjectJson })(['↓ Export project.json']),
           Button({ variant: 'ghost', onClick: _importProjectJson })(['↑ Import project.json']),
         ]),
-        p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
-          'project.json is the raw schema — useful for backup, version control, or sharing.',
+        p({ className: 'gef-hint' })([
+          'project.json is the raw schema - useful for backup, version control, or sharing.',
         ]),
       ]),
     ]),
@@ -212,9 +215,9 @@ const ExportPanel = state => {
     ...(assetSummary.length
       ? [Card({ title: `Bundled assets (${assetSummary.length})` })([
           Stack({ gap: 6 })([
-            p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
+            p({ className: 'gef-hint' })([
               'Uploaded files extracted from the project. They\'re written into the zip under their respective folders; the generated JS references them by relative path (e.g. ',
-              span({ style: 'font-family:ui-monospace,monospace' })(['./img/item_potion.webp']), ').',
+              span({ className: 'dv-mono' })(['./img/item_potion.webp']), ').',
             ]),
             div({ style: 'display:flex; flex-direction:column; gap:3px; font-family:ui-monospace,monospace; font-size:12px; max-height:200px; overflow:auto; border:1px solid var(--border); border-radius:var(--radius); padding:8px; background:var(--surface)' })(
               assetSummary.map(a => div({ style: 'display:flex; gap:12px; justify-content:space-between' })([
@@ -234,7 +237,7 @@ const ExportPanel = state => {
               type: 'button',
               className: `gef-file-tab${name === fileKey ? ' active' : ''}`,
               onclick: () => setState({ exportFile: name }),
-            })([name])
+            })([name + ' ' + (files[name].length / 1024).toFixed(1) + ' kb'])
           )
         ),
         pre({ className: 'gef-code' })([files[fileKey]]),

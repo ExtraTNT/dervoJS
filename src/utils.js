@@ -1,5 +1,5 @@
 /**
- * dervoJS — shared functional utilities
+ * dervoJS - shared functional utilities
  *
  * These are thin helpers built on top of the odocosJS core that appear
  * repeatedly across the component library.

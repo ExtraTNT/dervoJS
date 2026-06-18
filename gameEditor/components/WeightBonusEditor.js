@@ -1,5 +1,5 @@
 /**
- * WeightBonusList — reusable editor for a list of weight bonuses.
+ * WeightBonusList - reusable editor for a list of weight bonuses.
  *
  * Used wherever the engine resolves an effective weight from
  * `base + Σ bonus.amount where bonus.condition`. That's currently:
@@ -12,7 +12,7 @@
  *     condition  : Condition       (any mode: always / simple / hasItem / js)
  *     amountMode : 'fixed' | 'stat'
  *     amountFixed: number          (when amountMode === 'fixed')
- *     amountStat : string          (state[key] — when amountMode === 'stat')
+ *     amountStat : string          (state[key] - when amountMode === 'stat')
  *   }
  */
 
@@ -27,7 +27,8 @@ import { ConditionEditor } from './ConditionEditor.js';
 
 // One bonus row. Curried `bonus => onPatch => onDelete` so call sites stay flat.
 const _bonusRow = vars => bonus => onPatch => onDelete => {
-  const statOpts = [{ value: '', label: '— pick stat —' }, ...(vars.stats || []).map(k => ({ value: k, label: k }))];
+  // Bonus formulas multiply, so numeric stats only.
+  const statOpts = [{ value: '', label: '- pick stat -' }, ...(vars.numStats || vars.stats || []).map(k => ({ value: k, label: k }))];
   return div({ style: 'border:1px solid var(--border-2); border-radius:var(--radius); padding:8px; background:var(--bg)' })([
     div({ style: 'display:flex; align-items:center; gap:6px; margin-bottom:6px' })([
       span({ style: 'font-size:11px; color:var(--text-muted)' })(['+ if']),
@@ -73,7 +74,7 @@ const WeightBonusList = ({ bonuses, vars, onChange, label = 'Weight bonuses' }) 
   const _del   = i     => _set(list.filter((_, k) => k !== i));
   const _add   = ()    => _set([...list, emptyWeightBonus()]);
   return div({ style: 'border-top:1px dashed var(--border-2); padding-top:8px; margin-top:4px' })([
-    span({ style: 'font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600; display:block; margin-bottom:6px' })([
+    span({ className: 'gef-kbd-label', style: 'display:block; margin-bottom:6px' })([
       `${label} (${list.length})`,
     ]),
     Stack({ gap: 6 })([

@@ -28,7 +28,7 @@ const formatTime = secs => {
  * Creates a background interval that calls `fn` every `ms` milliseconds.
  * Curried: createInterval(fn)(opts).
  *
- * Completely decoupled from application state — use the returned controller
+ * Completely decoupled from application state - use the returned controller
  * to drive setState calls, fetch data, or trigger any side-effect on a
  * repeating schedule. Start/stop independently of rendering.
  *
@@ -92,7 +92,7 @@ const effect = f => new Task((_rej, res) => { f(); res(); });
  * Creates a timer controller that drives a store slice.
  *
  * Each tick is a lazy Task chain: delay(step s) -> update state -> chain(tick).
- * The loop stops when `cancelled` is flipped — no interval handle, no leaks.
+ * The loop stops when `cancelled` is flipped - no interval handle, no leaks.
  *
  * @param {Object}   opts
  * @param {Object}   opts.store         Store from createStore().
@@ -108,7 +108,7 @@ const effect = f => new Task((_rej, res) => { f(); res(); });
  *   timer.reset();    // back to 0:00
  *   timer.toggle();   // flips running
  *
- *   // In view — pass controls to Clock for built-in buttons:
+ *   // In view - pass controls to Clock for built-in buttons:
  *   Clock({ time: state.timer.elapsed, running: state.timer.running, controls: timer })
  */
 const createTimer = ({ store, key = 'timer', step = 1 } = {}) => {
@@ -151,11 +151,11 @@ const _btn = label => onClick => variant =>
   button({ className: `btn btn-${variant} btn-sm`, onclick: onClick, type: 'button' })([label]);
 
 /**
- * Clock — stateless time display, optionally with inline controls.
+ * Clock - stateless time display, optionally with inline controls.
  *
  * Without `controls`, renders the formatted time (and optional label).
  * With `controls` (a { start, pause, reset, toggle } from createTimer),
- * also renders Start/Pause and Reset buttons — replacing TimerDisplay.
+ * also renders Start/Pause and Reset buttons - replacing TimerDisplay.
  *
  * @param {Object}           opts
  * @param {number}           [opts.time=0]       Seconds to display (may be negative).
@@ -188,7 +188,7 @@ const Clock = ({ time = 0, label, size = 'md', running = false, className = '', 
     ])] : []),
   ]);
 
-/** Alias for Clock — kept for back-compat; prefer Clock({ controls }) directly. */
+/** Alias for Clock - kept for back-compat; prefer Clock({ controls }) directly. */
 const TimerDisplay = Clock;
 
 export { formatTime, createInterval, createTimer, Clock, TimerDisplay };

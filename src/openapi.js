@@ -1,5 +1,5 @@
 /**
- * dervoJS — OpenAPI 3.0 / 3.1 compiler
+ * dervoJS - OpenAPI 3.0 / 3.1 compiler
  *
  * Pure functions for turning an OpenAPI document into the descriptors
  * `CrudResource` needs:
@@ -22,8 +22,8 @@
  *     required, nullable, readOnly,
  *     minLength?, maxLength?, pattern?,
  *     minimum?,   maximum?,   step?,
- *     items?,      // for arrays — single nested field descriptor
- *     properties?, // for objects — array of nested field descriptors
+ *     items?,      // for arrays - single nested field descriptor
+ *     properties?, // for objects - array of nested field descriptors
  *   }
  *
  * 3.0 vs 3.1 differences handled:
@@ -122,7 +122,7 @@ const _isParam  = seg  => /^\{.+\}$/.test(seg);
 /**
  * Locate the CRUD operations for a given resource. The resource string is
  * matched as a path segment, so `'users'` finds `/users`, `/api/users`,
- * `/v1/users/{id}` — but not `/usergroups`.
+ * `/v1/users/{id}` - but not `/usergroups`.
  */
 const _findOps = spec => resource => {
   const paths = spec.paths || {};
@@ -190,7 +190,7 @@ const _itemSchema = spec => listSchema => {
 /**
  * Compile a single resource out of an OpenAPI document.
  *
- * @param {object} spec       — Parsed OpenAPI 3.0 or 3.1 document.
+ * @param {object} spec       - Parsed OpenAPI 3.0 or 3.1 document.
  * @returns {function} resource => compiled
  */
 const compileResource = spec => resource => {

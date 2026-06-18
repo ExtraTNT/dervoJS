@@ -3,7 +3,7 @@ import { Img, Video, Audio, VideoStream, Dropzone, Divider, Spacer, AspectBox, F
 import { setState } from '../store.js';
 import { doc } from '../components/doc.js';
 
-// Seeded picsum URL — seed changes on each visit so the browser fetches a
+// Seeded picsum URL - seed changes on each visit so the browser fetches a
 // different image rather than serving the cached one.
 const pic = seed => w => h => `https://picsum.photos/seed/${seed}-${w}x${h}/${w}/${h}`;
 
@@ -21,7 +21,7 @@ export const mediaPanel = state => {
       ' in NAV_ITEMS. The DOM is fully torn down on route change and a new seed is stamped into state on each visit, so picsum serves a different image every time. See the Docs tab for details.',
     ]),
     // Images 
-    Card({ title: 'Img — aspect, fit, shape' })([
+    Card({ title: 'Img - aspect, fit, shape' })([
       Row({ gap: 12 })([
         Col({ span: 12, sm: 6, md: 4 })([
           p({ style: 'margin:0 0 6px; font-size:12px; color:var(--text-muted)' })(['16/9 rounded cover']),
@@ -49,11 +49,11 @@ Img({ src: '/avatar.jpg', alt: 'Avatar', circle: true, width: 80, height: 80 })`
     div({ style: 'margin-top:16px' })([
       Card({ title: 'Divider + Spacer' })([
         Stack({ gap: 0 })([
-          p({ style: 'font-size:13px; color:var(--text-muted); margin:0 0 10px' })(['Divider — plain and labeled:']),
+          p({ style: 'font-size:13px; color:var(--text-muted); margin:0 0 10px' })(['Divider - plain and labeled:']),
           Divider(),
           Divider({ label: 'or continue with' }),
           Divider({ label: 'section 2' }),
-          p({ style: 'font-size:13px; color:var(--text-muted); margin:10px 0' })(['Spacer — pushes siblings apart:']),
+          p({ style: 'font-size:13px; color:var(--text-muted); margin:10px 0' })(['Spacer - pushes siblings apart:']),
           div({ style: 'display:flex; align-items:center; border:1px dashed var(--border); border-radius:var(--radius); padding:10px 16px; font-size:13px' })([
             strong({})(['Left']),
             Spacer(),
@@ -68,7 +68,7 @@ Img({ src: '/avatar.jpg', alt: 'Avatar', circle: true, width: 80, height: 80 })`
         doc([`Divider()
 Divider({ label: 'or continue with' })
 
-// Spacer — fills available flex space
+// Spacer - fills available flex space
 div({ style: 'display:flex' })([
   strong({})(['Left']),
   Spacer(),
@@ -81,7 +81,7 @@ Spacer({ size: 32 })`]),
 
     // AspectBox 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'AspectBox — embed-safe aspect ratio' })([
+      Card({ title: 'AspectBox - embed-safe aspect ratio' })([
         Row({ gap: 12 })([
           Col({ span: 12, md: 6 })([
             p({ style: 'margin:0 0 6px; font-size:12px; color:var(--text-muted)' })(['ratio: 16/9']),
@@ -125,7 +125,7 @@ AspectBox({ ratio: '1/1' })([ squareContent ])
 
     // Video player 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'Video — HTML5 player (multi-source + captions)' })([
+      Card({ title: 'Video - HTML5 player (multi-source + captions)' })([
         Row({ gap: 16 })([
           Col({ span: 12, md: 8 })([
             Video({
@@ -135,7 +135,7 @@ AspectBox({ ratio: '1/1' })([ squareContent ])
               poster:   'https://peach.blender.org/wp-content/uploads/title_anouncement.jpg?x11217',
               aspect:   '16/9',
               controls: true,
-              caption:  'Big Buck Bunny — sample clip (W3Schools)',
+              caption:  'Big Buck Bunny - sample clip (W3Schools)',
             }),
           ]),
           Col({ span: 12, md: 4 })([
@@ -151,7 +151,7 @@ AspectBox({ ratio: '1/1' })([ squareContent ])
         ]),
         Divider({ label: 'WebVTT subtitle track' }),
         p({ style: 'margin:0 0 8px; font-size:12px; color:var(--text-muted)' })([
-          'Enable CC (\u29c9) in the player controls to see subtitles. Data-URI VTT — works cross-origin.',
+          'Enable CC (\u29c9) in the player controls to see subtitles. Data-URI VTT - works cross-origin.',
         ]),
         Video({
           src:      'https://www.w3schools.com/html/mov_bbb.mp4',
@@ -183,20 +183,20 @@ Video({ src: '/clip.mp4', aspect: '16/9', controls: true })`]),
 
     // Audio player 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'Audio — HTML5 player (multi-format + caption)' })([
+      Card({ title: 'Audio - HTML5 player (multi-format + caption)' })([
         Stack({ gap: 12 })([
           Audio({
             sources: [
               { src: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', type: 'audio/mpeg' },
             ],
             controls: true,
-            caption:  'SoundHelix Song 1 — royalty-free sample',
+            caption:  'SoundHelix Song 1 - royalty-free sample',
           }),
           Audio({
             src:      'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
             controls: true,
             loop:     true,
-            caption:  'SoundHelix Song 2 — looping example',
+            caption:  'SoundHelix Song 2 - looping example',
           }),
         ]),
         doc([`Audio({
@@ -214,7 +214,7 @@ Audio({ src: '/track.mp3', controls: true, loop: true })`]),
 
     // VideoStream (webcam) 
     div({ style: 'margin-top:16px' })([
-      Card({ title: 'VideoStream — live MediaStream (getUserMedia)' })([
+      Card({ title: 'VideoStream - live MediaStream (getUserMedia)' })([
         div({ style: 'display:flex; gap:8px; margin-bottom:12px' })([
           Button({
             variant: state.stream ? 'danger' : 'primary',
@@ -237,7 +237,7 @@ Audio({ src: '/track.mp3', controls: true, loop: true })`]),
               ref:    el => { if (el) el.srcObject = state.stream; },
               aspect: '16/9',
               muted:  true,
-              caption: 'Live camera feed — mirrored for natural selfie view',
+              caption: 'Live camera feed - mirrored for natural selfie view',
             })
           : div({ style: 'aspect-ratio:16/9; background:var(--surface-2); border:1px dashed var(--border); border-radius:var(--radius); display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:13px' })([
               'Camera preview will appear here',

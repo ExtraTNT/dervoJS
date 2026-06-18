@@ -1,5 +1,5 @@
 /**
- * MultiStep — curried vnode multistep component.
+ * MultiStep - curried vnode multistep component.
  *
  * Usage:
  *   MultiStep({ steps, idx, setIdx, values, setValues, onDone })([])

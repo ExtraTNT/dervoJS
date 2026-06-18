@@ -1,5 +1,5 @@
 /**
- * GlitchImg — canvas-based image glitch effect component.
+ * GlitchImg - canvas-based image glitch effect component.
  * 
  * found at https://freefrontend.com/javascript-glitch-effects/
  * shit looks nice
@@ -8,14 +8,14 @@
  *   transform :: config -> state -> pixels -> pixels
  *
  * The imperative shell (RAF loop, canvas I/O) is kept as a thin wrapper
- * around the pure pipeline.  The component does NOT return a vnode — it mounts
+ * around the pure pipeline.  The component does NOT return a vnode - it mounts
  * into an existing element (canvas or container div) and returns controls.
  *
  * Effects 
- *   flowLine  — a bright scanline that scrolls down every frame
- *   shiftLine — random horizontal bands shifted left / right
- *   shiftRGB  — chromatic aberration: R, G, B channels shifted independently
- *   scatter   — random rectangles extracted and re-drawn at offset positions
+ *   flowLine  - a bright scanline that scrolls down every frame
+ *   shiftLine - random horizontal bands shifted left / right
+ *   shiftRGB  - chromatic aberration: R, G, B channels shifted independently
+ *   scatter   - random rectangles extracted and re-drawn at offset positions
  *
  *  API 
  *   GlitchImg(opts)(el) -> { stop, pause, resume }
@@ -28,10 +28,10 @@
  *   opts.scatCount       {number}  Scatter-rect slots.  Default 3.
  *   opts.rgb             {boolean} Enable chromatic aberration.  Default true.
  *
- *   el  — <canvas> element OR any container element (a canvas is created inside).
+ *   el  - <canvas> element OR any container element (a canvas is created inside).
  *
  *  CSS helper 
- *   GlitchCanvas(opts) -> vnode   — declare a canvas placeholder in your vnode tree.
+ *   GlitchCanvas(opts) -> vnode   - declare a canvas placeholder in your vnode tree.
  *
  * @example
  *   // 1. Put a canvas in your vnode tree:
@@ -170,7 +170,7 @@ const buildPipeline = ({ numShiftLines, flowCfg, enableRGB }) => state => src =>
   return p;
 };
 
-// Mount function — imperative shell, functional API 
+// Mount function - imperative shell, functional API 
 
 /**
  * GlitchImg :: opts -> (HTMLElement | HTMLCanvasElement) -> { stop, pause, resume }
@@ -200,7 +200,7 @@ export const GlitchImg = ({
   let paused       = false;
   let through      = false;     // true = show clean image this frame
   let throughTimer = null;
-  let origin       = null;      // Uint8ClampedArray snapshot — never mutated
+  let origin       = null;      // Uint8ClampedArray snapshot - never mutated
   let t            = rand(0)(1000);
   let scatter      = Array.from({ length: scatCount }, () => ({ x: 0, y: 0, rect: null }));
   let lastTime     = 0;
@@ -220,7 +220,7 @@ export const GlitchImg = ({
     cvs.width  = imgEl.naturalWidth;
     cvs.height = imgEl.naturalHeight;
     ctx.drawImage(imgEl, 0, 0);
-    // Capture the clean snapshot — this is the immutable origin used every frame
+    // Capture the clean snapshot - this is the immutable origin used every frame
     origin = copyPixels(ctx.getImageData(0, 0, cvs.width, cvs.height).data);
     rafId  = requestAnimationFrame(loop);
   };

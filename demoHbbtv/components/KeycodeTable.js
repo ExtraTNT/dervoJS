@@ -1,5 +1,5 @@
 /**
- * KeycodeTable — debug aid. Shows the raw event fields side-by-side with
+ * KeycodeTable - debug aid. Shows the raw event fields side-by-side with
  * the decoded semantic name for the last N keypresses, newest first.
  * Useful when bringing a new HbbTV STB up: confirm which keyCode the box
  * actually fires for VK_RED, VK_BACK, etc.
@@ -13,9 +13,9 @@ const _fmtTime = ts =>
 const COLS = [
   { key: 'time',   label: 'Time' },
   { key: 'key',    label: 'Decoded', render: v => Badge({ variant: 'blue' })([String(v)]) },
-  { key: 'keyStr', label: 'e.key',   render: v => span({ style: 'font-family:ui-monospace,monospace' })([String(v ?? '—')]) },
-  { key: 'code',   label: 'keyCode', render: v => span({ style: 'font-family:ui-monospace,monospace' })([String(v ?? '—')]) },
-  { key: 'which',  label: 'which',   render: v => span({ style: 'font-family:ui-monospace,monospace' })([String(v ?? '—')]) },
+  { key: 'keyStr', label: 'e.key',   render: v => span({ style: 'font-family:ui-monospace,monospace' })([String(v ?? '-')]) },
+  { key: 'code',   label: 'keyCode', render: v => span({ style: 'font-family:ui-monospace,monospace' })([String(v ?? '-')]) },
+  { key: 'which',  label: 'which',   render: v => span({ style: 'font-family:ui-monospace,monospace' })([String(v ?? '-')]) },
 ];
 
 export const KeycodeTable = buffer => buffer.length === 0

@@ -8,7 +8,7 @@ export const headerPanel = () =>
   div({})([
     ImageBg({ src: HERO, height: '420px', overlay: 'rgba(0,0,0,0.25)' })([
       div({ style: 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;padding:24px;color:#fff;text-align:center' })([
-        h1({ style: 'margin:0;font-size:36px;line-height:1.05;font-weight:800' })(['dervoJS — Beautiful page headers']),
+        h1({ style: 'margin:0;font-size:36px;line-height:1.05;font-weight:800' })(['dervoJS - Beautiful page headers']),
         p({ style: 'margin:0;max-width:720px;opacity:.95;color:rgba(255,255,255,.95);font-size:15px' })([
           'A composable, purely-functional `ImageBg` component that places an image behind any content. Drop buttons, forms or navigation in front of it.'
         ]),

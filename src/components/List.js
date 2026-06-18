@@ -1,11 +1,11 @@
 import { li, p, ul } from '../elements.js';
 
 /**
- * List component — renders an array of items applying a render function to each.
+ * List component - renders an array of items applying a render function to each.
  *
  * @param {Object}   opts
  * @param {Array}    [opts.items=[]]       - Data array.
- * @param {function} opts.renderItem       - (item, index) => vnode — renders one item.
+ * @param {function} opts.renderItem       - (item, index) => vnode - renders one item.
  * @param {vnode}    [opts.empty]          - Vnode to show when items is empty.
  * @returns {vnode}
  *

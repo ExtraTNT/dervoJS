@@ -1,15 +1,15 @@
 /**
- * Theme panel — designs the GAME's theme.
+ * Theme panel - designs the GAME's theme.
  *
  * Token overrides + custom CSS are written into the active project and baked
  * into the exported game by codegen. They also paint the running editor (since
- * editor + game share the same CSS-variable system) — that's a side-effect,
+ * editor + game share the same CSS-variable system) - that's a side-effect,
  * not the goal.
  *
  * The live preview runs an actual mini-game inside a small windowed pane,
  * using the SAME pipeline the Preview tab and the export use (buildGameConfig
  * → createGame → mount). When tokens or custom CSS change, the mini-game
- * repaints via the browser's CSS-custom-property cascade — no rebuild needed.
+ * repaints via the browser's CSS-custom-property cascade - no rebuild needed.
  */
 
 import {
@@ -98,8 +98,8 @@ const _groupCard = defaults => overrides => group =>
 
 // ─── Live mini-game window ──────────────────────────────────────────────
 //
-// A representative tiny project — exercises Scene, NPC dialogue (with topics),
-// and combat — so every game surface paints with the current theme + custom
+// A representative tiny project - exercises Scene, NPC dialogue (with topics),
+// and combat - so every game surface paints with the current theme + custom
 // CSS. Built once at module load; the engine handles its own state.
 
 // ─── Mini-game project ──────────────────────────────────────────────────
@@ -118,7 +118,7 @@ const _groupCard = defaults => overrides => group =>
 //                              referenced via the asset:<id> catalogue model
 //
 // SVGs are inline data URLs (URL-encoded) so the project is fully self-
-// contained — no upload, no network fetch.
+// contained - no upload, no network fetch.
 
 const _svg = body => `data:image/svg+xml;utf8,${encodeURIComponent(body)}`;
 
@@ -245,7 +245,7 @@ const _miniProject = () => ({
   assetDefaults: { imageQuality: 0.8, imageMaxDim: 1080 },
 });
 
-// Module singleton — the mini-game stays mounted across Theme-tab re-renders
+// Module singleton - the mini-game stays mounted across Theme-tab re-renders
 // so its state (current scene, hp, etc.) doesn't reset every keystroke.
 let _miniHandle = null;
 let _miniHost   = null;
@@ -257,7 +257,7 @@ const _ensureMiniGame = () => {
   if (!host) return;
   _miniHost = host;
   const cfg = buildGameConfig(_miniProject());
-  // Strip the floating debug panels — they'd cover the small window.
+  // Strip the floating debug panels - they'd cover the small window.
   cfg.debug = false;
   const game = createGame(cfg);
   _miniHandle = game.mount(host);
@@ -280,7 +280,7 @@ const _miniGameCard = () => Card({ title: 'Live mini-game preview' })([
     p({ style: 'margin:0; font-size:12.5px; color:var(--text-muted)' })([
       'A tiny game runs in this window using the SAME pipeline the export uses (',
       span({ style: 'font-family:ui-monospace,monospace; background:var(--surface-2); padding:1px 5px; border-radius:3px' })(['buildGameConfig → createGame → mount']),
-      '). Edit a token or paste custom CSS — the player\'s game on the right repaints instantly.',
+      '). Edit a token or paste custom CSS - the player\'s game on the right repaints instantly.',
     ]),
     div({ style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap' })([
       button({
@@ -306,7 +306,7 @@ const _classRow = (cls, what) => div({ style: 'display:grid; grid-template-colum
   span({ style: 'color:var(--text-muted); line-height:1.5' })([what]),
 ]);
 
-const _classGuide = () => Card({ title: 'CSS class guide — what to target in custom CSS' })([
+const _classGuide = () => Card({ title: 'CSS class guide - what to target in custom CSS' })([
   Stack({ gap: 4 })([
     p({ style: 'margin:0 0 4px; font-size:12.5px; color:var(--text-muted)' })([
       'Every running game emits these classes. Use them in the Custom CSS box below or in any external stylesheet you ship alongside the exported game.',
@@ -316,7 +316,7 @@ const _classGuide = () => Card({ title: 'CSS class guide — what to target in c
     _classRow('.game-scene p',   'Narrative paragraphs and dialogue lines.'),
     _classRow('.game-scene img', 'Page images, NPC portraits, enemy art, combat flavour images.'),
     _classRow('.btn',            'Every choice button uses this base class. Hover, focus, disabled states inherit.'),
-    _classRow('.btn-primary',    'The default choice variant — picks up --accent.'),
+    _classRow('.btn-primary',    'The default choice variant - picks up --accent.'),
     _classRow('.btn-secondary',  '"Quiet" choices.'),
     _classRow('.btn-ghost',      'Transparent-background actions (used in the topbar).'),
     _classRow('.btn-sm / .btn-lg', 'Size modifiers on Button.'),
@@ -397,12 +397,12 @@ const ThemePanel = state => {
               span({ style: 'font-family:ui-monospace,monospace; background:var(--surface-2); padding:1px 5px; border-radius:3px' })(['initStyles({ colors: { … } })']),
               ' call in ',
               span({ style: 'font-family:ui-monospace,monospace; background:var(--surface-2); padding:1px 5px; border-radius:3px' })(['main.js']),
-              ' so the player sees them. As a side-effect the editor chrome also picks them up — that\'s expected; you\'re looking at your own game palette.',
+              ' so the player sees them. As a side-effect the editor chrome also picks them up - that\'s expected; you\'re looking at your own game palette.',
             ]),
-            p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
+            p({ className: 'gef-hint' })([
               'The topbar ',
-              span({ style: 'font-family:ui-monospace,monospace' })(['🌗']),
-              ' light/dark switch is a separate editor comfort setting — it doesn\'t affect the exported game.',
+              span({ className: 'dv-mono' })(['🌗']),
+              ' light/dark switch is a separate editor comfort setting - it doesn\'t affect the exported game.',
             ]),
           ]),
           div({ style: 'display:flex; gap:8px; flex-shrink:0; align-items:flex-start' })([

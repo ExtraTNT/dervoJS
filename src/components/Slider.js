@@ -1,7 +1,7 @@
 import { div, input, label, span } from '../elements.js';
 
 /**
- * Slider — range input with label, value display, and CSS custom-property fill.
+ * Slider - range input with label, value display, and CSS custom-property fill.
  *
  * @param {Object}   opts
  * @param {string}   [opts.id]

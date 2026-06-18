@@ -1,5 +1,5 @@
 /**
- * Meta panel — project title, start room, default music, stats list, flags list.
+ * Meta panel - project title, start room, default music, stats list, flags list.
  *
  * Leaf components (TextInput, NumberInput, Select) are single-call: `TextInput({...})`.
  * Curried wrappers (Card, Stack, Grid, Toggle, Button, Badge) take children: `Card({...})([…])`.
@@ -15,35 +15,93 @@ import { Select } from '../../src/components/Select.js';
 import { Button } from '../../src/components/Button.js';
 import { Badge } from '../../src/components/Badge.js';
 import { setProject, getState } from '../store.js';
-import { onText } from '../helpers.js';
+import { onText, updateAt, removeAt, appendTo } from '../helpers.js';
 import { AssetInput } from '../components/AssetInput.js';
 import { FolderedList, groupedOptions } from '../components/FolderedList.js';
+import { emptyStat } from '../schema.js';
+
+/** Typed zero per stat kind. */
+const _defaultInitialFor = type =>
+  type === 'string' ? '' : type === 'array' ? [] : 0;
+
+/** Coerce an editor input to the stat's declared type. Comma-split for arrays. */
+const _coerceInitial = type => v => {
+  if (type === 'number') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  if (type === 'string') return v == null ? '' : String(v);
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === 'string') return v.split(',').map(s => s.trim()).filter(Boolean);
+  return [];
+};
 
 const _setMeta = patch => setProject(pj => ({ ...pj, meta: { ...pj.meta, ...patch } }));
 
-const _setStat  = (i, patch) => setProject(pj => ({ ...pj, stats: pj.stats.map((s, k) => k === i ? { ...s, ...patch } : s) }));
-const _addStat  = () => setProject(pj => ({ ...pj, stats: [...pj.stats, { key: '', initial: 0 }] }));
-const _delStat  = i => setProject(pj => ({ ...pj, stats: pj.stats.filter((_, k) => k !== i) }));
+const _withStats = fn => setProject(pj => ({ ...pj, stats: fn(pj.stats) }));
+const _withFlags = fn => setProject(pj => ({ ...pj, flags: fn(pj.flags) }));
 
-const _setFlag  = (i, patch) => setProject(pj => ({ ...pj, flags: pj.flags.map((f, k) => k === i ? { ...f, ...patch } : f) }));
-const _addFlag  = () => setProject(pj => ({ ...pj, flags: [...pj.flags, { key: '', initial: false }] }));
-const _delFlag  = i => setProject(pj => ({ ...pj, flags: pj.flags.filter((_, k) => k !== i) }));
+const _setStat = i => patch => _withStats(updateAt(i)(patch));
+const _addStat = ()         => _withStats(appendTo(emptyStat('number')('')));
+const _delStat = i => ()    => _withStats(removeAt(i));
+
+const _setFlag = i => patch => _withFlags(updateAt(i)(patch));
+const _addFlag = ()         => _withFlags(appendTo({ key: '', initial: false }));
+const _delFlag = i => ()    => _withFlags(removeAt(i));
+
+const _STAT_TYPE_OPTS = [
+  { value: 'number', label: 'number' },
+  { value: 'string', label: 'string' },
+  { value: 'array',  label: 'array'  },
+];
+
+/** Type-aware initial input. Arrays edit as comma-separated text; storage stays Array<string>. */
+const _initialInput = i => s => {
+  const onCommit = v => _setStat(i)({ initial: _coerceInitial(s.type)(v) });
+  if (s.type === 'number') {
+    return NumberInput({
+      label:    i === 0 ? 'Initial' : '',
+      value:    Number(s.initial) || 0,
+      onChange: onCommit,
+    });
+  }
+  if (s.type === 'string') {
+    return TextInput({
+      label:       i === 0 ? 'Initial' : '',
+      value:       typeof s.initial === 'string' ? s.initial : '',
+      onChange:    onText(onCommit),
+      placeholder: 'male',
+    });
+  }
+  // array
+  const csv = Array.isArray(s.initial) ? s.initial.join(', ') : '';
+  return TextInput({
+    label:       i === 0 ? 'Initial (comma-separated)' : '',
+    value:       csv,
+    onChange:    onText(onCommit),
+    placeholder: 'common, elvish',
+  });
+};
 
 const StatRow = (s, i) =>
-  Grid({ cols: 3, gap: 8 })([
+  Grid({ cols: 4, gap: 8 })([
     TextInput({
       label: i === 0 ? 'Key' : '',
       value: s.key,
-      onChange: onText(v => _setStat(i, { key: v })),
+      onChange: onText(v => _setStat(i)({ key: v })),
       placeholder: 'hp',
     }),
-    NumberInput({
-      label: i === 0 ? 'Initial' : '',
-      value: Number(s.initial) || 0,
-      onChange: v => _setStat(i, { initial: Number(v) || 0 }),
+    Select({
+      label:    i === 0 ? 'Type' : '',
+      options:  _STAT_TYPE_OPTS,
+      value:    s.type || 'number',
+      // Reset initial on type change. Coercion (e.g. 100 -> ['100'])
+      // would surprise more often than it would help.
+      onChange: onText(v => _setStat(i)({ type: v, initial: _defaultInitialFor(v) })),
     }),
-    div({ style: 'display:flex; align-items:flex-end' })([
-      Button({ variant: 'ghost', size: 'sm', onClick: () => _delStat(i) })(['Remove']),
+    _initialInput(i)(s),
+    div({ className: 'gef-row-end' })([
+      Button({ variant: 'ghost', size: 'sm', onClick: _delStat(i) })(['Remove']),
     ]),
   ]);
 
@@ -52,15 +110,15 @@ const FlagRow = (f, i) =>
     TextInput({
       label: i === 0 ? 'Key' : '',
       value: f.key,
-      onChange: onText(v => _setFlag(i, { key: v })),
+      onChange: onText(v => _setFlag(i)({ key: v })),
       placeholder: 'metHermit',
     }),
     div({ style: 'display:flex; align-items:flex-end; gap:8px' })([
-      Toggle({ on: !!f.initial, onChange: v => _setFlag(i, { initial: !!v }) })([]),
+      Toggle({ on: !!f.initial, onChange: v => _setFlag(i)({ initial: !!v }) })([]),
       span({ style: 'font-size:12px; color:var(--text-muted)' })([f.initial ? 'true' : 'false']),
     ]),
-    div({ style: 'display:flex; align-items:flex-end' })([
-      Button({ variant: 'ghost', size: 'sm', onClick: () => _delFlag(i) })(['Remove']),
+    div({ className: 'gef-row-end' })([
+      Button({ variant: 'ghost', size: 'sm', onClick: _delFlag(i) })(['Remove']),
     ]),
   ]);
 
@@ -78,7 +136,7 @@ const MetaPanel = project => {
         }),
         Select({
           label: 'Start room',
-          options: [{ value: '', label: '— pick one —' }, ...roomOpts],
+          options: [{ value: '', label: '- pick one -' }, ...roomOpts],
           value: project.meta.start,
           onChange: onText(v => _setMeta({ start: v })),
         }),
@@ -94,8 +152,15 @@ const MetaPanel = project => {
 
     Card({ title: 'Stats' })([
       Stack({ gap: 8 })([
-        p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
-          'Numeric values on the game state (hp, gold, STR, …). Read with state.<key>.',
+        p({ className: 'gef-hint gef-hint-13' })([
+          'Values on the game state (hp, gold, gender, languages, …). Read with state.<key>. Type drives which Effect / Condition ops are available: numbers get arithmetic (',
+          span({ className: 'dv-mono' })(['add / sub / set']),
+          '); strings get ', span({ className: 'dv-mono' })(['set / append / clear']),
+          ' + ', span({ className: 'dv-mono' })(['contains / startsWith']),
+          ' conditions; arrays get ',
+          span({ className: 'dv-mono' })(['push / removeValue / clear']),
+          ' + ', span({ className: 'dv-mono' })(['includes']),
+          ' conditions.',
         ]),
         ...(project.stats.length === 0
           ? [div({ className: 'gef-empty' })(['No stats yet.'])]
@@ -108,7 +173,7 @@ const MetaPanel = project => {
 
     Card({ title: 'Flags' })([
       Stack({ gap: 8 })([
-        p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
+        p({ className: 'gef-hint gef-hint-13' })([
           'Boolean toggles (metHermit, hasKey, …). Live under state.flags.<key>.',
         ]),
         ...(project.flags.length === 0
@@ -122,7 +187,7 @@ const MetaPanel = project => {
 
     Card({ title: 'Starting inventory' })([
       Stack({ gap: 8 })([
-        p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
+        p({ className: 'gef-hint gef-hint-13' })([
           'Items the player begins the game with. Lives at state.inventory[itemId] and is consumed/added by give/take effects exactly the same way as in-game pickups.',
         ]),
         ...(project.items.length === 0
@@ -159,7 +224,7 @@ const MetaPanel = project => {
 
     Card({ title: 'Additional imports' })([
       Stack({ gap: 10 })([
-        p({ style: 'margin:0; font-size:13px; color:var(--text-muted)' })([
+        p({ className: 'gef-hint gef-hint-13' })([
           'Extra JS modules to inject into the generated game bundle. Each row produces one ',
           span({ style: 'font-family:ui-monospace,monospace; background:var(--surface-2); padding:1px 5px; border-radius:3px' })(['import <binding> from "<specifier>";']),
           ' line at the top of the chosen generated file, BEFORE the auto-imports. Leave the binding blank for a side-effect-only ',
@@ -182,7 +247,7 @@ const MetaPanel = project => {
               Select({
                 label:    i === 0 ? 'Generated file' : '',
                 options:  [
-                  { value: '',        label: '— pick file —' },
+                  { value: '',        label: '- pick file -' },
                   { value: 'main',    label: 'main.js'    },
                   { value: 'scenes',  label: 'scenes.js'  },
                   { value: 'world',   label: 'world.js'   },

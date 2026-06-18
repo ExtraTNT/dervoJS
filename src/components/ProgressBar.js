@@ -1,7 +1,7 @@
 import { div, span } from '../elements.js';
 
 /**
- * ProgressBar — determinate or indeterminate progress indicator.
+ * ProgressBar - determinate or indeterminate progress indicator.
  *
  * @param {Object}   opts
  * @param {number}   [opts.value=0]              Current value (0–max).

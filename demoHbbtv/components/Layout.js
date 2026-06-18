@@ -1,8 +1,8 @@
 /**
- * Page shell — title + focusable tabs (via the library's TabBar), content
+ * Page shell - title + focusable tabs (via the library's TabBar), content
  * area, footer key hints.
  *
- * All tab styling lives in the library — this file just maps page ids to
+ * All tab styling lives in the library - this file just maps page ids to
  * labels and renders the chrome.
  */
 
@@ -31,7 +31,7 @@ export const Header = state => {
       state.focus?.id ? `focus: ${state.focus.id}` : 'no focus',
     ]),
     span({ style: 'flex:1; min-width:0' })([]),
-    // row:'nav' confines LEFT/RIGHT to top tabs only — it can never drift down to a sub-tab or content.
+    // row:'nav' confines LEFT/RIGHT to top tabs only - it can never drift down to a sub-tab or content.
     TabBar({ tabs: _tabDefs, current: state.page, focus: state.focus, row: 'nav', tabStyle: 'margin:0 4px' }),
     /*...(previewing
       ? [span({ style: 'font-size:11px; color:var(--accent)' })([

@@ -1,5 +1,5 @@
 /**
- * Asset helpers — read files, compress images, decode data URLs.
+ * Asset helpers - read files, compress images, decode data URLs.
  *
  * Uploaded files are stored as data: URLs on the project JSON so they survive
  * a save/load cycle through localStorage. On export, the data URLs are
@@ -8,7 +8,7 @@
  *
  * Images are passed through odocosJS's base64ToWebP for a meaningful size
  * reduction (lossy WebP at ~0.8 quality, max-height 1080). Audio and video
- * are stored verbatim — browser-side re-encoding for those is too heavy and
+ * are stored verbatim - browser-side re-encoding for those is too heavy and
  * the typical asset is already in a compressed container.
  */
 
@@ -43,7 +43,7 @@ const fileToDataUrl = file => new Promise((resolve, reject) => {
 });
 
 // Compress a base64/data URL image through odocosJS's base64ToWebP. Falls back
-// to the original on failure (some formats — SVG, GIF — don't survive canvas
+// to the original on failure (some formats - SVG, GIF - don't survive canvas
 // re-encode well; we keep them untouched).
 const compressImageDataUrl = async (dataUrl, opts = {}) => {
   const { quality = 0.8, maxDimension = 1080 } = opts;
@@ -102,7 +102,7 @@ const formatBytes = n => {
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 };
 
-// — Asset catalogue API ————————————————————————————————————————————
+// - Asset catalogue API --------------------------------------------
 
 // String ref scheme: `asset:<id>`. We pass everything else through unchanged
 // (plain URLs, empty string, even legacy inline data: URLs).
@@ -126,7 +126,7 @@ const resolveAssetRef = (project, ref) => {
 
 // Same shape, but returns an empty array of *all* refs in a project for the
 // extractor + sweeper at delete time. Hand-rolled to avoid mass field-walking
-// elsewhere — see extractAssets.js for the structural walk.
+// elsewhere - see extractAssets.js for the structural walk.
 
 export {
   isDataUrl, dataUrlMime, dataUrlByteSize, dataUrlToBytes,

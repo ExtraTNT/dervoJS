@@ -6,14 +6,14 @@ import { cn } from '../utils.js';
 const toPx = v => (typeof v === 'number' ? `${v}px` : v);
 
 /**
- * sourceNodes(sources) — converts a sources array into <source> vnodes.
+ * sourceNodes(sources) - converts a sources array into <source> vnodes.
  * Each entry: { src, type? }
  */
 const sourceNodes = sources =>
   (sources || []).map(s => source({ src: s.src, type: s.type || '' })([]));
 
 /**
- * trackNodes(tracks) — converts a tracks array into <track> vnodes.
+ * trackNodes(tracks) - converts a tracks array into <track> vnodes.
  * Each entry: { src, kind?, srclang?, label?, default? }
  */
 const trackNodes = tracks =>
@@ -30,7 +30,7 @@ const trackNodes = tracks =>
 // Video 
 
 /**
- * Video — accessible HTML5 video player with aspect ratio, caption, and track support.
+ * Video - accessible HTML5 video player with aspect ratio, caption, and track support.
  *
  * Pure: no DOM refs. All state (muted, autoplay, etc.) is expressed via props.
  * For imperative control (play/pause via JS) use the standard `id` + `document.getElementById`.
@@ -38,7 +38,7 @@ const trackNodes = tracks =>
  * @param {Object}   opts
  * @param {string}   [opts.src]          Single source URL (shorthand; use sources[] for multi).
  * @param {string}   [opts.type]         MIME type for opts.src, e.g. 'video/mp4'.
- * @param {Array}    [opts.sources]      Array of { src, type } — multiple format fallbacks.
+ * @param {Array}    [opts.sources]      Array of { src, type } - multiple format fallbacks.
  * @param {Array}    [opts.tracks]       Array of { src, kind?, srclang?, label?, default? }.
  * @param {string}   [opts.poster]       Poster image URL shown before play.
  * @param {string}   [opts.aspect='16/9'] CSS aspect-ratio value.
@@ -118,7 +118,7 @@ const Video = ({
 // VideoStream 
 
 /**
- * VideoStream — renders a <video> element wired to a MediaStream object
+ * VideoStream - renders a <video> element wired to a MediaStream object
  * (e.g. from getUserMedia / getDisplayMedia). The stream is attached via
  * the `srcObject` DOM property, which cannot be set through a vnode attribute.
  *
@@ -127,11 +127,11 @@ const Video = ({
  * The `stream` prop is compared by identity on each render; if it changes, the
  * ref callback fires again with the updated element so you can reassign srcObject.
  *
- * Pure from the vnode side — all imperative work is isolated in the ref callback.
+ * Pure from the vnode side - all imperative work is isolated in the ref callback.
  *
  * @param {Object}         opts
  * @param {MediaStream}    [opts.stream]         Live stream; null clears src.
- * @param {function}       [opts.ref]            (videoEl) => void — called after mount.
+ * @param {function}       [opts.ref]            (videoEl) => void - called after mount.
  * @param {string}         [opts.aspect='16/9']
  * @param {boolean}        [opts.muted=true]     Default true (required to avoid echo).
  * @param {boolean}        [opts.autoplay=true]  Default true so the stream plays automatically.
@@ -199,7 +199,7 @@ const VideoStream = ({
 // Audio 
 
 /**
- * Audio — accessible HTML5 audio player.
+ * Audio - accessible HTML5 audio player.
  *
  * @param {Object}   opts
  * @param {string}   [opts.src]         Single source URL.

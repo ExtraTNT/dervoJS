@@ -1,9 +1,9 @@
 /**
- * NPCs panel — list on the left, NpcEditor on the right.
+ * NPCs panel - list on the left, NpcEditor on the right.
  *
  * Two conversation systems per NPC, switched by an Advanced toggle:
  *
- *   advanced: false  (default — simple, flat)
+ *   advanced: false  (default - simple, flat)
  *     Greeting pages + flat Choices, exactly like before. Choice.flow is ignored;
  *     `to` drives navigation. Topics are hidden but preserved.
  *
@@ -13,7 +13,7 @@
  *     Each topic is itself like a tiny scene (pages + choices), but choices use
  *     the 4-mode flow: change / exitBack / exitRoom / exitCombat.
  *
- * `role: shop` is orthogonal — shops bypass both systems.
+ * `role: shop` is orthogonal - shops bypass both systems.
  */
 
 import { div, span, h2, h3, p, button } from '../../src/elements.js';
@@ -25,14 +25,15 @@ import { Button } from '../../src/components/Button.js';
 import { Card } from '../../src/components/Card.js';
 import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
-import { setProject, setState } from '../store.js';
+import { setProject, setState, updateById } from '../store.js';
 import { confirmAction } from '../components/ConfirmDialog.js';
-import { emptyNpc, emptyPage, emptyChoice, emptyShopEntry, emptyBuyback, emptyBuybackItem, emptyTopic } from '../schema.js';
-import { onText } from '../helpers.js';
+import { emptyNpc, emptyPage, emptyChoice, emptyShopEntry, emptyBuyback, emptyBuybackItem, emptyTopic, emptyNpcVariant } from '../schema.js';
+import { onText, projectVars, updateAt, removeAt, swapAt } from '../helpers.js';
 import { AssetInput } from '../components/AssetInput.js';
 import { PageEditor }     from '../components/PageEditor.js';
 import { ChoiceEditor }   from '../components/ChoiceEditor.js';
 import { EffectEditor }   from '../components/EffectEditor.js';
+import { ConditionEditor } from '../components/ConditionEditor.js';
 import { ChoiceGenerator, openChoiceGenerator } from '../components/ChoiceGenerator.js';
 import { FolderedList, FolderField, folderSuggestions, groupedOptions } from '../components/FolderedList.js';
 import { vnode } from '../../lib/odocosjs/src/render.js';
@@ -52,24 +53,13 @@ const ROLE_OPTS = [
   { value: 'shop',     label: 'Shop (item stock)' },
 ];
 
-const _vars = project => ({
-  stats:   project.stats.map(s => s.key).filter(Boolean),
-  flags:   project.flags.map(f => f.key).filter(Boolean),
-  items:   project.items,
-  skills:  project.skills || [],
-  npcs:    project.npcs,
-  rooms:   project.rooms,
-  combats: project.combats || [],
-});
+const _vars = projectVars;
 
-const _updateNpc = (id, mut) => setProject(p => ({
-  ...p,
-  npcs: p.npcs.map(n => n.id === id ? (typeof mut === 'function' ? mut(n) : { ...n, ...mut }) : n),
-}));
+const _updateNpc = updateById('npcs');
 
 const _addNpc = () => setProject(p => ({ ...p, npcs: [...p.npcs, emptyNpc()] }));
 const _deleteNpc = id => setProject(p => ({ ...p, npcs: p.npcs.filter(n => n.id !== id) }));
-const _toggleLocation = (npcId, roomId) => _updateNpc(npcId, n => {
+const _toggleLocation = npcId => roomId => _updateNpc(npcId)(n => {
   const has  = n.locations.includes(roomId);
   const next = has ? n.locations.filter(x => x !== roomId) : [...n.locations, roomId];
   return { ...n, locations: next };
@@ -110,7 +100,7 @@ const LocationsEditor = (npc, project) => {
     project.rooms.map(r =>
       button({
         type: 'button',
-        onclick: () => _toggleLocation(npc.id, r.id),
+        onclick: () => _toggleLocation(npc.id)(r.id),
         className: `gef-list-btn${npc.locations.includes(r.id) ? ' active' : ''}`,
         style: 'border:1px solid var(--border)',
       })([
@@ -126,11 +116,11 @@ const ShopStockEditor = (npc, project) => {
     return div({ className: 'gef-empty' })(['Add some items first (Items tab).']);
   }
   const stock = npc.shop?.stock || [];
-  const _setStock = next => _updateNpc(npc.id, n => ({ ...n, shop: { ...(n.shop || {}), stock: next } }));
+  const _setStock = next => _updateNpc(npc.id)(n => ({ ...n, shop: { ...(n.shop || {}), stock: next } }));
 
-  const statOpts = [{ value: '', label: '(item default)' }, ...project.stats.map(s => ({ value: s.key, label: s.key }))];
+  const statOpts = [{ value: '', label: '(item default)' }, ...project.stats.filter(s => (s.type || 'number') === 'number').map(s => ({ value: s.key, label: s.key }))];
   return Stack({ gap: 8 })([
-    p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
+    p({ className: 'gef-hint' })([
       'Items the NPC sells. Leave currency/amount blank to use the item\'s default price; leave quantity blank for infinite.',
     ]),
     ...stock.map((entry, i) => {
@@ -146,7 +136,7 @@ const ShopStockEditor = (npc, project) => {
         Select({
           label:    i === 0 ? 'Item' : '',
           options:  [
-            { value: '', label: '— pick —' },
+            { value: '', label: '- pick -' },
             ...groupedOptions(project.items)(it => ({ value: it.id, label: `${it.name} (${it.id})` })),
           ],
           value:    entry.itemId,
@@ -178,32 +168,32 @@ const ShopStockEditor = (npc, project) => {
 };
 
 const BUYBACK_MODE_OPTS = [
-  { value: 'none', label: 'none — shop only sells, no buying'   },
-  { value: 'open', label: 'open — buy anything in inventory'    },
-  { value: 'list', label: 'list — only the specified items'     },
+  { value: 'none', label: 'none - shop only sells, no buying'   },
+  { value: 'open', label: 'open - buy anything in inventory'    },
+  { value: 'list', label: 'list - only the specified items'     },
 ];
 
-// Shop buyback editor — wired to npc.shop.buyback. Mode picks behaviour;
+// Shop buyback editor - wired to npc.shop.buyback. Mode picks behaviour;
 // multiplier is the default fraction of the item's price the shop pays
 // (0.8 → sell for 8 gold an item priced at 10). Per-item rows on `list` mode
 // can override the multiplier; blank = use the shop default.
 const ShopBuybackEditor = (npc, project) => {
   const buyback = npc.shop?.buyback || emptyBuyback();
-  const _set = patch => _updateNpc(npc.id, n => ({
+  const _set = patch => _updateNpc(npc.id)(n => ({
     ...n,
     shop: { ...(n.shop || { stock: [] }), buyback: { ...buyback, ...patch } },
   }));
   const _setItems = items => _set({ items });
   const items = buyback.items || [];
 
-  // Items already in the whitelist — used so the dropdown skips them.
+  // Items already in the whitelist - used so the dropdown skips them.
   const taken = new Set(items.map(it => it.itemId).filter(Boolean));
   const remainingOpts = project.items.filter(it => !taken.has(it.id));
 
   return Stack({ gap: 10 })([
-    p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
+    p({ className: 'gef-hint' })([
       'What the shop will ', span({ style: 'font-weight:600' })(['buy back']), ' from the player. Sell price = ',
-      span({ style: 'font-family:ui-monospace,monospace' })(['floor(multiplier × item.price.amount)']),
+      span({ className: 'dv-mono' })(['floor(multiplier x item.price.amount)']),
       ' · paid in the item\'s own price stat.',
     ]),
     Grid({ cols: 2, gap: 10 })([
@@ -233,7 +223,7 @@ const ShopBuybackEditor = (npc, project) => {
                   const effMul = entry.multiplier == null ? (Number(buyback.multiplier) || 0.8) : Number(entry.multiplier);
                   const pays   = Math.floor(effMul * price.amount);
                   const itemOptsList = [
-                    ...(item ? [{ value: item.id, label: `${item.name || item.id} (${item.id})` }] : [{ value: '', label: '— pick item —' }]),
+                    ...(item ? [{ value: item.id, label: `${item.name || item.id} (${item.id})` }] : [{ value: '', label: '- pick item -' }]),
                     ...groupedOptions(project.items.filter(it => it.id !== entry.itemId && !taken.has(it.id)))(it => ({ value: it.id, label: `${it.name || it.id} (${it.id})` })),
                   ];
                   return div({ style: 'display:grid; grid-template-columns: 2fr 120px 1fr 40px; gap:8px; align-items:end' })([
@@ -244,7 +234,7 @@ const ShopBuybackEditor = (npc, project) => {
                       onChange: onText(v => _setItems(items.map((it, k) => k === i ? { ...it, itemId: v } : it))),
                     }),
                     TextInput({
-                      label:       i === 0 ? 'Override ×' : '',
+                      label:       i === 0 ? 'Override x' : '',
                       value:       entry.multiplier == null ? '' : String(entry.multiplier),
                       onChange:    onText(v => _setItems(items.map((it, k) => k === i ? { ...it, multiplier: v.trim() === '' ? null : Math.max(0, Number(v) || 0) } : it))),
                       placeholder: String(Number(buyback.multiplier) || 0.8),
@@ -267,16 +257,16 @@ const ShopBuybackEditor = (npc, project) => {
     ...(buyback.mode === 'open'
       ? [div({ style: 'font-size:11px; color:var(--text-muted)' })([
           'Every item in the player\'s inventory is eligible at ',
-          span({ style: 'font-family:ui-monospace,monospace' })([`× ${Number(buyback.multiplier) || 0.8}`]),
+          span({ className: 'dv-mono' })([`x ${Number(buyback.multiplier) || 0.8}`]),
           '. Restock-sensitive items (quests, keys, …) can be excluded by giving them ',
-          span({ style: 'font-family:ui-monospace,monospace' })(['kind: \'key\'']),
+          span({ className: 'dv-mono' })(['kind: \'key\'']),
           ' upstream if you build that convention into your game.',
         ])]
       : []),
   ]);
 };
 
-// — Topic-tree SVG view ————————————————————————————————————————————
+// - Topic-tree SVG view --------------------------------------------
 
 const _TOPIC_W  = 150;
 const _TOPIC_H  = 46;
@@ -320,7 +310,7 @@ const TopicTree = (npc, selectedTopicId) => {
   const layout = _topicLayout(npc);
   if (layout.length === 0) {
     return div({ className: 'gef-empty' })([
-      'No topics yet — add one to start mapping the conversation.',
+      'No topics yet - add one to start mapping the conversation.',
     ]);
   }
   const byId   = Object.fromEntries(layout.map(n => [n.topic.id, n]));
@@ -419,42 +409,25 @@ const TopicTree = (npc, selectedTopicId) => {
   ]);
 };
 
-// — Single-topic editor (advanced mode) ————————————————————————————————
+// - Single-topic editor (advanced mode) --------------------------------
 
 const SingleTopicEditor = ({ topic, npc, project, vars, roomOpts, topicOpts, combatOpts, onChange, onDelete }) => {
-  const set = patch => onChange({ ...topic, ...patch });
+  const set       = patch => onChange({ ...topic, ...patch });
+  const _withList = key   => fn => set({ [key]: fn(topic[key] || []) });
+  // Deleting the last page would leave an empty list; backfill so the
+  // editor always has at least one page to render.
+  const _withPages = fn => set({ pages: (out => out.length ? out : [emptyPage()])(fn(topic.pages || [])) });
 
-  const _setPage = (i, patch) => set({
-    pages: topic.pages.map((pg, k) => k === i ? { ...pg, ...patch } : pg),
-  });
-  const _addPage    = () => set({ pages: [...topic.pages, emptyPage()] });
-  const _deletePage = i  => {
-    const next = topic.pages.filter((_, k) => k !== i);
-    set({ pages: next.length ? next : [emptyPage()] });
-  };
-  const _movePage = (i, dir) => {
-    const j = i + dir;
-    if (j < 0 || j >= topic.pages.length) return;
-    const pages = [...topic.pages];
-    [pages[i], pages[j]] = [pages[j], pages[i]];
-    set({ pages });
-  };
+  const _setPage    = i => patch => _withPages(updateAt(i)(patch));
+  const _addPage    = () => _withPages(pages => [...pages, emptyPage()]);
+  const _deletePage = i => _withPages(removeAt(i));
+  const _movePage   = i => dir => _withPages(swapAt(i)(dir));
 
-  const _setChoice = (i, next) => set({
-    choices: topic.choices.map((c, k) => k === i ? next : c),
-  });
   // Default new topic choice = exitBack (the most common case: a "Goodbye" or "Done").
-  const _addChoice = () => set({
-    choices: [...topic.choices, { ...emptyChoice(), flow: 'exitBack' }],
-  });
-  const _deleteChoice = i => set({ choices: topic.choices.filter((_, k) => k !== i) });
-  const _moveChoice = (i, dir) => {
-    const j = i + dir;
-    if (j < 0 || j >= topic.choices.length) return;
-    const choices = [...topic.choices];
-    [choices[i], choices[j]] = [choices[j], choices[i]];
-    set({ choices });
-  };
+  const _setChoice    = i => next => _withList('choices')(updateAt(i)(next));
+  const _addChoice    = () => _withList('choices')(arr => [...arr, { ...emptyChoice(), flow: 'exitBack' }]);
+  const _deleteChoice = i => _withList('choices')(removeAt(i));
+  const _moveChoice   = i => dir => _withList('choices')(swapAt(i)(dir));
 
   return Stack({ gap: 12 })([
     div({ style: 'display:flex; align-items:center; gap:8px' })([
@@ -487,7 +460,7 @@ const SingleTopicEditor = ({ topic, npc, project, vars, roomOpts, topicOpts, com
 
     div({})([
       span({ style: 'font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px' })([
-        `Pages (${topic.pages.length}) — the dialogue shown when the player is in this topic`,
+        `Pages (${topic.pages.length}) - the dialogue shown when the player is in this topic`,
       ]),
       Stack({ gap: 4 })([
         ...topic.pages.map((pg, i) => PageEditor({
@@ -495,10 +468,10 @@ const SingleTopicEditor = ({ topic, npc, project, vars, roomOpts, topicOpts, com
           index:      i,
           isLast:     i === topic.pages.length - 1,
           canDelete:  topic.pages.length > 1,
-          onChange:   next => _setPage(i, next),
+          onChange:   _setPage(i),
           onDelete:   () => _deletePage(i),
-          onMoveUp:   () => _movePage(i, -1),
-          onMoveDown: () => _movePage(i,  1),
+          onMoveUp:   () => _movePage(i)(-1),
+          onMoveDown: () => _movePage(i)(+1),
         })),
         Button({ size: 'sm', variant: 'ghost', onClick: _addPage })(['+ Add page']),
       ]),
@@ -506,7 +479,7 @@ const SingleTopicEditor = ({ topic, npc, project, vars, roomOpts, topicOpts, com
 
     div({})([
       span({ style: 'font-size:12px; color:var(--text-muted); display:block; margin-bottom:6px' })([
-        `Choices after last page (${topic.choices.length}) — what the player can do next`,
+        `Choices after last page (${topic.choices.length}) - what the player can do next`,
       ]),
       Stack({ gap: 4 })([
         ...(topic.choices.length === 0
@@ -522,10 +495,10 @@ const SingleTopicEditor = ({ topic, npc, project, vars, roomOpts, topicOpts, com
               combatOpts,
               isFirst:    i === 0,
               isLast:     i === topic.choices.length - 1,
-              onChange:   next => _setChoice(i, next),
+              onChange:   _setChoice(i),
               onDelete:   () => _deleteChoice(i),
-              onMoveUp:   () => _moveChoice(i, -1),
-              onMoveDown: () => _moveChoice(i,  1),
+              onMoveUp:   () => _moveChoice(i)(-1),
+              onMoveDown: () => _moveChoice(i)(+1),
             }))),
         div({ style: 'display:flex; gap:8px; flex-wrap:wrap' })([
           Button({ size: 'sm', variant: 'ghost', onClick: _addChoice })(['+ Add choice']),
@@ -536,67 +509,55 @@ const SingleTopicEditor = ({ topic, npc, project, vars, roomOpts, topicOpts, com
   ]);
 };
 
-// — NPC editor ————————————————————————————————————————————
+// - NPC editor --------------------------------------------
 
 const NpcEditor = (npc, project, selectedTopicId) => {
   const vars      = _vars(project);
   const roomOpts  = groupedOptions(project.rooms)(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}` }));
   const topicOpts = (npc.topics || []).map(t => ({ value: t.id, label: t.name || t.id }));
   const combatOpts = (project.combats || []).map(c => ({ value: c.id, label: c.name || c.id }));
-  const set = patch => _updateNpc(npc.id, patch);
+  const set = patch => _updateNpc(npc.id)(patch);
 
-  // Simple-mode page + choice mutators (legacy flat dialogue).
-  const _setPage = (i, patch) => _updateNpc(npc.id, n => ({
-    ...n,
-    pages: n.pages.map((pg, k) => k === i ? { ...pg, ...patch } : pg),
-  }));
-  const _addPage    = () => _updateNpc(npc.id, n => ({ ...n, pages: [...n.pages, emptyPage()] }));
-  const _deletePage = i  => _updateNpc(npc.id, n => {
-    const next = n.pages.filter((_, k) => k !== i);
+  // Curried per-list patcher: `_overList(key)(fn)` runs `fn(currentList)`
+  // and stores the result back at npc[key]. Pages get a backfill so the
+  // editor never deals with an empty list.
+  const _overList  = key => fn => _updateNpc(npc.id)(n => ({ ...n, [key]: fn(n[key] || []) }));
+  const _overPages = fn  => _updateNpc(npc.id)(n => {
+    const next = fn(n.pages || []);
     return { ...n, pages: next.length ? next : [emptyPage()] };
   });
-  const _movePage = (i, dir) => _updateNpc(npc.id, n => {
-    const j = i + dir;
-    if (j < 0 || j >= n.pages.length) return n;
-    const pages = [...n.pages];
-    [pages[i], pages[j]] = [pages[j], pages[i]];
-    return { ...n, pages };
-  });
 
-  const _setChoice = (i, next) => _updateNpc(npc.id, n => ({
-    ...n,
-    choices: n.choices.map((c, k) => k === i ? next : c),
-  }));
-  const _addChoice    = () => _updateNpc(npc.id, n => ({ ...n, choices: [...n.choices, emptyChoice()] }));
-  const _deleteChoice = i  => _updateNpc(npc.id, n => ({ ...n, choices: n.choices.filter((_, k) => k !== i) }));
-  const _moveChoice = (i, dir) => _updateNpc(npc.id, n => {
-    const j = i + dir;
-    if (j < 0 || j >= n.choices.length) return n;
-    const choices = [...n.choices];
-    [choices[i], choices[j]] = [choices[j], choices[i]];
-    return { ...n, choices };
-  });
+  // Simple-mode page + choice mutators (legacy flat dialogue).
+  const _setPage    = i => patch => _overPages(updateAt(i)(patch));
+  const _addPage    = ()         => _overPages(pages => [...pages, emptyPage()]);
+  const _deletePage = i          => _overPages(removeAt(i));
+  const _movePage   = i => dir   => _overPages(swapAt(i)(dir));
+
+  const _setChoice    = i => next => _overList('choices')(updateAt(i)(next));
+  const _addChoice    = ()         => _overList('choices')(arr => [...arr, emptyChoice()]);
+  const _deleteChoice = i          => _overList('choices')(removeAt(i));
+  const _moveChoice   = i => dir   => _overList('choices')(swapAt(i)(dir));
 
   // Advanced-mode topic mutators.
-  const _topics = npc.topics || [];
-  const _setTopic = (id, next) => _updateNpc(npc.id, n => ({
-    ...n,
-    topics: (n.topics || []).map(t => t.id === id ? next : t),
-  }));
-  const _addTopic = () => {
+  const _topics    = npc.topics || [];
+  const _setTopic  = id => next => _overList('topics')(arr => arr.map(t => t.id === id ? next : t));
+  const _addTopic  = () => {
     const fresh = emptyTopic();
-    _updateNpc(npc.id, n => {
-      const nextTopics = [...(n.topics || []), fresh];
+    _updateNpc(npc.id)(n => ({
+      ...n,
+      topics:       [...(n.topics || []), fresh],
       // Auto-pick the first topic as entry if none set yet.
-      const entryTopicId = n.entryTopicId || fresh.id;
-      return { ...n, topics: nextTopics, entryTopicId };
-    });
+      entryTopicId: n.entryTopicId || fresh.id,
+    }));
     setState({ selectedTopicId: fresh.id });
   };
-  const _deleteTopic = id => _updateNpc(npc.id, n => {
+  const _deleteTopic = id => _updateNpc(npc.id)(n => {
     const next = (n.topics || []).filter(t => t.id !== id);
-    const entryTopicId = n.entryTopicId === id ? (next[0]?.id || '') : n.entryTopicId;
-    return { ...n, topics: next, entryTopicId };
+    return {
+      ...n,
+      topics:       next,
+      entryTopicId: n.entryTopicId === id ? (next[0]?.id || '') : n.entryTopicId,
+    };
   });
 
   const selectedTopic = _topics.find(t => t.id === selectedTopicId) || _topics[0];
@@ -644,6 +605,12 @@ const NpcEditor = (npc, project, selectedTopicId) => {
           onChange:    onText(v => set({ greeting: v })),
           placeholder: 'Eldra the merchant adjusts her wares as you pass.',
         }),
+        TextInput({
+          label:       'Interaction button label (blank = "Talk to <name>")',
+          value:       npc.interactLabel || '',
+          onChange:    onText(v => set({ interactLabel: v })),
+          placeholder: 'Use workbench / Read tome / Pray at altar',
+        }),
         FolderField({
           id:          `npc-folder-${npc.id}`,
           value:       npc.folder,
@@ -663,11 +630,11 @@ const NpcEditor = (npc, project, selectedTopicId) => {
     ...(npc.role === 'shop'
       ? [
           Card({ title: `Stock (${(npc.shop?.stock || []).length})` })([ShopStockEditor(npc, project)]),
-          Card({ title: `Buyback — what the shop buys from the player` })([ShopBuybackEditor(npc, project)]),
+          Card({ title: `Buyback - what the shop buys from the player` })([ShopBuybackEditor(npc, project)]),
         ]
       : []),
 
-    // The toggle — chooses between flat (legacy) and topic tree (advanced).
+    // The toggle - chooses between flat (legacy) and topic tree (advanced).
     ...(npc.role === 'shop' ? [] : [
       Card({ title: 'Conversation system' })([
         div({ style: 'display:flex; align-items:center; gap:14px; flex-wrap:wrap' })([
@@ -684,11 +651,11 @@ const NpcEditor = (npc, project, selectedTopicId) => {
       ]),
     ]),
 
-    // GREETING PAGES — always shown for dialogue role (becomes "greeting" in advanced
+    // GREETING PAGES - always shown for dialogue role (becomes "greeting" in advanced
     // mode, "dialogue" in simple mode).
     ...(npc.role === 'shop' ? [] : [
       Card({ title: npc.advanced
-        ? `Greeting pages (${npc.pages.length}) — shown before the entry topic`
+        ? `Greeting pages (${npc.pages.length}) - shown before the entry topic`
         : `Dialogue pages (${npc.pages.length})`
       })([
         Stack({ gap: 4 })([
@@ -698,10 +665,10 @@ const NpcEditor = (npc, project, selectedTopicId) => {
               index:       i,
               isLast:      i === npc.pages.length - 1,
               canDelete:   npc.pages.length > 1,
-              onChange:    next => _setPage(i, next),
+              onChange:    _setPage(i),
               onDelete:    () => _deletePage(i),
-              onMoveUp:    () => _movePage(i, -1),
-              onMoveDown:  () => _movePage(i,  1),
+              onMoveUp:    () => _movePage(i)(-1),
+              onMoveDown:  () => _movePage(i)(+1),
             })
           ),
           Button({ size: 'sm', variant: 'ghost', onClick: _addPage })(['+ Add page']),
@@ -709,7 +676,7 @@ const NpcEditor = (npc, project, selectedTopicId) => {
       ]),
     ]),
 
-    // SIMPLE MODE — flat choice list (no flow selector).
+    // SIMPLE MODE - flat choice list (no flow selector).
     ...((!npc.advanced && npc.role !== 'shop') ? [
       Card({ title: `Choices (${npc.choices.length})` })([
         Stack({ gap: 4 })([
@@ -725,10 +692,10 @@ const NpcEditor = (npc, project, selectedTopicId) => {
                   topicCtx:   false,
                   isFirst:    i === 0,
                   isLast:     i === npc.choices.length - 1,
-                  onChange:   next => _setChoice(i, next),
+                  onChange:   _setChoice(i),
                   onDelete:   () => _deleteChoice(i),
-                  onMoveUp:   () => _moveChoice(i, -1),
-                  onMoveDown: () => _moveChoice(i,  1),
+                  onMoveUp:   () => _moveChoice(i)(-1),
+                  onMoveDown: () => _moveChoice(i)(+1),
                 })
               )),
           Button({ size: 'sm', variant: 'ghost', onClick: _addChoice })(['+ Add choice']),
@@ -736,12 +703,12 @@ const NpcEditor = (npc, project, selectedTopicId) => {
       ]),
     ] : []),
 
-    // ADVANCED MODE — topic tree + entry select + per-topic editor.
+    // ADVANCED MODE - topic tree + entry select + per-topic editor.
     ...((npc.advanced && npc.role !== 'shop') ? [
       Card({ title: `Topic tree (${_topics.length})` })([
         Stack({ gap: 10 })([
-          p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
-            'Each box is a topic. Solid arrows are ', span({ style: 'font-family:ui-monospace,monospace' })(['change']),
+          p({ className: 'gef-hint' })([
+            'Each box is a topic. Solid arrows are ', span({ className: 'dv-mono' })(['change']),
             ' edges (push current topic on the stack, switch to target). Click a topic to edit it below.',
           ]),
           TopicTree(npc, selectedTopic?.id || null),
@@ -749,7 +716,7 @@ const NpcEditor = (npc, project, selectedTopicId) => {
             div({ style: 'flex:1; min-width:240px' })([
               Select({
                 label:    'Entry topic (where the player lands after the greeting pages)',
-                options:  [{ value: '', label: '— pick a topic —' }, ...topicOpts],
+                options:  [{ value: '', label: '- pick a topic -' }, ...topicOpts],
                 value:    npc.entryTopicId || _topics[0]?.id || '',
                 onChange: onText(v => set({ entryTopicId: v })),
               }),
@@ -769,12 +736,14 @@ const NpcEditor = (npc, project, selectedTopicId) => {
               roomOpts,
               topicOpts,
               combatOpts,
-              onChange:   next => _setTopic(selectedTopic.id, next),
+              onChange:   _setTopic(selectedTopic.id),
               onDelete:   () => { _deleteTopic(selectedTopic.id); setState({ selectedTopicId: null }); },
             }),
           ])]
         : []),
     ] : []),
+
+    ...(npc.role === 'shop' ? [] : [VariantsCard({ npc, project, vars })]),
 
     Card({ title: 'Danger zone' })([
       Button({ size: 'sm', variant: 'danger', onClick: () => confirmAction({
@@ -784,6 +753,71 @@ const NpcEditor = (npc, project, selectedTopicId) => {
         danger:       true,
         onConfirm:    () => { _deleteNpc(npc.id); setState({ selectedNpcId: null, selectedTopicId: null }); },
       }) })(['Delete NPC']),
+    ]),
+  ]);
+};
+
+/**
+ * Variants: alternate NPC configs gated on state. First-match wins.
+ * Empty override fields fall through to the base npc. Reuses
+ * ConditionEditor so authors get type-aware ops.
+ */
+const VariantsCard = ({ npc, project, vars }) => {
+  const variants    = npc.variants || [];
+  const _overList   = fn => _updateNpc(npc.id)(n => ({ ...n, variants: fn(n.variants || []) }));
+  const _setVariant = i => patch => _overList(updateAt(i)(patch));
+  const _addVariant = ()         => _overList(arr => [...arr, emptyNpcVariant()]);
+  const _delVariant = i          => _overList(removeAt(i));
+  const _moveVariant = i => dir  => _overList(swapAt(i)(dir));
+
+  return Card({ title: `Variants (${variants.length}) - react to player state` })([
+    Stack({ gap: 10 })([
+      p({ className: 'gef-hint' })([
+        'Variants override fields on the base NPC when their condition passes (first-match wins). Use this to greet a male player as "sir", swap the portrait when wearing a uniform, or hand the player a different conversation tree if they\'ve completed a quest. Leave an override field blank to inherit from base. For light reactions in greetings/topic text, ',
+        span({ className: 'dv-mono' })(['${gender === "male" ? "sir" : "ma\'am"}']),
+        ' inside any text also works (the engine interpolates ', span({ className: 'dv-mono' })(['${…}']), ' with state in scope).',
+      ]),
+      ...variants.map((v, i) => Card({})([
+        Stack({ gap: 8 })([
+          div({ style: 'display:flex; align-items:center; gap:8px' })([
+            Badge({ variant: 'blue' })([`Variant ${i + 1}`]),
+            TextInput({
+              value:    v.name || '',
+              onChange: onText(s => _setVariant(i)({ name: s })),
+              placeholder: 'editor label (e.g. "to male player")',
+            }),
+            div({ style: 'flex:1' })([]),
+            Button({ size: 'sm', variant: 'ghost', onClick: () => _moveVariant(i)(-1), disabled: i === 0                  })(['↑']),
+            Button({ size: 'sm', variant: 'ghost', onClick: () => _moveVariant(i)(+1), disabled: i === variants.length - 1 })(['↓']),
+            Button({ size: 'sm', variant: 'ghost', onClick: () => _delVariant(i) })(['Remove']),
+          ]),
+          div({})([
+            span({ className: 'gef-kbd-label', style: 'display:block; margin-bottom:4px' })(['Apply when']),
+            ConditionEditor({
+              condition: v.condition,
+              vars,
+              onChange:  c => _setVariant(i)({ condition: c }),
+            }),
+          ]),
+          Grid({ cols: 2, gap: 8 })([
+            TextInput({
+              label:    'Override · greeting (blank = base)',
+              value:    v.overrides?.greeting || '',
+              onChange: onText(s => _setVariant(i)(vv => ({ ...vv, overrides: { ...vv.overrides, greeting: s } }))),
+            }),
+            AssetInput({
+              label:    'Override · portrait (blank = base)',
+              value:    v.overrides?.portrait || '',
+              onChange: s => _setVariant(i)(vv => ({ ...vv, overrides: { ...vv.overrides, portrait: s } })),
+              accept:   'image',
+            }),
+          ]),
+          p({ style: 'margin:4px 0 0; font-size:11px; color:var(--text-muted)' })([
+            'Override of pages / topics / choices isn\'t exposed in this minimal UI yet - for whole-conversation swaps, duplicate the NPC and pick at runtime via stat. Greeting + portrait cover most "react to player" cases.',
+          ]),
+        ]),
+      ])),
+      Button({ size: 'sm', variant: 'ghost', onClick: _addVariant })(['+ Add variant']),
     ]),
   ]);
 };

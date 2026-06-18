@@ -1,7 +1,7 @@
 import { span } from '../elements.js';
 
 /**
- * Badge component — a small pill label for statuses, counts, and tags.
+ * Badge component - a small pill label for statuses, counts, and tags.
  *
  * @param {Object} opts
  * @param {'blue'|'green'|'red'|'yellow'|'gray'|'purple'} [opts.variant='gray']

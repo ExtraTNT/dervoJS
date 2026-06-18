@@ -13,10 +13,10 @@ const row = k => v => [
 export const ChannelInfo = channel =>
   !channel
     ? p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
-        'No broadcast channel — running outside a TV.',
+        'No broadcast channel - running outside a TV.',
       ])
     : div({ style: 'display:grid; grid-template-columns:max-content 1fr; gap:6px 16px; font-size:13px' })([
-        row('Name')      (channel.name ?? '—'),
+        row('Name')      (channel.name ?? '-'),
         row('Network')   (channel.onid),
         row('Transport') (channel.tsid),
         row('Service')   (channel.sid),

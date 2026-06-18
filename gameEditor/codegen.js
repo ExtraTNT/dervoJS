@@ -1,25 +1,36 @@
 /**
- * codegen.js — emit JS source files for a project. The shape mirrors the
+ * codegen.js - emit JS source files for a project. The shape mirrors the
  * existing demoGame/ layout so the export drops in next to dervoJS and runs.
  *
  * Files:
- *   main.js     — entry, calls createGame and mounts it
- *   scenes.js   — id -> (ctx) => Scene(...)(ctx) map
- *   world.js    — NPCS map with greetings + dialogue functions
- *   items.js    — item catalogue + initial state
- *   index.html  — boots main.js as a module
+ *   main.js     - entry, calls createGame and mounts it
+ *   scenes.js   - id -> (ctx) => Scene(...)(ctx) map
+ *   world.js    - NPCS map with greetings + dialogue functions
+ *   items.js    - item catalogue + initial state
+ *   index.html  - boots main.js as a module
  *
  * Semantics match preview.js exactly. All emitted JS imports from
  * `../src/index.js`, assuming the export folder sits at the dervoJS root.
  */
 
+import { Just, Nothing, bind, fromMaybe, orElse } from '../lib/odocosjs/src/core.js';
+
 const _q = s => JSON.stringify(s ?? '');
+
+// Pure helpers used by the layout fold - both placed here so the IIFE
+// below stays focused on the BFS shape. `tryListM(list)` searches `list`
+// for the first item matching `pred`; returns `Maybe<item>` so the caller
+// can compose with `orElse` instead of juggling nulls.
+const _tryListM = pred => list => {
+  const hit = list.find(pred);
+  return hit ? Just(hit) : Nothing;
+};
 
 // Project → extra import lines, scoped to one of the generated files
 // ('main' / 'scenes' / 'world' / 'items' / 'sidebar'). Each entry yields one
 // `import <binding> from '<target>';` line (or a bare `import '<target>';`
 // when the binding is empty for side-effect imports). Author errors fall
-// through quietly — empty target = skipped.
+// through quietly - empty target = skipped.
 const _extraImports = (project, file) => {
   const list = (project.meta?.imports || []).filter(imp => imp && imp.file === file && imp.target);
   if (list.length === 0) return '';
@@ -133,7 +144,7 @@ const _t = (state, text) => {
 const _condExpr = (cond, stateExpr = 'c.state') => {
   if (!cond || cond.mode === 'always') return 'true';
   if (cond.mode === 'js') {
-    // Default state source — emit the user's expression verbatim so the
+    // Default state source - emit the user's expression verbatim so the
     // existing call sites (choices, weight bonuses, …) stay byte-identical.
     if (stateExpr === 'c.state') return `(${cond.expr || 'true'})`;
     // Per-op condition with the IN-PROGRESS state. Rebind `c.state` to the
@@ -146,6 +157,13 @@ const _condExpr = (cond, stateExpr = 'c.state') => {
       cond.key?.startsWith('flags.') ? `${stateExpr}.flags?.[${_q(cond.key.slice(6))}]`
       : cond.key?.startsWith('inv.')  ? `(${stateExpr}.inventory?.[${_q(cond.key.slice(4))}] ?? 0)`
       : `${stateExpr}[${_q(cond.key)}]`;
+    // String / array ops aren't standard JS operators - emit a small expr.
+    if (cond.op === 'contains')   return `(String(${left} ?? '').includes(${_q(String(cond.value ?? ''))}))`;
+    if (cond.op === 'startsWith') return `(String(${left} ?? '').startsWith(${_q(String(cond.value ?? ''))}))`;
+    if (cond.op === 'includes')   return `(Array.isArray(${left}) && ${left}.includes(${_q(String(cond.value))}))`;
+    if (cond.op === 'excludes')   return `(!Array.isArray(${left}) || !${left}.includes(${_q(String(cond.value))}))`;
+    if (cond.op === 'lenAtLeast') return `((Array.isArray(${left}) ? ${left}.length : 0) >= ${Number(cond.value) || 0})`;
+    if (cond.op === 'isEmpty')    return `(${left} == null || ${left} === '' || (Array.isArray(${left}) && ${left}.length === 0))`;
     const right = typeof cond.value === 'string' ? _q(cond.value) : (cond.value ?? 0);
     return `(${left} ${cond.op} ${right})`;
   }
@@ -154,6 +172,10 @@ const _condExpr = (cond, stateExpr = 'c.state') => {
     if (cond.op === 'has')     return `(${have} >= 1)`;
     if (cond.op === 'lacks')   return `(${have} <= 0)`;
     if (cond.op === 'atleast') return `(${have} >= ${Number(cond.count || 1)})`;
+  }
+  if (cond.mode === 'random') {
+    const p = Math.max(0, Math.min(1, Number(cond.p ?? 0.25)));
+    return `(Math.random() < ${p})`;
   }
   return 'true';
 };
@@ -183,7 +205,7 @@ const _wrapClamp = (nextExpr, op, { invFloor = false } = {}) => {
 };
 
 // Compile a single Op (simple-mode) to a sequence of patch keys. Returns
-// `{ key, value }` strings — caller wraps in `next = { ...next, [key]: value }`.
+// `{ key, value }` strings - caller wraps in `next = { ...next, [key]: value }`.
 // Returns null for ops that don't write (no target, toggle on missing kind, …).
 const _opPatchPair = op => {
   const { target, op: kind, value } = op || {};
@@ -202,7 +224,7 @@ const _opPatchPair = op => {
       : kind === 'take' ? `${cur} - ${n}`
       : kind === 'set'  ? `${n}`
       : cur;
-    // Implicit floor of 0 only on `take` — matches the engine's original
+    // Implicit floor of 0 only on `take` - matches the engine's original
     // behaviour and what the preview does. User min/max apply on top.
     const clamped = _wrapClamp(raw, op, { invFloor: kind === 'take' });
     return { key: 'inventory', value: `{ ...(s.inventory || {}), [${_q(k)}]: ${clamped} }` };
@@ -213,7 +235,23 @@ const _opPatchPair = op => {
     if (kind === 'forget') return { key: 'skills', value: `(s.skills || []).filter(x => x !== ${_q(k)})` };
     return null;
   }
-  const cur = `(s[${_q(target)}] ?? 0)`;
+  // Plain stat - branch on op kind. The string/array ops are guarded
+  // explicitly here; everything else falls through to the numeric path so
+  // legacy ops compile byte-identically.
+  const live = `s[${_q(target)}]`;
+  if (kind === 'append') return { key: target, value: `(${live} ?? '') + ${_q(String(value ?? ''))}` };
+  if (kind === 'clear') {
+    // `clear` works for either string or array - pick at runtime so the
+    // same op survives if the stat's type changes.
+    return { key: target, value: `(Array.isArray(${live}) ? [] : '')` };
+  }
+  if (kind === 'push') {
+    return { key: target, value: `[...(Array.isArray(${live}) ? ${live} : []), ${_q(String(value))}]` };
+  }
+  if (kind === 'removeValue') {
+    return { key: target, value: `(Array.isArray(${live}) ? ${live}.filter(x => x !== ${_q(String(value))}) : [])` };
+  }
+  const cur = `(${live} ?? 0)`;
   const isNumeric = Number.isFinite(Number(value));
   const v = isNumeric ? Number(value) : _q(value);
   const raw =
@@ -221,7 +259,7 @@ const _opPatchPair = op => {
     : kind === 'add' ? `${cur} + ${isNumeric ? v : 0}`
     : kind === 'sub' ? `${cur} - ${isNumeric ? v : 0}`
     : cur;
-  // Only clamp numeric writes — string `set` (e.g. label) passes through.
+  // Only clamp numeric writes - string `set` (e.g. label) passes through.
   const clamped = (isNumeric || kind !== 'set') ? _wrapClamp(raw, op) : raw;
   return { key: target, value: clamped };
 };
@@ -245,7 +283,7 @@ const _opStmt = op => {
 };
 
 // One weight bonus: `{ guard: c=>bool, amountMode, amountFixed, amountStat }`.
-// The guard is a compiled Condition expression — we wrap it inline so the
+// The guard is a compiled Condition expression - we wrap it inline so the
 // emitted entry stays self-contained.
 const _emitWeightBonus = bonus => `{ ` +
   `guard: c => ${_condExpr(bonus.condition)}, ` +
@@ -254,7 +292,7 @@ const _emitWeightBonus = bonus => `{ ` +
   `amountStat: ${_q(bonus.amountStat || '')} ` +
 `}`;
 
-// Random loot — emit the table data + a small runner that does the same
+// Random loot - emit the table data + a small runner that does the same
 // weighted-pick / unique / picks dance the preview interpreter does. The
 // runner is a pure function literal, so this composes inside choice actions
 // and combat onWin/onLose like any other Effect.
@@ -380,7 +418,7 @@ const _effectFnCore = effect => {
   }
   if (effect.mode === 'oneOf') {
     // Weighted "exactly one outcome" picker. Each option holds an arbitrary
-    // nested Effect — recursion handles the nesting. Inline _wt mirrors the
+    // nested Effect - recursion handles the nesting. Inline _wt mirrors the
     // randomLoot version so bonus semantics stay identical.
     const opts = (effect.options || []).map(o => {
       const subFn = _effectFn(o.effect) || '() => {}';
@@ -431,20 +469,23 @@ const _effectFn = effect => {
 const _emitPageLit = pg =>
   `{ text: ${_q(pg.text)}, image: ${_q(pg.image)}, video: ${_q(pg.video)}, advanceLabel: ${_q(pg.advanceLabel || 'More')} }`;
 
-// onEnter / onEnterCondition for a target room. Returns a fragment that fires
-// the room's onEnter Effect (if any) gated by its Condition. The fragment
-// assumes `c` is in scope.
+/**
+ * Emit the room's onEnter Effect gated by its onEnterCondition. The
+ * fragment snapshots `_scene` around the effect and returns from the
+ * action if onEnter navigated (enterCombat / talkTo / js goto); without
+ * this the trailing c.goto(roomId) would silently override.
+ * Inlined inside `action: c => { ... }`; assumes `c` is in scope.
+ */
 const _emitRoomEnter = project => roomId => {
   const target  = (project?.rooms || []).find(r => r.id === roomId);
   if (!target) return '';
-  const condExpr = _condExpr(target.onEnterCondition || { mode: 'always' });
-  const enterFn  = _effectFn(target.onEnter);
+  const enterFn = _effectFn(target.onEnter);
   if (!enterFn) return '';
-  return `{ const live = { ...c, state: c.getState() }; if (${condExpr.replace(/c\.state/g, 'live.state')}) (${enterFn})(c); }`;
+  const condExpr = _condExpr(target.onEnterCondition || { mode: 'always' });
+  return `{ const live = { ...c, state: c.getState() }; if (${condExpr.replace(/c\.state/g, 'live.state')}) { const _beforeEnter = c.getState()._scene; (${enterFn})(c); if (c.getState()._scene !== _beforeEnter) return; } }`;
 };
 
-// _pageIdx reset + onEnter gate + goto(roomId). When roomId is '' the fallback
-// is "return to the calling scene" (the surrounding emit binds `back`).
+/** _pageIdx reset + onEnter gate + goto. Empty roomId returns to `back`. */
 const _emitGotoRoom = project => roomId => {
   if (!roomId) return `c.setState({ _scene: back });`;
   return [
@@ -454,6 +495,18 @@ const _emitGotoRoom = project => roomId => {
   ].filter(Boolean).join(' ');
 };
 
+/**
+ * Compose `action: c => { ... }` body. With both an effect and a nav
+ * fragment, snapshot _scene around the effect and yield if it navigated;
+ * stops a choice from running `to:` on top of enterCombat / talkTo.
+ */
+const _emitActionBody = effectFn => navFragment => {
+  if (!effectFn && !navFragment) return `_startAction(c);`;
+  if (!effectFn) return `_startAction(c); ${navFragment}`;
+  if (!navFragment) return `_startAction(c); (${effectFn})(c);`;
+  return `_startAction(c); const _beforeAction = c.getState()._scene; (${effectFn})(c); if (c.getState()._scene !== _beforeAction) return; ${navFragment}`;
+};
+
 // Enter combat by id. Mirrors _emitGotoRoom in shape.
 const _emitGotoCombat = combatId => combatId
   ? `{ const cb = __COMBATS[${_q(combatId)}]; if (cb) { ` +
@@ -461,7 +514,7 @@ const _emitGotoCombat = combatId => combatId
       `c.goto("_combat:" + ${_q(combatId)}); } }`
   : '';
 
-// exitBack fragment — pop the topic stack, or leave the NPC if empty.
+// exitBack fragment - pop the topic stack, or leave the NPC if empty.
 const _emitExitBack = npcId => {
   const npcIdLit = _q(npcId);
   return `{ const stack = c.state._npcTopicStack?.[${npcIdLit}] || []; ` +
@@ -483,13 +536,11 @@ const _emitChoice = ch => project => {
   if (hasCond) parts.push(`if: c => ${_condExpr(ch.condition)}`);
 
   // The action body is (effect) + (page-idx reset + onEnter gate + goto). When
-  // ch.to is empty there's no navigation slice. _emitGotoRoom handles both.
+  // ch.to is empty there's no navigation slice. _emitActionBody handles the
+  // snapshot-and-yield logic so an enterCombat action doesn't get clobbered by
+  // the trailing goto.
   const navLine = ch.to ? _emitGotoRoom(project)(ch.to) : '';
-  const lines   = [
-    effectFn ? `(${effectFn})(c);` : '',
-    navLine,
-  ].filter(Boolean);
-  if (lines.length) parts.push(`action: c => { _startAction(c); ${lines.join(' ')} }`);
+  if (effectFn || navLine) parts.push(`action: c => { ${_emitActionBody(effectFn)(navLine)} }`);
   return `{ ${parts.join(', ')} }`;
 };
 
@@ -569,7 +620,7 @@ const _emitInventoryRoomFn = room => project => {
     const inv = ctx.state.inventory || {};
     const equippedIds = Object.values(ctx.state.equipped || {});
 
-    // Reading overlay — re-renders inside the same scene fn when state._reading
+    // Reading overlay - re-renders inside the same scene fn when state._reading
     // names this room and a known itemId.
     const reading = ctx.state._reading;
     if (reading && reading.roomId === ${_q(room.id)}) {
@@ -678,7 +729,7 @@ const _emitRoomFn = room => project => {
   if (room.kind === 'inventory') return _emitInventoryRoomFn(room)(project);
   const pagesLit = room.pages.map(_emitPageLit).join(', ');
   const choicesLit = room.choices.map(c => _emitChoice(c)(project)).join(', ');
-  // Optional end-of-dialog Effect — when the last page has no Choices AND the
+  // Optional end-of-dialog Effect - when the last page has no Choices AND the
   // room defines an onEnd Effect, render one button that fires it. Nothing is
   // auto-created. The button's label inherits the page's advanceLabel so the
   // dev can keep narrative voice ("Drink", "Continue", "Wake up", …).
@@ -709,7 +760,7 @@ const _emitRoomFn = room => project => {
   })`;
 };
 
-// Combat scene factory — emitted into scenes.js. Uses player skills + combat
+// Combat scene factory - emitted into scenes.js. Uses player skills + combat
 // extraMoves as available moves; enemy AI picks from weighted actions.
 const _emitCombatSceneFn = combat => project => {
   const onWinFn  = _effectFn(combat.onWin);
@@ -842,7 +893,7 @@ const _emitCombatSceneFn = combat => project => {
       const pct = Math.max(0, Math.min(100, Number(a.hitPercent ?? 100)));
       const hit = Math.floor(Math.random() * 100) + 1 <= pct;
       if (!hit) {
-        const log = [...(cstate.log || []), cb.enemy.name + ' ' + (a.label || 'attacks') + ' — miss.'];
+        const log = [...(cstate.log || []), cb.enemy.name + ' ' + (a.label || 'attacks') + ' - miss.'];
         return { ...s, _combat: { ...cstate, log, turn: (cstate.turn || 0) + 1, lastEnemyImage: a.image || null, lastEnemyText: a.flavourText || '' } };
       }
       const dmg = Math.max(0, (Number(a.damage) || 0) + _randInt(Number(a.damageRandom) || 0));
@@ -927,12 +978,160 @@ const _emitCombatSceneFn = combat => project => {
   })`;
 };
 
+/**
+ * Emit one Scene fn per character-creation step, addressed `_cc:<stepId>`.
+ * Wizard state lives at state._cc. `_ccAdvance(idx, maybeStart)` walks to
+ * the next step, or on the last step goto's the resolved start room (last
+ * picked option's startRoom wins, else meta.start).
+ */
+const _emitCcRuntime = project => {
+  const cc = project.charCreation || { enabled: false, steps: [] };
+  if (!cc.enabled || cc.steps.length === 0) return { code: '', sceneEntries: [] };
+  const stepLits = cc.steps.map(s => `{ id: ${_q(s.id)} }`).join(', ');
+  const code = `
+const __CC_STEPS = [${stepLits}];
+const __CC_META_START = ${_q(project.meta.start || (project.rooms[0]?.id) || '')};
+const _ccAdvance = (idx, maybeStart) => c => {
+  const cur = c.getState();
+  const cc  = cur._cc || { picks: {}, points: {}, startRoom: null };
+  const startRoom = maybeStart || cc.startRoom;
+  const next = __CC_STEPS[idx + 1];
+  c.setState({ _cc: Object.assign({}, cc, { step: idx + 1, startRoom, done: !next }) });
+  if (next) { c.goto('_cc:' + next.id); return; }
+  const dest = startRoom || __CC_META_START;
+  if (dest) {
+    c.setState(s => ({ _pageIdx: Object.assign({}, s._pageIdx || {}, { [dest]: 0 }) }));
+    c.goto(dest);
+  }
+};`;
+  const sceneEntries = cc.steps.map((step, idx) =>
+    step.type === 'pointBuy'
+      ? _emitCcPointBuyScene(step)(idx)(cc.steps)(project)
+      : _emitCcChoiceScene  (step)(idx)(cc.steps)(project)
+  );
+  return { code, sceneEntries };
+};
+
+const _emitCcPointBuyScene = step => idx => allSteps => project => {
+  const rowsLit = JSON.stringify((step.stats || []).map(r => ({
+    statKey: r.statKey || '', min: Number(r.min) || 0, max: Number(r.max) || 0, start: Number(r.start) || 0,
+  })));
+  const budget = Number(step.budget) || 0;
+  const isLast = idx + 1 === allSteps.length;
+  return `${_q('_cc:' + step.id)}: ctx => {
+    const STEP_ID = ${_q(step.id)};
+    const ROWS = ${rowsLit};
+    const BUDGET = ${budget};
+    const ccs = ctx.state._cc || {};
+    const cur = ccs.points && ccs.points[STEP_ID] ? ccs.points[STEP_ID] : Object.fromEntries(ROWS.map(r => [r.statKey, r.start]));
+    const spent = ROWS.reduce((sum, r) => sum + Math.max(0, ((cur[r.statKey] !== undefined ? cur[r.statKey] : r.start) - r.start)), 0);
+    const remaining = BUDGET - spent;
+    const adjust = (statKey, delta) => () => ctx.setState(s => {
+      const cc = s._cc || {};
+      const points = (cc.points && cc.points[STEP_ID]) || {};
+      const row = ROWS.find(r => r.statKey === statKey);
+      if (!row) return s;
+      const at = points[statKey] !== undefined ? points[statKey] : row.start;
+      const want = at + delta;
+      const next = Math.max(row.min, Math.min(row.max, want));
+      if (next === at) return s;
+      if (delta > 0) {
+        const cost = Math.max(0, next - row.start) - Math.max(0, at - row.start);
+        if (cost > 0 && cost > remaining) return s;
+      }
+      return { _cc: Object.assign({}, cc, { points: Object.assign({}, cc.points || {}, { [STEP_ID]: Object.assign({}, points, { [statKey]: next }) }) }) };
+    });
+    const rows = ROWS.map(r => {
+      const at = cur[r.statKey] !== undefined ? cur[r.statKey] : r.start;
+      return div({ style: 'display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border-2, var(--border))' })([
+        span({ style: 'min-width:100px; font-weight:600' })([r.statKey || '(unset)']),
+        button({ type: 'button', onclick: adjust(r.statKey, -1), style: 'padding:4px 12px; border:1px solid var(--border); background:var(--surface); color:var(--text); cursor:pointer; border-radius:var(--radius)' })(['-']),
+        span({ style: 'min-width:32px; text-align:center; font-family:ui-monospace,monospace; font-size:14px; font-weight:600' })([String(at)]),
+        button({ type: 'button', onclick: adjust(r.statKey, +1), style: 'padding:4px 12px; border:1px solid var(--border); background:var(--surface); color:var(--text); cursor:pointer; border-radius:var(--radius)' })(['+']),
+        span({ style: 'color:var(--text-muted); font-size:12px; margin-left:auto' })(['[' + r.min + ' – ' + r.max + ']']),
+      ]);
+    });
+    return Scene({
+      title: ${_q(step.title || 'Allocate stat points')},
+      body: [
+        ${step.prompt ? `p({ style: 'color:var(--text-muted)' })([${_q(step.prompt)}]),` : ''}
+        div({ style: 'padding:8px 12px; margin-bottom:12px; background:var(--surface); border-radius:var(--radius); font-family:ui-monospace,monospace' })([
+          'Remaining points: ' + remaining + ' / ' + BUDGET,
+        ]),
+        ...rows,
+      ],
+      choices: [
+        {
+          label: ${_q(isLast ? 'Start' : 'Continue')},
+          if: () => remaining >= 0,
+          action: c => {
+            const patch = ROWS.reduce((acc, r) => { acc[r.statKey] = cur[r.statKey] !== undefined ? cur[r.statKey] : r.start; return acc; }, {});
+            c.setState(patch);
+            _ccAdvance(${idx}, null)(c);
+          },
+        },
+      ],
+    })(ctx);
+  }`;
+};
+
+const _emitCcChoiceScene = step => idx => allSteps => project => {
+  const optsLit = (step.options || []).map(opt => {
+    const effectFn = _effectFn(opt.effect);
+    const callEffect = effectFn ? `(${effectFn})(c);` : '';
+    const startRoom = opt.startRoom ? _q(opt.startRoom) : 'null';
+    return `{
+      label: ${_q(opt.label || '(unnamed)')},
+      action: c => {
+        ${callEffect}
+        c.setState(s => ({ _cc: Object.assign({}, s._cc || {}, { picks: Object.assign({}, (s._cc && s._cc.picks) || {}, { [${_q(step.id)}]: ${_q(opt.id)} }) }) }));
+        _ccAdvance(${idx}, ${startRoom})(c);
+      },
+    }`;
+  }).join(',\n      ');
+  const cardsLit = (step.options || []).map(opt => {
+    const imgPart = opt.image
+      ? `img({ src: ${_q(opt.image)}, style: 'width:80px; height:80px; object-fit:cover; border-radius:var(--radius); flex-shrink:0' })([]),`
+      : '';
+    const descPart = opt.description
+      ? `p({ className: 'gef-hint gef-hint-13' })([_t(ctx.state, ${_q(opt.description)})]),`
+      : '';
+    const startNote = opt.startRoom
+      ? `div({ style: 'margin-top:6px; font-size:11px; color:var(--text-subtle); font-family:ui-monospace,monospace' })(['→ spawn at ${opt.startRoom}']),`
+      : '';
+    return `div({ style: 'border:1px solid var(--border); border-radius:var(--radius); padding:10px 14px; margin-bottom:10px; background:var(--surface)' })([
+      div({ style: 'display:flex; gap:12px; align-items:flex-start' })([
+        ${imgPart}
+        div({ style: 'flex:1' })([
+          div({ style: 'font-weight:600; margin-bottom:4px' })([${_q(opt.label || '(unnamed)')}]),
+          ${descPart}
+          ${startNote}
+        ]),
+      ]),
+    ])`;
+  }).join(',\n        ');
+  return `${_q('_cc:' + step.id)}: ctx => Scene({
+    title: ${_q(step.title || 'Choose')},
+    body: [
+      ${step.prompt ? `p({ style: 'color:var(--text-muted)' })([${_q(step.prompt)}]),` : ''}
+      ${cardsLit}
+    ],
+    choices: [
+      ${optsLit}
+    ],
+  })(ctx)`;
+};
+
 // Generate the scenes.js source file
-const emitScenes = project => `// AUTO-GENERATED by dervoJS gameEditor.
+const emitScenes = project => {
+  const cc = _emitCcRuntime(project);
+  const ccScenes = cc.sceneEntries.length ? ',\n  ' + cc.sceneEntries.join(',\n  ') : '';
+  return `// AUTO-GENERATED by dervoJS gameEditor.
 ${_extraImports(project, 'scenes')}import { div, span, p, img, video, button } from '../src/elements.js';
 import { Scene, NpcChoices, NpcLine } from '../src/game.js';
 ${_TEMPLATE_HELPER}
 ${_MESSAGE_HELPERS}
+${cc.code}
 
 const __COMBATS = ${JSON.stringify((project.combats || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {}))};
 const __SKILLS  = ${JSON.stringify((project.skills  || []).reduce((acc, s) => ({ ...acc, [s.id]: s }), {}))};
@@ -943,11 +1142,12 @@ const scenes = {
     (project.combats || []).length
       ? ',\n  ' + project.combats.map(c => _emitCombatSceneFn(c)(project)).join(',\n  ')
       : ''
-  },
+  }${ccScenes},
 };
 
 export { scenes };
 `;
+};
 
 // One topic-context choice. Each flow translates to a concrete fragment:
 //   stay        → effect only, no navigation (re-render same topic)
@@ -986,12 +1186,7 @@ const _emitTopicChoice = ch => npc => project => {
     flow === 'exitCombat' ? _emitGotoCombat(ch.combatId) :
     '';
 
-  const lines = [
-    effectFn ? `(${effectFn})(c);` : '',
-    navLine,
-  ].filter(Boolean);
-
-  parts.push(`action: c => { _startAction(c); ${lines.join(' ')} }`);
+  parts.push(`action: c => { ${_emitActionBody(effectFn)(navLine)} }`);
   return `{ ${parts.join(', ')} }`;
 };
 
@@ -1001,16 +1196,54 @@ const _emitSimpleNpcChoice = ch => project => {
   const effectFn = _effectFn(ch.action);
   const parts = [`label: ${_q(ch.label)}`];
   if (hasCond) parts.push(`if: c => ${_condExpr(ch.condition)}`);
-  const lines = [
-    effectFn ? `(${effectFn})(c);` : '',
-    _emitGotoRoom(project)(ch.to),
-  ].filter(Boolean);
-  parts.push(`action: c => { _startAction(c); ${lines.join(' ')} }`);
+  parts.push(`action: c => { ${_emitActionBody(effectFn)(_emitGotoRoom(project)(ch.to))} }`);
   return `{ ${parts.join(', ')} }`;
 };
 
-// Emit the NPC dialogue scene function. Branches at the top on npc.advanced
-// to either the legacy flat path or the topic-tree path. Curried `npc => project`.
+/**
+ * Merge variant overrides onto base npc. Empty strings and empty arrays
+ * are treated as "not specified" so authors can leave fields blank.
+ */
+const _mergeVariant = base => variant => {
+  const o = variant?.overrides || {};
+  return {
+    ...base,
+    greeting:     o.greeting && o.greeting.length     ? o.greeting     : base.greeting,
+    portrait:     o.portrait && o.portrait.length     ? o.portrait     : base.portrait,
+    pages:        Array.isArray(o.pages)   && o.pages.length   ? o.pages   : base.pages,
+    choices:      Array.isArray(o.choices) && o.choices.length ? o.choices : base.choices,
+    topics:       Array.isArray(o.topics)  && o.topics.length  ? o.topics  : base.topics,
+    entryTopicId: o.entryTopicId && o.entryTopicId.length      ? o.entryTopicId : base.entryTopicId,
+  };
+};
+
+/**
+ * Emit a dialogue function that picks the first matching variant at
+ * render time. Each variant is precompiled at codegen; runtime cost is
+ * one guard call per variant. With no variants, emits the base dialogue.
+ */
+const _emitNpcWithVariants = npc => project => {
+  const variants = Array.isArray(npc.variants) ? npc.variants : [];
+  if (variants.length === 0) return _emitNpcDialogue(npc)(project);
+  const baseFn = _emitNpcDialogue(npc)(project);
+  const variantFns = variants.map(v => {
+    const eff = _mergeVariant(npc)(v);
+    const condExpr = _condExpr(v.condition);
+    return `{ guard: c => (${condExpr}), dlg: ${_emitNpcDialogue(eff)(project)} }`;
+  }).join(',\n      ');
+  return `(() => {
+    const __base = ${baseFn};
+    const __vars = [
+      ${variantFns}
+    ];
+    return ctx => {
+      const live = Object.assign({}, ctx, { state: ctx.getState ? ctx.getState() : ctx.state });
+      const hit = __vars.find(v => { try { return v.guard(live); } catch { return false; } });
+      return (hit ? hit.dlg : __base)(ctx);
+    };
+  })()`;
+};
+
 const _emitNpcDialogue = npc => project => {
   const npcIdLit = _q(npc.id);
 
@@ -1097,7 +1330,7 @@ const _emitNpcDialogue = npc => project => {
     }`;
 };
 
-// NPC shop dialogue function — auto-builds buy choices from stock
+// NPC shop dialogue function - auto-builds buy choices from stock
 // Resolve effective price from a (possibly-null) entry.price + the item's
 // default price. Both shapes are { stat, amount }. Returns the literal that
 // becomes the entry's `priceStat` / `priceAmount` fields in the emitted JS.
@@ -1260,16 +1493,17 @@ import { Scene } from '../src/game.js';
 ${_TEMPLATE_HELPER}
 ${_MESSAGE_HELPERS}
 
-// Mirrors scenes.js — NPC dialogue functions reference __COMBATS for exit-to-combat
+// Mirrors scenes.js - NPC dialogue functions reference __COMBATS for exit-to-combat
 // flow / enterCombat actions from inside a topic.
 const __COMBATS = ${JSON.stringify((project.combats || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {}))};
 
 const NPCS = {
   ${project.npcs.map(n => `${n.id}: {
-    name:      ${_q(n.name)},
-    locations: ${JSON.stringify(n.locations)},
-    greeting:  ${_q(n.greeting)},
-    dialogue:  ${n.role === 'shop' ? _emitNpcShop(n)(project) : _emitNpcDialogue(n)(project)},
+    name:          ${_q(n.name)},
+    locations:     ${JSON.stringify(n.locations)},
+    greeting:      ${_q(n.greeting)},
+    interactLabel: ${_q(n.interactLabel || '')},
+    dialogue:      ${n.role === 'shop' ? _emitNpcShop(n)(project) : _emitNpcWithVariants(n)(project)},
   }`).join(',\n  ')}
 };
 
@@ -1290,11 +1524,20 @@ const emitItems = project => {
   const startingSkills = Array.isArray(project.startingSkills)
     ? project.startingSkills.filter(id => (project.skills || []).find(s => s.id === id))
     : [];
+  // Type-aware initials: numeric stats get coerced via Number(); strings
+  // and arrays pass through (with light shape guards) so the emitted
+  // initialState shows the same value the player sees in state.
+  const _statInitial = s => {
+    const t = s.type || 'number';
+    if (t === 'string') return typeof s.initial === 'string' ? s.initial : '';
+    if (t === 'array')  return Array.isArray(s.initial) ? s.initial.map(String) : [];
+    return Number(s.initial) || 0;
+  };
   return `// AUTO-GENERATED by dervoJS gameEditor.
 ${_extraImports(project, 'items')}const ITEMS = ${JSON.stringify(project.items.reduce((acc, it) => ({ ...acc, [it.id]: it }), {}), null, 2)};
 
 const initialState = ${JSON.stringify({
-  ...Object.fromEntries(project.stats.map(s => [s.key, Number(s.initial) || 0])),
+  ...Object.fromEntries(project.stats.map(s => [s.key, _statInitial(s)])),
   flags:      Object.fromEntries(project.flags.map(f => [f.key, !!f.initial])),
   inventory:  startingInv,
   equipped:   startingEquipped,
@@ -1311,6 +1554,15 @@ const initialState = ${JSON.stringify({
   _lootLog:       [],
   _messageQueue:  [],
   _msgInit:       {},
+  // Character-creation progress (only used when project.charCreation.enabled).
+  // step       - index of the current step
+  // picks      - { stepId: optionId }   from choice steps
+  // points     - { stepId: { statKey: value } }  from pointBuy steps
+  // startRoom  - latest non-empty `option.startRoom` override
+  // done       - true once the wizard has advanced past the last step
+  _cc: (project.charCreation && project.charCreation.enabled && project.charCreation.steps?.length)
+    ? { step: 0, picks: {}, points: {}, startRoom: null, done: false }
+    : null,
 }, null, 2)};
 
 export { ITEMS, initialState };
@@ -1323,19 +1575,143 @@ const _emitSidebarFile = project => {
   const sb = project.sidebar || { enabled: false, widgets: [] };
   if (!sb.enabled || sb.widgets.length === 0) return null;
 
-  // Per-widget literal — keeps the runtime branchless (only emit branches
+  // Per-widget literal - keeps the runtime branchless (only emit branches
   // for widget types actually used).
   const used = new Set(sb.widgets.map(w => w.type));
 
   const widgetLiterals = sb.widgets.map(w => JSON.stringify(w)).join(', ');
 
+  // Minimap layout. Precomputed grid coords + exits per mappable room.
+  // Story rooms and rooms with hideOnMap are dropped before BFS so they
+  // can't act as a stepping stone. Single-pass BFS: place each head's
+  // children, then emit the head's snapshot node. Maybe is used where a
+  // step is genuinely optional (dirOf, findOffset, placeChild).
+  const _bfsRooms = (() => {
+    const mapped  = project.rooms.filter(r => r && r.kind !== 'story' && !r.hideOnMap);
+    const byId    = Object.fromEntries(mapped.map(r => [r.id, r]));
+    const startId = byId[project.meta.start] ? project.meta.start : mapped[0]?.id;
+    if (!startId) return [];
+    const DIRS = [
+      ['north', [0, -1]], ['up',       [0, -1]], ['above', [0, -1]],
+      ['south', [0,  1]], ['down',     [0,  1]], ['below', [0,  1]],
+      ['east',  [1,  0]], ['eastern',  [1,  0]], ['right', [1,  0]],
+      ['west',  [-1, 0]], ['western',  [-1, 0]], ['left',  [-1, 0]],
+    ];
+    const dirOf = label => {
+      const lower = String(label || '').toLowerCase();
+      const m = _tryListM(([word]) => new RegExp(`\\b${word}\\b`).test(lower))(DIRS);
+      //console.log(fromMaybe(null)(bind(m)(([, dir]) => Just(dir))), label);
+      return bind(m)(([, dir]) => Just(dir));
+    };
+    const CARDINALS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const SPIRAL = Array.from({ length: 49 }, (_, i) => i + 2).flatMap(r => {
+      const range = Array.from({ length: 2 * r + 1 }, (_, i) => i - r);
+      return range.flatMap(d => [[d, -r], [d, r], [-r, d], [r, d]]);
+    });
+    // Maybe<offset>. Hint, then cardinals, then spiral; Nothing only
+    // when the spiral itself fills up (radius > 50, degenerate map).
+    const findOffset = occupied => x => y => mHint => {
+      const free    = ([dx, dy]) => !occupied.has(`${x + dx},${y + dy}`);
+      const tryHint = bind(mHint)(h => free(h) ? Just(h) : Nothing);
+      return orElse(orElse(tryHint)(_tryListM(free)(CARDINALS)))(_tryListM(free)(SPIRAL));
+    };
+    // Place one child or leave state unchanged. Curried on `head` so the
+    // (state, ch) shape drops into Array.reduce.
+    const placeChild = head => (state, ch) => {
+      if (!ch.to || !byId[ch.to] || state.posById[ch.to]) return state;
+      const [x, y] = state.posById[head];
+      const placed = bind(findOffset(state.occupied)(x)(y)(dirOf(ch.label)))(offset => {
+        const cell = [x + offset[0], y + offset[1]];
+        return Just({
+          posById:  { ...state.posById,  [ch.to]: cell },
+          occupied: new Map(state.occupied).set(`${cell[0]},${cell[1]}`, ch.to),
+          queue:    [...state.queue, ch.to],
+          out:      state.out,
+        });
+      });
+      return fromMaybe(state)(placed);
+    };
+    // Single-pass driver. One `let` because JS lacks TCO; recursion
+    // would risk stack overflow on big projects.
+    let state = {
+      posById:  { [startId]: [0, 0] },
+      occupied: new Map([['0,0', startId]]),
+      queue:    [startId],
+      out:      [],
+    };
+    while (state.queue.length > 0) {
+      const [head, ...rest] = state.queue;
+      const children = byId[head].choices || [];
+      const afterPlace = children.reduce(placeChild(head), { ...state, queue: rest });
+      const exits = children.map(c => c.to).filter(to => to && byId[to]);
+      const node  = { id: head, title: byId[head].title || head, x: afterPlace.posById[head][0], y: afterPlace.posById[head][1], exits };
+      state = { ...afterPlace, out: [...afterPlace.out, node] };
+    }
+    return state.out;
+  })();
+  // Per-edge fast-travel conditions. Key "from>>>to" maps to either a JS
+  // expression or null (always-passable). The runtime distinguishes
+  // "missing key" (no such edge) from "key with null" (always passes).
+  // Multiple choices on the same (from, to) OR together; one always-pass
+  // wins over all expressions.
+  const _bfsConds = (() => {
+    const mapped = project.rooms.filter(r => r && r.kind !== 'story' && !r.hideOnMap);
+    const byId   = Object.fromEntries(mapped.map(r => [r.id, r]));
+    const isAlways = c => !c || c.mode === 'always';
+    const edges = mapped.flatMap(r =>
+      (r.choices || [])
+        .filter(ch => ch.to && byId[ch.to])
+        .map(ch => ({
+          key:  `${r.id}>>>${ch.to}`,
+          cond: isAlways(ch.condition) ? null : _condExpr(ch.condition),
+        })));
+    const merge = (prev, next) =>
+        prev === null || next === null ? null
+      : prev                           ? `(${prev}) || (${next})`
+      :                                  next;
+    return edges.reduce((acc, { key, cond }) => ({
+      ...acc,
+      [key]: key in acc ? merge(acc[key], cond) : cond,
+    }), {});
+  })();
+  const minimapData  = used.has('minimap') ? _bfsRooms : null;
+  const minimapConds = used.has('minimap') ? _bfsConds : null;
+
   return `// AUTO-GENERATED by dervoJS gameEditor.
 ${_extraImports(project, 'sidebar')}import { div, span, p, img, video, h3, button } from '../src/elements.js';
-
+${used.has('minimap') ? "import { vnode } from '../lib/odocosjs/src/render.js';\n" : ''}
 const WIDGETS = [${widgetLiterals}];
 const PROJECT_TITLE = ${_q(project.meta.title)};
 const ITEMS = ${JSON.stringify(project.items.reduce((acc, it) => ({ ...acc, [it.id]: it }), {}))};
 const STATS_KEYS_ALL = ${JSON.stringify(project.stats.map(s => s.key))};
+${used.has('minimap') ? `
+// Each entry carries its precomputed grid (x,y) coords so layout is stable
+// across renders - discovering new rooms doesn't shuffle the others.
+const MINIMAP_ROOMS = ${JSON.stringify(minimapData)};
+// Per-directional-edge passability expressions. \`null\` = always passable;
+// missing key = no such edge (so it's blocked). Used by the fast-travel
+// click handler. Compiled lazily into functions inside _CONDS_FN cache.
+const MINIMAP_CONDS = ${JSON.stringify(minimapConds)};
+const _CONDS_FN = {};
+const _edgeOpen = (fromId, toId, ctx) => {
+  const key = fromId + '>>>' + toId;
+  if (!(key in MINIMAP_CONDS)) return false;
+  const expr = MINIMAP_CONDS[key];
+  if (expr === null) return true;
+  let fn = _CONDS_FN[key];
+  if (!fn) {
+    try { fn = new Function('c', 'return ' + expr + ';'); }
+    catch (e) { console.warn('[minimap] bad fast-travel cond for ' + key, e); fn = () => false; }
+    _CONDS_FN[key] = fn;
+  }
+  try { return !!fn(ctx); } catch { return false; }
+};
+const _svgEl  = vnode('svg');
+const _svgG   = vnode('g');
+const _svgRct = vnode('rect');
+const _svgLn  = vnode('line');
+const _svgPl  = vnode('polyline');
+const _svgTxt = vnode('text');` : ''}
 
 ${used.has('portrait') ? `
 const _renderPortrait = (w, ctx) => {
@@ -1376,7 +1752,7 @@ const _renderInventory = (w, ctx) => {
   return div({ style: 'margin-bottom:12px' })([
     h3({ style: 'margin:0 0 6px; font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em' })(['Inventory']),
     ...(entries.length === 0
-      ? [p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })(['(empty)'])]
+      ? [p({ className: 'gef-hint' })(['(empty)'])]
       : (w.layout === 'grid'
           ? [div({ style: 'display:grid; grid-template-columns:repeat(auto-fill,minmax(56px,1fr)); gap:6px' })(
               entries.map(([id, n]) => {
@@ -1417,6 +1793,207 @@ const _renderRoomLink = (w, ctx) => {
   ]);
 };` : ''}
 
+${used.has('minimap') ? `
+// MINIMAP_ROOMS is the precomputed snapshot - { id, title, x, y, exits[] }
+// per mappable room, indexed by id. The grid coords were chosen at
+// codegen time using whole-word direction hints in choice labels
+// (north/up/above, south/down/below, east/right, west/left), so the
+// runtime never reflows the layout.
+const MINIMAP_BY_ID = Object.fromEntries(MINIMAP_ROOMS.map(r => [r.id, r]));
+const MINIMAP_START = (MINIMAP_ROOMS[0] && MINIMAP_ROOMS[0].id) || '';
+
+// During combat ctx.scene reads as "_combat:<id>"; the player's physical
+// room sits at state._combat.returnTo. Highlight + range + visited write
+// all follow THAT so the current cell stays lit and the local map keeps
+// tracking the player through combat / dialogue.
+const _physicalScene = ctx => {
+  const s = ctx.scene;
+  if (typeof s === 'string' && s.startsWith('_combat:')) {
+    return (ctx.state._combat && ctx.state._combat.returnTo) || null;
+  }
+  return s;
+};
+
+// BFS over the choice graph with optional depth limit. maxDepth 0 means
+// unlimited (the "show all reachable" mode). Returns a Set of ids.
+const _bfsWithin = (rootId, maxDepth) => {
+  if (!MINIMAP_BY_ID[rootId]) return new Set();
+  const seen = new Set([rootId]);
+  const queue = [[rootId, 0]];
+  while (queue.length) {
+    const [id, depth] = queue.shift();
+    if (maxDepth > 0 && depth >= maxDepth) continue;
+    for (const to of (MINIMAP_BY_ID[id].exits || [])) {
+      if (MINIMAP_BY_ID[to] && !seen.has(to)) { seen.add(to); queue.push([to, depth + 1]); }
+    }
+  }
+  return seen;
+};
+
+// Fast-travel reachability - directional BFS using the edge cond cache.
+// Every room touched (including the destination) must be VISITED and every
+// edge's condition must currently pass. Returns the Set of ids reachable
+// from \`fromId\` in this state - computed ONCE per render, not per cell.
+const _reachableFastTravel = (ctx, fromId) => {
+  if (!fromId || !MINIMAP_BY_ID[fromId]) return new Set();
+  const visited = ctx.state._mapVisited || {};
+  const seen = new Set([fromId]);
+  const queue = [fromId];
+  const out = new Set();
+  while (queue.length) {
+    const id = queue.shift();
+    for (const to of (MINIMAP_BY_ID[id].exits || [])) {
+      if (!MINIMAP_BY_ID[to] || seen.has(to) || !visited[to]) continue;
+      if (!_edgeOpen(id, to, ctx)) continue;
+      seen.add(to);
+      out.add(to);
+      queue.push(to);
+    }
+  }
+  return out;
+};
+
+const _renderMinimap = (w, ctx) => {
+  if (MINIMAP_ROOMS.length === 0) return div({})([]);
+  const range   = Math.max(0, Number(w.range) || 0);
+  const here    = _physicalScene(ctx);
+  const showLbl = !!w.showLabels;
+  const dim     = w.dimUnvisited !== false;
+  const wPx     = Math.max(0, Number(w.width) || 0);
+  const fog     = !!w.visitedOnly;
+  const reach   = Math.max(0, Number(w.reach) || 0);
+  // Zoom is a max-viewport cap in CSS pixels. >0 wraps the SVG in a
+  // scrolling div with that cap on both axes; 0 = off (fits container).
+  // Sub-16 values from the old multiplier semantics are treated as off.
+  const rawZoom = Math.max(0, Number(w.zoom) || 0);
+  const zoom    = rawZoom < 16 ? 0 : rawZoom;
+  const ftOn    = !!w.fastTravel;
+  const visited = ctx.state._mapVisited || {};
+
+  const rangeRoot = range > 0 ? (MINIMAP_BY_ID[here] ? here : MINIMAP_START) : MINIMAP_START;
+  const rangeSet  = _bfsWithin(rangeRoot, range);
+
+  let visibleSet;
+  if (fog) {
+    visibleSet = new Set();
+    for (const id of rangeSet) if (visited[id]) visibleSet.add(id);
+    if (here && rangeSet.has(here)) visibleSet.add(here);
+    let frontier = new Set(visibleSet);
+    for (let d = 0; d < reach && frontier.size > 0; d++) {
+      const next = new Set();
+      for (const id of frontier) {
+        for (const to of (MINIMAP_BY_ID[id].exits || [])) {
+          if (rangeSet.has(to) && !visibleSet.has(to)) { visibleSet.add(to); next.add(to); }
+        }
+      }
+      frontier = next;
+    }
+  } else {
+    visibleSet = rangeSet;
+  }
+  if (visibleSet.size === 0) return div({})([]);
+
+  if (typeof here === 'string' && MINIMAP_BY_ID[here] && !visited[here]) {
+    Promise.resolve().then(() => ctx.setState(s => ({
+      _mapVisited: { ...(s._mapVisited || {}), [here]: true },
+    })));
+  }
+
+  // Viewport = bounding box of visible grid cells. Cells never shift
+  // between renders because their (x,y) is precomputed.
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const id of visibleSet) {
+    const r = MINIMAP_BY_ID[id];
+    if (r.x < minX) minX = r.x;
+    if (r.x > maxX) maxX = r.x;
+    if (r.y < minY) minY = r.y;
+    if (r.y > maxY) maxY = r.y;
+  }
+  const cols = maxX - minX + 1;
+  const rows = maxY - minY + 1;
+
+  const CELL_W = showLbl ? 56 : 18;
+  const CELL_H = showLbl ? 22 : 18;
+  const GAP    = 4;
+  const PAD    = 6;
+  const W      = PAD * 2 + cols * CELL_W + Math.max(0, cols - 1) * GAP;
+  const H      = PAD * 2 + rows * CELL_H + Math.max(0, rows - 1) * GAP;
+
+  const placed = [];
+  for (const id of visibleSet) {
+    const r = MINIMAP_BY_ID[id];
+    const col = r.x - minX, row = r.y - minY;
+    const px  = PAD + col * (CELL_W + GAP);
+    const py  = PAD + row * (CELL_H + GAP);
+    placed.push({ id, title: r.title, exits: r.exits, x: px, y: py, cx: px + CELL_W / 2, cy: py + CELL_H / 2 });
+  }
+  const posByIdVisible = Object.fromEntries(placed.map(n => [n.id, n]));
+
+  // Reachable-by-fast-travel - single BFS per render shared across cells.
+  const ftReachable = ftOn ? _reachableFastTravel(ctx, here) : null;
+
+  const edges = [];
+  const seenPair = new Set();
+  for (const n of placed) {
+    for (const to of n.exits) {
+      if (!posByIdVisible[to]) continue;
+      const key = n.id < to ? n.id + '>' + to : to + '>' + n.id;
+      if (seenPair.has(key)) continue;
+      seenPair.add(key);
+      edges.push({ from: n, to: posByIdVisible[to] });
+    }
+  }
+  const _edge = e => {
+    if (e.from.cy === e.to.cy || e.from.cx === e.to.cx) {
+      return _svgLn({ x1: e.from.cx, y1: e.from.cy, x2: e.to.cx, y2: e.to.cy, stroke: 'var(--border)', 'stroke-width': 1 })([]);
+    }
+    const pts = e.from.cx + ',' + e.from.cy + ' ' + e.to.cx + ',' + e.from.cy + ' ' + e.to.cx + ',' + e.to.cy;
+    return _svgPl({ points: pts, fill: 'none', stroke: 'var(--border)', 'stroke-width': 1 })([]);
+  };
+  const _cell = n => {
+    const isCurrent = n.id === here;
+    const isVisited = !!visited[n.id];
+    const canTravel = ftReachable !== null && ftReachable.has(n.id);
+    const fill   = isCurrent ? 'var(--accent)' : (isVisited ? 'var(--surface)' : (dim ? 'transparent' : 'var(--surface)'));
+    const stroke = isCurrent ? 'var(--accent)' : (isVisited ? 'var(--text-muted)' : 'var(--border)');
+    const textFill = isCurrent ? '#fff' : (isVisited ? 'var(--text)' : 'var(--text-muted)');
+    const gProps = canTravel
+      ? {
+          key: n.id,
+          style: 'cursor:pointer',
+          onclick: () => {
+            ctx.setState(s => ({ _pageIdx: Object.assign({}, s._pageIdx || {}, { [n.id]: 0 }) }));
+            ctx.goto(n.id);
+          },
+        }
+      : { key: n.id };
+    return _svgG(gProps)([
+      _svgRct({ x: n.x, y: n.y, width: CELL_W, height: CELL_H, rx: 3, fill, stroke, 'stroke-width': isCurrent ? 1.5 : 1 })([]),
+      ...(showLbl ? [_svgTxt({
+        x: n.cx, y: n.cy + 3, 'text-anchor': 'middle',
+        style: 'font-size:9px; fill:' + textFill + '; pointer-events:none; font-family:ui-monospace,monospace',
+      })([n.title.length > 9 ? n.title.slice(0, 8) + '…' : n.title])] : []),
+    ]);
+  };
+  const svgStyle = zoom > 0
+    ? 'display:block; height:auto' + (wPx ? '; width:' + wPx + 'px' : '')
+    : 'display:block; max-width:100%; height:auto' + (wPx ? '; width:' + wPx + 'px' : '');
+  const svg = _svgEl({
+    width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, xmlns: 'http://www.w3.org/2000/svg',
+    style: svgStyle,
+  })([
+    ...edges.map(_edge),
+    ...placed.map(_cell),
+  ]);
+  const viewport = zoom > 0
+    ? div({ style: 'overflow:auto; max-width:' + zoom + 'px; max-height:' + zoom + 'px' })([svg])
+    : svg;
+  return div({ style: 'margin-bottom:12px' })([
+    ...(w.label ? [h3({ style: 'margin:0 0 6px; font-size:13px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em' })([w.label])] : []),
+    viewport,
+  ]);
+};` : ''}
+
 ${used.has('js') ? `
 // JS widgets compile to inline functions. Helpers + state are bound at the
 // call site so author bodies stay terse.
@@ -1445,6 +2022,7 @@ const sidebar = ctx => WIDGETS.map(w => {
     ${used.has('stats')     ? `case 'stats':     return _renderStats(w, ctx);` : ''}
     ${used.has('inventory') ? `case 'inventory': return _renderInventory(w, ctx);` : ''}
     ${used.has('roomLink')  ? `case 'roomLink':  return _renderRoomLink(w, ctx);` : ''}
+    ${used.has('minimap')   ? `case 'minimap':   return _renderMinimap(w, ctx);` : ''}
     ${used.has('js')        ? `case 'js':        return _renderJs(w, ctx);` : ''}
     default: return null;
   }
@@ -1465,8 +2043,12 @@ const emitMain = project => {
   const initLine = colorsLit
     ? `initStyles({ colors: ${colorsLit} });`
     : `initStyles();`;
+  const sidebarWidth = (project.sidebar?.width || '').trim();
+  //const sidebarWidthLine = sidebarWidth
+  //  ? `document.documentElement.style.setProperty('--sidebar-width', ${_q(sidebarWidth)});`
+  //  : '';
 
-  // Background music — one literal entry per room with a non-empty `music`,
+  // Background music - one literal entry per room with a non-empty `music`,
   // plus a default. Asset refs are already rewritten to relative paths by
   // the extractAssets pass, so these are usable URLs in the exported game.
   const musicByRoom = (project.rooms || []).filter(r => r.music).map(r => `  ${_q(r.id)}: ${_q(r.music)},`).join('\n');
@@ -1488,7 +2070,11 @@ document.body.style.cssText = 'padding:0; margin:0';
 ${musicLine}
 const game = createGame({
   title:  ${_q(project.meta.title)},
-  start:  ${_q(project.meta.start)},
+  start:  ${(() => {
+    const cc = project.charCreation;
+    if (cc && cc.enabled && cc.steps?.length) return _q('_cc:' + cc.steps[0].id);
+    return _q(project.meta.start);
+  })()},
   state:  initialState,
   scenes,
   npcs:   NPCS,
@@ -1535,7 +2121,7 @@ const emitAll = project => {
   return out;
 };
 
-// Public versions of the small helpers — the editor uses these to show the
+// Public versions of the small helpers - the editor uses these to show the
 // author what JS their structured choices will generate. By going through the
 // SAME functions the export goes through, the inline preview can never drift
 // from the actual emitted source.

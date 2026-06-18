@@ -1,5 +1,5 @@
 /**
- * PageEditor — one media-page block. Used both inside rooms and NPC dialogues.
+ * PageEditor - one media-page block. Used both inside rooms and NPC dialogues.
  *
  * A "page" is a unit of content with text and optional image / video URLs;
  * the engine advances through pages with a "More" button (label customisable)
@@ -17,7 +17,7 @@ const PageEditor = ({ page, index, isLast, onChange, onDelete, onMoveUp, onMoveD
 
   return div({ className: 'gef-page' })([
     div({ className: 'gef-page-head' })([
-      span({})([`Page ${index + 1}${isLast ? ' (final — choices appear here)' : ''}`]),
+      span({})([`Page ${index + 1}${isLast ? ' (final - choices appear here)' : ''}`]),
       div({ style: 'flex:1' })([]),
       Button({ size: 'sm', variant: 'ghost', onClick: onMoveUp,   disabled: index === 0 })(['↑']),
       Button({ size: 'sm', variant: 'ghost', onClick: onMoveDown, disabled: isLast })(['↓']),
@@ -59,7 +59,7 @@ const PageEditor = ({ page, index, isLast, onChange, onDelete, onMoveUp, onMoveD
           }),
         ])]
       : [p({ style: 'margin:8px 0 0; font-size:12px; color:var(--text-muted)' })([
-          'Last page — the choices below render here. Add a page above to extend the sequence.',
+          'Last page - the choices below render here. Add a page above to extend the sequence.',
         ])]),
   ]);
 };

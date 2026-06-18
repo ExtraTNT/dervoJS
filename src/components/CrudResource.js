@@ -1,5 +1,5 @@
 /**
- * dervoJS — CrudResource
+ * dervoJS - CrudResource
  *
  * Curried factory that turns an OpenAPI document into ready-to-render CRUD
  * views. Each curry step earns its keep: a value bound at that level is
@@ -110,7 +110,7 @@ const _seedForm = fields => Object.fromEntries(
 // field rendering 
 
 const _formatDisplay = (field, value) => {
-  if (value == null || value === '') return span({ style: 'color:var(--text-muted)' })(['—']);
+  if (value == null || value === '') return span({ style: 'color:var(--text-muted)' })(['-']);
   if (field.type === 'boolean')      return Badge({ variant: value ? 'green' : 'gray' })([value ? 'Yes' : 'No']);
   if (field.format === 'date-time' || field.format === 'date') {
     try { return String(new Date(value).toLocaleString()); } catch (_) { return String(value); }
@@ -138,7 +138,7 @@ const _renderEnum   = ({ field, id, value, error, disabled, set }) =>
     id, label: field.title,
     options: field.enum.map(v => ({ value: String(v), label: String(v) })),
     value:    value == null ? '' : String(value),
-    placeholder: field.required ? 'Choose…' : '— none —',
+    placeholder: field.required ? 'Choose…' : '- none -',
     disabled, error,
     onChange: e => set(e.target.value),
   });
@@ -230,7 +230,7 @@ const _renderText   = ({ field, id, value, error, disabled, set }) =>
   });
 
 /**
- * _renderInput — dispatches to a per-type renderer.
+ * _renderInput - dispatches to a per-type renderer.
  *
  * Single options bag instead of six positional args; recursive calls (arrays
  * + nested objects) re-invoke with another bag, so the readability win
@@ -277,7 +277,7 @@ const _validateForm = fields => values => {
 };
 
 //  side-effect dispatcher 
-// Effects must run *after* the current render — never inside it. queueMicrotask
+// Effects must run *after* the current render - never inside it. queueMicrotask
 // runs before paint but after the synchronous render returns, which means
 // setState calls won't trigger render re-entry.
 
@@ -285,7 +285,7 @@ const _runEffect = fn => queueMicrotask(fn);
 
 const _loadKey = ({ view, id }) => `${view}:${id ?? ''}`;
 
-// URL builders — deduplicate the same template-fill done in 4 places.
+// URL builders - deduplicate the same template-fill done in 4 places.
 const _listUrl = ctx => `${ctx.basePath}${ctx.ops.basePath || `/${ctx.resource}`}`;
 const _itemUrl = ctx => `${ctx.basePath}${ctx.ops.itemPath?.replace(`{${ctx.idParam}}`, ctx.id) || `/${ctx.resource}/${ctx.id}`}`;
 
@@ -317,7 +317,7 @@ const _viewList = ctx => {
     : listItemFields.filter(f => f.type !== 'object' && f.type !== 'array')
   ).filter(f => !(hideFields || []).includes(f.name));
 
-  // Table calls render(raw, row) — `raw` is row[col.key], `row` is the full row.
+  // Table calls render(raw, row) - `raw` is row[col.key], `row` is the full row.
   // Data columns just need `raw`; the actions column needs the whole `row`.
   const cols = [
     ...visible.map(f => ({
@@ -489,7 +489,7 @@ const _viewForm = mode => ctx => {
               })
             ),
             div({ style: 'display:flex; gap:10px; margin-top:16px' })([
-              // type='submit' alone — the form's onsubmit handler runs submit().
+              // type='submit' alone - the form's onsubmit handler runs submit().
               // Adding onClick would double-fire (click event + submit event).
               Button({ type: 'submit', disabled: state.submitting })([
                 state.submitting ? 'Saving…' : (isNew ? 'Create' : 'Save'),

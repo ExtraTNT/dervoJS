@@ -7,9 +7,9 @@ import { setState, getState } from '../store.js';
 import { doc } from '../components/doc.js';
 
 // Module-level WS instances 
-// One demo per WS scenario — lazily created, stored outside the view.
+// One demo per WS scenario - lazily created, stored outside the view.
 let _echoWs  = null;
-let _chatLog = null;  // alias — displayed messages live in state
+let _chatLog = null;  // alias - displayed messages live in state
 
 const MAX_MSGS = 40;
 
@@ -72,7 +72,7 @@ export const websocketPanel = state => {
 
   return div({ style: 'display:flex; flex-direction:column; gap:16px' })([
 
-    Card({ title: 'createWS — echo demo (wss://echo.websocket.org)' })([
+    Card({ title: 'createWS - echo demo (wss://echo.websocket.org)' })([
       p({ style: 'margin:0 0 12px; font-size:13px; color:var(--text-muted)' })([
         'Everything you send is echoed back by the server. Demonstrates full handler wiring, ' +
         'reconnect back-off, and the typed ',
@@ -157,7 +157,7 @@ export const websocketPanel = state => {
     ]),
 
     Card({ title: 'Usage' })([
-      doc([`// Create once — outside the view function
+      doc([`// Create once - outside the view function
 const ws = createWS({
   url:        'wss://api.example.com/live',
   reconnect:  true,

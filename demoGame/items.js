@@ -2,14 +2,14 @@
  * Item catalogue + initial game state for the demoGame.
  *
  * Item shape:
- *   id        — unique key (also referenced from state.inventory / state.equipped)
- *   name      — display label
- *   slot      — 'hat' | 'shirt' | 'pants' | 'weapon'
- *   price     — gold cost in shop
- *   bonuses   — { STR?, AGI?, INT?, CHA? }  applied while equipped
- *   damage    — (weapons only) base damage added on attack
- *   color     — SVG fill colour for the layered character
- *   kind      — hats: 'cap' | 'hood' | 'crown' · weapons: 'fist' | 'club' | 'sword' | 'staff' for shape choice
+ *   id        - unique key (also referenced from state.inventory / state.equipped)
+ *   name      - display label
+ *   slot      - 'hat' | 'shirt' | 'pants' | 'weapon'
+ *   price     - gold cost in shop
+ *   bonuses   - { STR?, AGI?, INT?, CHA? }  applied while equipped
+ *   damage    - (weapons only) base damage added on attack
+ *   color     - SVG fill colour for the layered character
+ *   kind      - hats: 'cap' | 'hood' | 'crown' · weapons: 'fist' | 'club' | 'sword' | 'staff' for shape choice
  */
 
 export const ITEMS = {
@@ -54,7 +54,7 @@ export const initial = {
   // possessions
   inventory: ['rags', 'shorts', 'fists'],
   equipped:  { hat: null, shirt: 'rags', pants: 'shorts', weapon: 'fists' },
-  // shop stock — items get removed when bought
+  // shop stock - items get removed when bought
   shopStock: [
     'tunic', 'scholarRobe', 'athleteVest', 'nobleSilk',
     'trousers', 'leatherPants', 'silkPants',
@@ -69,7 +69,7 @@ export const initial = {
     bridgeOpen: false,    // troll defeated or paid
     bossSlain:  false,
   },
-  // combat — null when out of combat
+  // combat - null when out of combat
   combat: null,
 };
 
@@ -94,4 +94,4 @@ export const formatBonuses = bonuses =>
   Object.entries(bonuses || {})
     .filter(([, v]) => v !== 0)
     .map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${v}`)
-    .join(' · ') || '—';
+    .join(' · ') || '-';

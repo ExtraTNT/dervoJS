@@ -9,7 +9,7 @@ export const tablePanel = state =>
         id: 'tableSearchInput',
         placeholder: 'Search all columns…',
         value: state.tableFilter,
-        hint: 'Uses filterAll — searches every column value.',
+        hint: 'Uses filterAll - searches every column value.',
         onInput: e => setState({ tableFilter: e.target.value }),
       }),
 
@@ -59,7 +59,7 @@ export const tablePanel = state =>
             filterFn: filterExact('paradigm'),
           }),
         ]),
-        doc([`// filterExact(key) — strict equality on one column
+        doc([`// filterExact(key) - strict equality on one column
 Table({
   filter: state.paradigmFilter,
   filterFn: filterExact('paradigm'),
@@ -67,7 +67,7 @@ Table({
   columns: TABLE_COLS,
 })
 
-// filterBy(key) — substring match on one column
+// filterBy(key) - substring match on one column
 Table({ filter: q, filterFn: filterBy('lang'), ... })`]),
       ]),
     ]),
@@ -83,7 +83,7 @@ Table({ filter: q, filterFn: filterBy('lang'), ... })`]),
           filter: state.builtinFilter || '',
           onFilterChange: v => setState({ builtinFilter: v }),
           filterFn: filterAll,
-          caption: 'Scrollable — 14 rows, 220px height',
+          caption: 'Scrollable - 14 rows, 220px height',
         }),
         doc([`// showFilter=true renders the search input inside the table header
 Table({

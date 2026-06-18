@@ -29,6 +29,7 @@ import { AssetsPanel }  from './panels/assets.js';
 import { CheatSheet }   from './cheatsheet.js';
 import { ThemePanel }   from './panels/theme.js';
 import { StoryPointsPanel } from './panels/storyPoints.js';
+import { CharCreationPanel } from './panels/charCreation.js';
 import { StateExplorer }    from './components/StateExplorer.js';
 import { QuickBuilder, openQuickBuilder } from './components/QuickBuilder.js';
 import { ComponentBuilder, openComponentBuilder } from './components/ComponentBuilder.js';
@@ -43,7 +44,7 @@ import { ConfirmDialog, confirmAction } from './components/ConfirmDialog.js';
 initEditorStyles();
 document.body.style.cssText = 'padding:0; margin:0; min-height:100vh; background:var(--bg)';
 
-// Per-project token overrides — these define the *game*'s palette and are
+// Per-project token overrides - these define the *game*'s palette and are
 // baked into the exported main.js by codegen. As a side-effect they also
 // recolour the editor chrome (since both share dervo's CSS custom properties).
 // On slot switch the diff against the previous overrides decides what to reset.
@@ -90,6 +91,7 @@ store.subscribe(s => _syncCustomCss(s.project.meta.gameCss));
 const TABS = [
   { id: 'meta',    label: 'Project'  },
   { id: 'theme',   label: 'Theme'    },
+  { id: 'charCreation', label: 'Char creation' },
   { id: 'rooms',   label: 'Rooms'    },
   { id: 'stories', label: 'Story Points' },
   { id: 'npcs',    label: 'NPCs'     },
@@ -122,7 +124,7 @@ const _topBar = s =>
     Button({
       variant: 'ghost', size: 'sm',
       onClick: () => setState({ stateExplorerOpen: !s.stateExplorerOpen }),
-      title:   'State explorer — what ${…} can reference',
+      title:   'State explorer - what ${…} can reference',
     })(['📊 State']),
     Button({ variant: 'ghost', size: 'sm', onClick: () => setState({ cheatsheetOpen: !s.cheatsheetOpen }) })(['Cheat sheet']),
     Button({ variant: 'ghost', size: 'sm', onClick: openQuickBuilder, title: 'Scaffold a base project from a few inputs' })(['New from template']),
@@ -134,7 +136,7 @@ const _sidebar = s => {
   const slots = listSlots();
   return div({ className: 'gef-side' })([
     h2({ style: 'margin:0 0 4px; font-size:14px' })(['Project']),
-    p({ style: 'margin:0; font-size:12px; color:var(--text-muted)' })([
+    p({ className: 'gef-hint' })([
       'Edit rooms, NPCs and exits. Save persists to localStorage; Export downloads JS files.',
     ]),
 
@@ -198,7 +200,8 @@ const _activePanel = s => {
     case 'graph':   return GraphPanel(s);
     case 'preview': return PreviewPanel(s);
     case 'export':  return ExportPanel(s);
-    case 'theme':   return ThemePanel(s);
+    case 'theme':         return ThemePanel(s);
+    case 'charCreation':  return CharCreationPanel(s);
     default:        return _placeholder('Unknown panel', String(s.activeTab));
   }
 };
