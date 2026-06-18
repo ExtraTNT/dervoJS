@@ -223,8 +223,8 @@ const ChoiceEditor = ({ step, idx, project }) =>
     })(['+ Add option']),
   ]);
 
-/** Curried project => total => step => idx => vnode. */
-const StepCard = project => total => step => idx =>
+/** Curried project => total => (step, idx) => vnode. */
+const StepCard = project => total => (step, idx) =>
   Card({
     title: `${idx + 1}. ${step.type === 'pointBuy' ? '⚖ Point-buy' : '☷ Choice'}${step.title ? ' - ' + step.title : ''}`,
   })([
