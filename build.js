@@ -3,9 +3,7 @@
  * rewrites `lib/odocosjs/` imports so odocosjs is expected as a sibling.
  *
  *   node build.js [outDir]   // writes to <outDir>/dervoJS (default ./dist)
- *   node build.js --in-place // destructive: writes dervoJS/ at repo root,
- *                            // then wipes src/ and DEMO_DIRS. Meant to be
- *                            // run right before pushing a release branch.
+ *   node build.js --in-place // destructive of base repo, release to /dervoJS
  */
 
 import { readdir, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
@@ -18,12 +16,25 @@ const SRC       = join(ROOT, 'src');
 const IN_PLACE  = process.argv.includes('--in-place');
 const OUT_DIR   = IN_PLACE
   ? join(ROOT, 'dervoJS')
-  : resolve(process.cwd(), process.argv.find(a => !a.startsWith('-') && !a.endsWith('build.js') && a !== process.execPath) || './dist', 'dervoJS');
+  : resolve(
+      process.cwd(),
+      process.argv.find(
+        a => !a.startsWith('-')
+        && !a.endsWith('build.js')
+        && a !== process.execPath
+      )
+      || './dist', 'dervoJS'
+    );
 console.log(ROOT, SRC, IN_PLACE, OUT_DIR);
 const DEMO_DIRS = ['demo', 'demoGame', 'demoHbbtv', 'gameEditor'];
 // Files copied from repo root into dervoJS/, then wiped from root in --in-place.
 const EXTRAS    = ['optimise-imports.js', 'README.md', 'LICENSE'];
-const NUKE      = [...DEMO_DIRS, ...EXTRAS, 'src', 'build.js', 'server.js'];
+const NUKE      = [
+  ...DEMO_DIRS, ...EXTRAS,
+  'src', 'build.js', 'server.js',
+  'lib', '.gitmodules',
+  'Roadmap.md',
+];
 
 const _JS_EXT = new Set(['.js', '.mjs']);
 const _IMPORT = /(from\s*['"]|import\s*\(\s*['"])((?:\.\.\/)+)lib\/odocosjs\//g;
