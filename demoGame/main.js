@@ -8,7 +8,7 @@ import { scenes }   from './scenes.js';
 import { NPCS }     from './world.js';
 import { Sidebar }  from './character.js';
 
-initStyles();
+initStyles({noLink: true});
 document.body.style.cssText = 'padding:0; margin:0';
 
 const game = createGame({

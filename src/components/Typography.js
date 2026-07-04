@@ -1,4 +1,4 @@
-import { div, nav, a, span, sup, ol, li, h1, h2, h3, h4, h5, h6 } from '../elements.js';
+import { div, nav, a, span, sup, ol, li, h1, h2, h3, h4, h5, h6, pre } from '../elements.js';
 import { cn } from '../utils.js';
 
 // Utilities 
@@ -315,7 +315,7 @@ const Code = ({ className = '', style = '' } = {}) => children =>
 
 /** Pre-formatted code block */
 const Pre = ({ className = '', style = '', lang = '' } = {}) => children =>
-  div({ className: cn('typo-pre', className), style, 'data-lang': lang })(children);
+  pre({ className: cn('typo-pre', className), style, 'data-lang': lang })(children);
 
 /** Blockquote */
 const Quote = ({ className = '', style = '', cite: citeText = '' } = {}) => children =>

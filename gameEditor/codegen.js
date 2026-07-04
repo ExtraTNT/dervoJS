@@ -2041,8 +2041,8 @@ const emitMain = project => {
   // initStyles colors arg: only emit it when there are overrides, so the
   // generated source stays tidy for projects that use defaults.
   const initLine = colorsLit
-    ? `initStyles({ colors: ${colorsLit} });`
-    : `initStyles();`;
+    ? `initStyles({ colors: ${colorsLit}, noLink: true });`
+    : `initStyles({ noLink: true });`;
   const sidebarWidth = (project.sidebar?.width || '').trim();
   //const sidebarWidthLine = sidebarWidth
   //  ? `document.documentElement.style.setProperty('--sidebar-width', ${_q(sidebarWidth)});`
@@ -2100,6 +2100,7 @@ const emitIndexHtml = project => {
   <style id="game-custom-css">
 ${gameCss}
   </style>` : ''}
+  <link rel="stylesheet" href="../src/styles.css" />
 </head>
 <body>
   <script type="module" src="./main.js"></script>
