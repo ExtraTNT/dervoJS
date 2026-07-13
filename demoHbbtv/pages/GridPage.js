@@ -2,7 +2,9 @@
  * Page 4 - 4x4 grid of focusable cards (left) + scrollable picks log (right).
  */
 
-import { div, p, Card, FocusGrid } from '../../src/index.js';
+import { div, p } from '../../src/elements.js';
+import { Card } from '../../src/components/Card.js';
+import { FocusGrid } from '../../src/components/HbbtvWidgets.js';
 import { PicksLog } from '../components/PicksLog.js';
 
 export const GRID_COLS  = 4;

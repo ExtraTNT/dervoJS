@@ -5,7 +5,9 @@
  * component is just the row formatting.
  */
 
-import { div, span, p, Badge, FocusScroll } from '../../src/index.js';
+import { div, span, p } from '../../src/elements.js';
+import { Badge } from '../../src/components/Badge.js';
+import { FocusScroll } from '../../src/components/HbbtvWidgets.js';
 
 /**
  * @param {Object} opts

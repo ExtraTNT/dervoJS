@@ -3,7 +3,7 @@
  * friendly "no broadcast" message when running off a TV.
  */
 
-import { div, p, span } from '../../src/index.js';
+import { div, p, span } from '../../src/elements.js';
 
 const row = k => v => [
   span({ style: 'color:var(--text-muted)' })([k]),

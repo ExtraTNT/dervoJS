@@ -10,7 +10,9 @@
  * event - the prefix tells the dispatcher which slice of state to update.
  */
 
-import { div, Card, TabBar }                   from '../../src/index.js';
+import { div } from '../../src/elements.js';
+import { Card } from '../../src/components/Card.js';
+import { TabBar } from '../../src/components/HbbtvWidgets.js';
 import { ColourPad, NavPad, VcrPad, NumPad }   from '../components/Keypads.js';
 import { KeyBuffer }                           from '../components/KeyBuffer.js';
 import { KeycodeTable }                        from '../components/KeycodeTable.js';

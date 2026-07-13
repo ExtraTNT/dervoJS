@@ -3,7 +3,7 @@
  * of the most recent key so the active button stands out.
  */
 
-import { div } from '../../src/index.js';
+import { div } from '../../src/elements.js';
 
 // shared building blocks
 

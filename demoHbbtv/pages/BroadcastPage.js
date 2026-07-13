@@ -2,7 +2,8 @@
  * Page 2 - DVB channel info + DSM-CC stream events log.
  */
 
-import { div, Card } from '../../src/index.js';
+import { div } from '../../src/elements.js';
+import { Card } from '../../src/components/Card.js';
 import { ChannelInfo }  from '../components/ChannelInfo.js';
 import { StreamEvents } from '../components/StreamEvents.js';
 

@@ -3,7 +3,7 @@
  * Components read state; the bus -> store wiring in main.js writes it.
  */
 
-import { createStore } from '../src/index.js';
+import { createStore } from '../src/state.js';
 
 export const store = createStore({
   hbbtv:        false,                 // HbbTV capability detected at boot

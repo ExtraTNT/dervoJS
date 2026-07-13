@@ -6,7 +6,9 @@
  * labels and renders the chrome.
  */
 
-import { div, h1, span, kbd, Badge, TabBar } from '../../src/index.js';
+import { div, h1, span, kbd } from '../../src/elements.js';
+import { Badge } from '../../src/components/Badge.js';
+import { TabBar } from '../../src/components/HbbtvWidgets.js';
 
 export const PAGES = ['remote', 'broadcast', 'list', 'grid'];
 

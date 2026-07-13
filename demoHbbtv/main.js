@@ -12,12 +12,13 @@
  * StateDebugger + RenderProfiler + ListenersDebugger.
  */
 
-import {
-  initStyles, mount, bootHbbtv,
-  createFocusManager, onKeyCombo,
-  FloatingPanel, StateDebugger, RenderProfiler, ListenersDebugger,
-  disableProfiler,
-} from '../src/index.js';
+import { initStyles } from '../src/styles.js';
+import { mount, disableProfiler } from '../src/state.js';
+import { bootHbbtv, createFocusManager, onKeyCombo } from '../src/hbbtv.js';
+import { FloatingPanel } from '../src/components/FloatingPanel.js';
+import { StateDebugger } from '../src/components/StateDebugger.js';
+import { RenderProfiler } from '../src/components/RenderProfiler.js';
+import { ListenersDebugger } from '../src/components/ListenersDebugger.js';
 import {
   store, setBoot, pushKey, pushEvent, pushPick,
   setPage, setSubPage, toggleProfiler, getState,

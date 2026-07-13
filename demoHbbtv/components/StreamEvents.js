@@ -2,7 +2,8 @@
  * Scrollable log of DSM-CC stream events.
  */
 
-import { div, p, span, Badge } from '../../src/index.js';
+import { div, p, span } from '../../src/elements.js';
+import { Badge } from '../../src/components/Badge.js';
 
 export const StreamEvents = events =>
   events.length === 0

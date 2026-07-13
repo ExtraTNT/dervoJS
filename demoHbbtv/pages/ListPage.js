@@ -3,7 +3,10 @@
  * Both sides reachable via spatial nav from the tab bar above.
  */
 
-import { div, p, span, Card, Badge, FocusList } from '../../src/index.js';
+import { div, p, span } from '../../src/elements.js';
+import { Card } from '../../src/components/Card.js';
+import { Badge } from '../../src/components/Badge.js';
+import { FocusList } from '../../src/components/HbbtvWidgets.js';
 import { PicksLog } from '../components/PicksLog.js';
 
 export const LIST_ITEMS = Array.from({ length: 20 }, (_, i) => ({

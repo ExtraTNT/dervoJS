@@ -5,7 +5,9 @@
  * actually fires for VK_RED, VK_BACK, etc.
  */
 
-import { div, span, p, Badge, Table } from '../../src/index.js';
+import { div, span, p } from '../../src/elements.js';
+import { Badge } from '../../src/components/Badge.js';
+import { Table } from '../../src/components/Table.js';
 
 const _fmtTime = ts =>
   new Date(ts).toLocaleTimeString() + '.' + String(ts % 1000).padStart(3, '0');

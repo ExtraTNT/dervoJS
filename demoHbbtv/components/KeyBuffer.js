@@ -2,7 +2,7 @@
  * Rolling history of the most recent remote keypresses.
  */
 
-import { div, span, p } from '../../src/index.js';
+import { div, span, p } from '../../src/elements.js';
 
 export const KeyBuffer = buffer => buffer.length === 0
   ? p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })(['Press a remote key…'])
