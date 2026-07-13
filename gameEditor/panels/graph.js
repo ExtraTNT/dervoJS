@@ -24,8 +24,14 @@ import { div, p, h2, span } from '../../src/elements.js';
 import { Card } from '../../src/components/Card.js';
 import { Stack } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
+import { Button } from '../../src/components/Button.js';
 import { setState } from '../store.js';
 import { vnode } from '../../lib/odocosjs/src/render.js';
+import {
+  NODE_W, NODE_H, COL_GAP, ROW_GAP, NPC_W, NPC_H, COMBAT_W, COMBAT_H,
+  edgePath, hexPath, arrowMarker,
+} from '../components/_graphGeometry.js';
+import { ChoiceGraphView } from './graphChoices.js';
 
 const svg     = vnode('svg');
 const g       = vnode('g');
@@ -33,24 +39,9 @@ const rect    = vnode('rect');
 const text    = vnode('text');
 const path    = vnode('path');
 const defs    = vnode('defs');
-const marker  = vnode('marker');
-const polygon = vnode('polygon');
 const ellipse = vnode('ellipse');
 
-// ─── Geometry constants ──────────────────────────────────────────────────
-
-const NODE_W = 168;
-const NODE_H = 60;
-const COL_GAP = 110;
-const ROW_GAP = 200;
-
-const NPC_W = 132;
-const NPC_H = 34;
-
-const COMBAT_W = 132;
-const COMBAT_H = 40;
-
-// ─── Media detection - curried per source ─────────────────────────────────
+// Media detection
 
 const _hasMedia = ref => typeof ref === 'string' && ref.length > 0;
 
@@ -112,7 +103,7 @@ const _mediaBadges = flags => baseX => baseY => {
   return items;
 };
 
-// ─── Layout: BFS from start room, row-major fill ─────────────────────────
+// Layout: BFS from start room, row-major fill
 
 // Rooms with `kind:'story'` or the opt-out `hideOnMap` flag never render on
 // the graph - story rooms are narrative-only scenes that the player can't
@@ -180,65 +171,10 @@ const _findCombatTriggers = project => {
   return triggers;
 };
 
-// ─── Edge geometry ──────────────────────────────────────────────────────
+// Overview body (rooms + npcs + combats, deduped room edges)
 
-// Attach an edge endpoint to the BORDER of a rectangle (centred at cx,cy with
-// half-extents hx,hy) along the ray pointing at the target. Returns
-// `{ x, y }` on the rectangle edge.
-const _rectEdgePoint = ({ cx, cy, hx, hy, towardX, towardY }) => {
-  const dx = towardX - cx, dy = towardY - cy;
-  if (dx === 0 && dy === 0) return { x: cx, y: cy };
-  const tx = dx === 0 ? Infinity : hx / Math.abs(dx);
-  const ty = dy === 0 ? Infinity : hy / Math.abs(dy);
-  const t = Math.min(tx, ty);
-  return { x: cx + dx * t, y: cy + dy * t };
-};
-
-const _nodeBox = node => ({
-  cx: node.x + (node.w || NODE_W) / 2,
-  cy: node.y + (node.h || NODE_H) / 2,
-  hx: (node.w || NODE_W) / 2,
-  hy: (node.h || NODE_H) / 2,
-});
-
-// Build a smooth path from one node's border to another's border with a gentle
-// curve so parallel edges don't overlap. Returns an SVG path-data string.
-const _edgePath = from => to => {
-  const a = _nodeBox(from);
-  const b = _nodeBox(to);
-  const start = _rectEdgePoint({ ...a, towardX: b.cx, towardY: b.cy });
-  const end   = _rectEdgePoint({ ...b, towardX: a.cx, towardY: a.cy });
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const len = Math.max(1, Math.hypot(dx, dy));
-  // Perpendicular offset for the control point - small for short edges, larger
-  // for long edges so the bow is always visible without crossing through nodes.
-  const bow = Math.min(64, len * 0.18);
-  const mx = (start.x + end.x) / 2;
-  const my = (start.y + end.y) / 2;
-  const px = -dy / len, py = dx / len;
-  const cx = mx + px * bow;
-  const cy = my + py * bow;
-  return `M ${start.x} ${start.y} Q ${cx} ${cy} ${end.x} ${end.y}`;
-};
-
-// Hexagon path sized COMBAT_W x COMBAT_H.
-const _hexPath = () => {
-  const w = COMBAT_W, h = COMBAT_H, o = 12;
-  return `M ${o} 0 L ${w - o} 0 L ${w} ${h / 2} L ${w - o} ${h} L ${o} ${h} L 0 ${h / 2} Z`;
-};
-
-// ─── Component ──────────────────────────────────────────────────────────
-
-const GraphPanel = state => {
+const _overviewBody = state => {
   const { project, selectedRoomId } = state;
-
-  if (project.rooms.length === 0) {
-    return Stack({ gap: 14 })([
-      h2({ style: 'margin:0' })(['Graph']),
-      div({ className: 'gef-empty' })(['No rooms to draw yet. Add some in the Rooms tab.']),
-    ]);
-  }
 
   const nodes = _layout(project);
   const byId  = Object.fromEntries(nodes.map(n => [n.id, n]));
@@ -357,16 +293,10 @@ const GraphPanel = state => {
   const width      = allDrawn.reduce(_maxRight,  0) + 30;
   const height     = allDrawn.reduce(_maxBottom, 0) + 60;
 
-  // ─── Render ──────────────────────────────────────────────────────────
-
-  // Arrow markers - each tied to a CSS variable so themes can recolour at will.
-  const _arrowMarker = id => fill => marker({
-    id, viewBox: '0 0 10 10', refX: 9, refY: 5,
-    markerWidth: 8, markerHeight: 8, orient: 'auto-start-reverse',
-  })([polygon({ points: '0,0 10,5 0,10', fill })([])]);
+  // Rendering
 
   const _edgeRoom = e => path({
-    d: _edgePath(e.from)(e.to),
+    d: edgePath(e.from)(e.to),
     fill: 'none',
     stroke: 'var(--text-muted)',
     'stroke-width': 1.4,
@@ -374,7 +304,7 @@ const GraphPanel = state => {
   })([]);
 
   const _edgeNpc = e => path({
-    d: _edgePath(e.from)(e.to),
+    d: edgePath(e.from)(e.to),
     fill: 'none',
     stroke: 'var(--text-subtle)',
     'stroke-width': 1.1,
@@ -382,7 +312,7 @@ const GraphPanel = state => {
   })([]);
 
   const _edgeTrigger = e => path({
-    d: _edgePath(e.from)(e.to),
+    d: edgePath(e.from)(e.to),
     fill: 'none',
     stroke: 'var(--warning)',
     'stroke-width': 1.4,
@@ -391,7 +321,7 @@ const GraphPanel = state => {
   })([]);
 
   const _edgeOutcome = e => path({
-    d: _edgePath(e.from)(e.to),
+    d: edgePath(e.from)(e.to),
     fill: 'none',
     stroke: e.kind === 'win' ? 'var(--success)' : 'var(--danger)',
     'stroke-width': 1.8,
@@ -459,7 +389,7 @@ const GraphPanel = state => {
     style: 'cursor:pointer',
   })([
     path({
-      d: _hexPath(),
+      d: hexPath(),
       fill: 'var(--surface)',
       stroke: 'var(--danger)',
       'stroke-width': 1.4,
@@ -475,12 +405,7 @@ const GraphPanel = state => {
     ..._mediaBadges(cn.media)(COMBAT_W - 4)(COMBAT_H - 6),
   ]);
 
-  return Stack({ gap: 14 })([
-    h2({ style: 'margin:0' })(['Graph']),
-    p({ style: 'margin:0; color:var(--text-muted); font-size:13px' })([
-      'Rooms (rectangles), NPCs (ellipses), and combats (hexagons). Media badges show what kinds of assets each entity uses. Click any node to jump to its editor.',
-    ]),
-
+  return [
     Card({})([
       div({ className: 'gef-graph', style: 'overflow:auto; max-width:100%' })([
         svg({
@@ -489,10 +414,10 @@ const GraphPanel = state => {
           xmlns:   'http://www.w3.org/2000/svg',
         })([
           defs({})([
-            _arrowMarker('arrow-room')('var(--text-muted)'),
-            _arrowMarker('arrow-trigger')('var(--warning)'),
-            _arrowMarker('arrow-win')('var(--success)'),
-            _arrowMarker('arrow-lose')('var(--danger)'),
+            arrowMarker('arrow-room')('var(--text-muted)'),
+            arrowMarker('arrow-trigger')('var(--warning)'),
+            arrowMarker('arrow-win')('var(--success)'),
+            arrowMarker('arrow-lose')('var(--danger)'),
           ]),
 
           // Order matters: edges first (behind nodes), then NPCs (so room nodes
@@ -525,6 +450,36 @@ const GraphPanel = state => {
         ]),
       ]),
     ]),
+  ];
+};
+
+// Header
+
+const _VIEWS = [
+  { id: 'overview', label: 'Overview', hint: 'Rooms (rectangles), NPCs (ellipses), and combats (hexagons). Room edges are deduped. Click any node to jump to its editor.' },
+  { id: 'choices',  label: 'Choices',  hint: 'Every player interaction: room choices, talk access, NPC topic flow, shop buy/sell, item gain/use/requirements, combat entry/loot/outcomes, onEnter/onEnd routing. Local interactions show as @ notes under their node. Includes story and hidden rooms.' },
+];
+
+const GraphPanel = state => {
+  const { project } = state;
+  if (project.rooms.length === 0) {
+    return Stack({ gap: 14 })([
+      h2({ style: 'margin:0' })(['Graph']),
+      div({ className: 'gef-empty' })(['No rooms to draw yet. Add some in the Rooms tab.']),
+    ]);
+  }
+  const view = _VIEWS.find(v => v.id === state.graphView) || _VIEWS[0];
+  return Stack({ gap: 14 })([
+    h2({ style: 'margin:0' })(['Graph']),
+    div({ style: 'display:flex; gap:8px; align-items:center' })([
+      ..._VIEWS.map(v => Button({
+        size:    'sm',
+        variant: v.id === view.id ? 'primary' : 'ghost',
+        onClick: () => setState({ graphView: v.id }),
+      })([v.label])),
+    ]),
+    p({ className: 'gef-hint gef-hint-13' })([view.hint]),
+    ...(view.id === 'choices' ? ChoiceGraphView(state) : _overviewBody(state)),
   ]);
 };
 

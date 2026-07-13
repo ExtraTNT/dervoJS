@@ -27,8 +27,8 @@ import { Stack, Grid } from '../../src/components/Layout.js';
 import { Badge } from '../../src/components/Badge.js';
 import { setProject, setState, updateById } from '../store.js';
 import { confirmAction } from '../components/ConfirmDialog.js';
-import { emptyNpc, emptyPage, emptyChoice, emptyShopEntry, emptyBuyback, emptyBuybackItem, emptyTopic, emptyNpcVariant } from '../schema.js';
-import { onText, projectVars, updateAt, removeAt, swapAt } from '../helpers.js';
+import { emptyNpc, emptyPage, emptyChoice, emptyShopEntry, emptyBuyback, emptyBuybackItem, emptyTopic, emptyNpcVariant, emptyNpcVar } from '../schema.js';
+import { onText, projectVars, updateAt, removeAt, swapAt, appendTo } from '../helpers.js';
 import { AssetInput } from '../components/AssetInput.js';
 import { PageEditor }     from '../components/PageEditor.js';
 import { ChoiceEditor }   from '../components/ChoiceEditor.js';
@@ -509,10 +509,128 @@ const SingleTopicEditor = ({ topic, npc, project, vars, roomOpts, topicOpts, com
   ]);
 };
 
+// - NPC vars (per-NPC declared state) --------------------------------------
+//
+// Lives at state.npcVars[npc.id][key] at runtime. Addressable from ANY
+// Condition/Effect editor in the project as `npcVars.<npcId>.<key>`, or from
+// this NPC's own choices/topics as the portable `npcSelf.<key>` shorthand
+// (see ConditionEditor / EffectEditor - resolved to the concrete npcId only
+// at preview/export time, so copying a topic to another NPC still points at
+// THAT NPC's own vars). One type richer than project Stats: object, for
+// freeform relationship/reputation tracking ({ trust: 5, metCount: 2 }).
+
+const _NPC_VAR_TYPE_OPTS = [
+  { value: 'number', label: 'number' },
+  { value: 'string', label: 'string' },
+  { value: 'array',  label: 'array'  },
+  { value: 'object', label: 'object' },
+];
+
+const _defaultNpcVarInitialFor = type =>
+  type === 'string' ? '' : type === 'array' ? [] : type === 'object' ? {} : 0;
+
+// Coerce an editor input to the var's declared type. Comma-split for arrays;
+// JSON-parse for objects, falling back to `prev` (not `{}`) on invalid JSON
+// so a blur mid-edit can't silently blank out an author's data.
+const _coerceNpcVarInitial = (type, prev) => v => {
+  if (type === 'number') { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+  if (type === 'string') return v == null ? '' : String(v);
+  if (type === 'object') {
+    if (v && typeof v === 'object' && !Array.isArray(v)) return v;
+    try {
+      const p = JSON.parse(v);
+      return (p && typeof p === 'object' && !Array.isArray(p)) ? p : prev;
+    } catch (_) { return prev; }
+  }
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === 'string') return v.split(',').map(s => s.trim()).filter(Boolean);
+  return [];
+};
+
+/** Type-aware initial input. Objects edit as JSON text; storage stays a plain object. */
+const _npcVarInitialInput = (i, setVar) => v => {
+  const onCommit = val => setVar(i)({ initial: _coerceNpcVarInitial(v.type, v.initial)(val) });
+  if (v.type === 'number') {
+    return NumberInput({ label: i === 0 ? 'Initial' : '', value: Number(v.initial) || 0, onChange: onCommit });
+  }
+  if (v.type === 'string') {
+    return TextInput({
+      label:       i === 0 ? 'Initial' : '',
+      value:       typeof v.initial === 'string' ? v.initial : '',
+      onChange:    onText(onCommit),
+      placeholder: 'stranger',
+    });
+  }
+  if (v.type === 'object') {
+    return TextInput({
+      label:       i === 0 ? 'Initial (JSON)' : '',
+      value:       JSON.stringify(v.initial ?? {}),
+      onChange:    onText(onCommit),
+      placeholder: '{"trust": 0}',
+    });
+  }
+  const csv = Array.isArray(v.initial) ? v.initial.join(', ') : '';
+  return TextInput({
+    label:       i === 0 ? 'Initial (comma-separated)' : '',
+    value:       csv,
+    onChange:    onText(onCommit),
+    placeholder: 'seen, warned',
+  });
+};
+
+const NpcVarRow = (setVar, delVar) => (v, i) =>
+  Grid({ cols: 4, gap: 8 })([
+    TextInput({
+      label:    i === 0 ? 'Key' : '',
+      value:    v.key,
+      onChange: onText(key => setVar(i)({ key })),
+      placeholder: 'trust',
+    }),
+    Select({
+      label:    i === 0 ? 'Type' : '',
+      options:  _NPC_VAR_TYPE_OPTS,
+      value:    v.type || 'number',
+      // Reset initial on type change - coercion across types (e.g. 5 -> {5:
+      // true}) would surprise more often than it would help.
+      onChange: onText(type => setVar(i)({ type, initial: _defaultNpcVarInitialFor(type) })),
+    }),
+    _npcVarInitialInput(i, setVar)(v),
+    div({ className: 'gef-row-end' })([
+      Button({ variant: 'ghost', size: 'sm', onClick: delVar(i) })(['Remove']),
+    ]),
+  ]);
+
+const NpcVarsCard = (npc, setNpcVars) => {
+  const vars = npc.vars || [];
+  const setVar = i => patch => setNpcVars(updateAt(i)(patch));
+  const delVar = i => () => setNpcVars(removeAt(i));
+  const addVar = () => setNpcVars(appendTo(emptyNpcVar('number')('')));
+  return Card({ title: `Vars (${vars.length}) - this NPC's own state` })([
+    Stack({ gap: 8 })([
+      p({ className: 'gef-hint gef-hint-13' })([
+        'Values scoped to THIS npc (', span({ className: 'dv-mono' })(['state.npcVars.' + npc.id]),
+        '). Pick "npc (self): <key>" in any Condition/Effect on this NPC\'s own choices/topics, or "npc: ',
+        npc.name || npc.id, ' → <key>" from anywhere else in the project (rooms, items, combats, other NPCs). ',
+        'Same number/string/array ops as Stats, plus object (', span({ className: 'dv-mono' })(['set / setField / clear']),
+        ') for freeform relationship tracking.',
+      ]),
+      ...(vars.length === 0
+        ? [div({ className: 'gef-empty' })(['No vars yet.'])]
+        : vars.map(NpcVarRow(setVar, delVar))),
+      div({})([
+        Button({ size: 'sm', onClick: addVar })(['+ Add var']),
+      ]),
+    ]),
+  ]);
+};
+
 // - NPC editor --------------------------------------------
 
 const NpcEditor = (npc, project, selectedTopicId) => {
-  const vars      = _vars(project);
+  // selfNpcId lets ConditionEditor/EffectEditor offer the "this NPC" self
+  // shortcut on every nested editor below (simple choices, topic onEnter,
+  // topic choices, variant condition) without each one naming npc.id itself.
+  const vars      = { ..._vars(project), selfNpcId: npc.id };
   const roomOpts  = groupedOptions(project.rooms)(r => ({ value: r.id, label: `${r.kind === 'story' ? '⭐ ' : ''}${r.title || r.id}` }));
   const topicOpts = (npc.topics || []).map(t => ({ value: t.id, label: t.name || t.id }));
   const combatOpts = (project.combats || []).map(c => ({ value: c.id, label: c.name || c.id }));
@@ -619,6 +737,8 @@ const NpcEditor = (npc, project, selectedTopicId) => {
         }),
       ]),
     ]),
+
+    NpcVarsCard(npc, _overList('vars')),
 
     Card({ title: `Locations (${npc.locations.length})` })([
       p({ style: 'margin:0 0 8px; font-size:12px; color:var(--text-muted)' })([

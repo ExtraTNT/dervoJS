@@ -7,7 +7,7 @@
  * project.stats[].initial, project.startingInventory, etc.), so authors can
  * see the actual shape behind a `${path}` template.
  *
- * Grouped: Stats / Flags / Inventory / Equipped / Skills / Engine internals.
+ * Grouped: Stats / Flags / Inventory / Equipped / Skills / NPC vars / Engine internals.
  * Reads from the current project; doesn't run the game.
  */
 
@@ -51,12 +51,17 @@ const _initialStateShape = project => {
   const npcLocations = Object.fromEntries(
     (project.npcs || []).filter(n => n.locations[0]).map(n => [n.id, n.locations[0]])
   );
+  // Per-NPC declared state - mirrors buildGameConfig's / emitItems' seeding.
+  const npcVars = Object.fromEntries(
+    (project.npcs || []).map(n => [n.id, Object.fromEntries((n.vars || []).map(v => [v.key, v.initial]))])
+  );
   return {
     ...stats,
     flags,
     inventory:        startingInv,
     equipped:         startingEquipped,
     skills:           startingSkills,
+    npcVars,
     _scene:           project.meta?.start || '',
     _history:         [],
     _pageIdx:         {},
@@ -208,6 +213,26 @@ const _skillsSection = expandedKeys => state => project => {
   ]);
 };
 
+const _npcVarsSection = expandedKeys => state => project => {
+  const npcs = (project.npcs || []).filter(n => (n.vars || []).length > 0);
+  if (npcs.length === 0) return _section('NPC vars')('- none defined; add some in an NPC\'s Vars card')([]);
+  const fmt = v => JSON.stringify(v.initial);
+  return _section('NPC vars')('per-NPC state, seeded from each NPC\'s Vars card - one type richer than Stats (adds object)')(
+    npcs.flatMap(n => [
+      _row(expandedKeys)(state)({
+        path:        `state.npcVars.${n.id}`,
+        exampleExpr: `npcVars.${n.id}`,
+        description: `${n.name || n.id} - the whole map`,
+      }),
+      ...(n.vars || []).map(v => _row(expandedKeys)(state)({
+        path:        `state.npcVars.${n.id}.${v.key}`,
+        exampleExpr: `npcVars.${n.id}.${v.key}`,
+        description: `${n.name || n.id} · ${v.type} · initial = ${fmt(v)}`,
+      })),
+    ])
+  );
+};
+
 const _engineSection = expandedKeys => state => () => _section('Engine internals')('managed by the engine - read-only in templates')([
   _row(expandedKeys)(state)({ path: 'state._scene',         exampleExpr: '_scene',                exampleDescription: '', description: 'current scene id' }),
   _row(expandedKeys)(state)({ path: 'state._history',       exampleExpr: '_history.length',       description: 'stack of prior scenes; ctx.back() pops it' }),
@@ -283,6 +308,7 @@ const StateExplorer = uiState => {
         _inventorySection(expandedKeys)(initialState)(project),
         _equippedSection(expandedKeys)(initialState)(project),
         _skillsSection(expandedKeys)(initialState)(project),
+        _npcVarsSection(expandedKeys)(initialState)(project),
         _engineSection(expandedKeys)(initialState)(),
         _messageScopeSection(expandedKeys)(initialState)(),
       ]),

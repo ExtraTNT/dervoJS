@@ -64,9 +64,9 @@ const _BuilderTab = () => div({})([
     ]),
     _row('Explorer',       [
       'The 📊 ', _kbd('State'), ' button in the topbar opens a floating reference panel that lists every key on ',
-      _kbd('state'), ' your project will produce - grouped Stats / Flags / Inventory / Equipped / Skills / Engine internals, each with an example ',
+      _kbd('state'), ' your project will produce - grouped Stats / Flags / Inventory / Equipped / Skills / NPC vars / Engine internals, each with an example ',
       _kbd('${…}'), ' you can paste. Click ', _kbd('▸'),
-      ' on any property-path row to expand and see the INITIAL JSON value (computed from project.stats[].initial, project.startingInventory, etc.) so you know exactly what shape sits behind a path.',
+      ' on any property-path row to expand and see the INITIAL JSON value (computed from project.stats[].initial, project.startingInventory, each NPC\'s Vars card, etc.) so you know exactly what shape sits behind a path.',
     ]),
   ),
 
@@ -106,7 +106,7 @@ const _BuilderTab = () => div({})([
   _section('Rooms tab',
     _row('Room kinds',    ['Four templates: ', _kbd('scene'), ' (pages + choices), ', _kbd('wardrobe'), ' (paper-doll + equipment list), ', _kbd('inventory'), ' (all items with Use/Read/Equip buttons), ', _kbd('story'), ' (narrative-arc, lives in Story Points tab). Switch with the Room kind dropdown.']),
     _row('Page sequence', ['Each scene room is a sequence of pages. Page index lives at ', _kbd('state._pageIdx[roomId]'), '; a "More" choice advances. Real choices render on the final page.']),
-    _row('On enter',      ['Effect + ', span({ className: 'dv-mono' })(['Condition']), ' gate. The Condition decides whether the Effect fires when entering. Pattern: gate behind ', _kbd('flags.fought === false'), ' so a combat doesn\'t repeat.']),
+    _row('On enter',      ['Effect + ', span({ className: 'dv-mono' })(['Condition']), ' gate. Fires on EVERY way of entering the room - choice ', _kbd('to:'), ', ', _kbd('navigate'), ' / ', _kbd('randomLoot'), ' effects, ', _kbd('back()'), ', and the START room on game load. The Condition decides whether the Effect fires. Because re-entering re-fires it, gate one-shots behind a flag (e.g. ', _kbd('flags.fought === false'), ') so a combat doesn\'t repeat.']),
     _row('Choice',        ['{ label, to, condition, action }. ', _kbd('to: ""'), ' means "stay in place - action only".']),
     _row('Choice goto yields to action', [
       'If your choice\'s ', _kbd('action'),
@@ -189,6 +189,15 @@ const _BuilderTab = () => div({})([
       _kbd('price.stat'), '. Whitelist rows accept a per-item override multiplier - blank falls back to the shop default. The runtime renders a "Sell to shop" grid under the stock - same card layout (image, name, price, button) - so buy and sell look identical except for the action.',
     ]),
     _row('locations',      ['Array of room ids. ', _kbd('ctx.tickWorld()'), ' moves the NPC; ', _kbd('withTick(action)'), ' wraps an action to tick after it fires.']),
+    _row('Vars',           [
+      'Per-NPC state at ', _kbd('state.npcVars.<npcId>.<key>'), ' - one type richer than Stats: number / string / array / ',
+      _kbd('object'), ' (freeform, e.g. ', _kbd('{trust: 5, metCount: 2}'), ' for relationship tracking). Declare in the NPC\'s ',
+      _kbd('Vars'), ' card. Addressable from ANY Condition/Effect in the project as ',
+      _kbd('npcVars.<npcId>.<key>'), ' (pick "npc: <name> → key"), or from THIS NPC\'s own choices/topics/variant condition as the ',
+      _kbd('npcSelf.<key>'), ' shortcut ("npc (self): key") - stored npc-agnostic so copying a topic to another NPC still points at ITS OWN vars. ',
+      'Same ops as Stats for number/string/array; object gets ', _kbd('set (JSON)'), ' / ', _kbd('setField'), ' / ', _kbd('clear'),
+      ' in Effects and ', _kbd('has field'), ' / ', _kbd('is empty'), ' in Conditions. No clamp (min/max) support.',
+    ]),
     _row('Simple mode',    ['Default. ', _kbd('pages'), ' (advanced via "More") → ', _kbd('choices'), ' (flat). Choices use the ', _kbd('Goes to'), ' picker; empty = return to the calling room. A ', _kbd('Goodbye'), ' button is auto-added if you have no choices.']),
     _row('Advanced mode',  ['Conversation tree: greeting pages → entry topic → other topics via ', _kbd('change'), ' flow. Click a topic node in the tree to edit it. Topic data is preserved if you toggle Advanced off - never deleted, just bypassed.']),
     _row('Topic',          [_kbd('name'), ' + ', _kbd('onEnter'), ' Effect + ', _kbd('pages'), ' + ', _kbd('choices'), '. A topic is essentially a tiny scene scoped to the NPC.']),
@@ -597,6 +606,17 @@ const _BuilderTab = () => div({})([
   ),
 
   _section('Graph tab',
+    _row('Views',          [
+      _kbd('Overview'), ' is the classic map: rooms / NPCs / combats with deduped room edges. ',
+      _kbd('Choices'), ' draws EVERY player interaction: room choices (dashed = conditional), effect navigation (',
+      _kbd('navigate'), ' / ', _kbd('talkTo'), ' / ', _kbd('enterCombat'), ', recursing through ', _kbd('multi'), ' / ', _kbd('oneOf'), ' / ', _kbd('randomLoot'),
+      '), ', _kbd('onEnter'), ' / ', _kbd('onEnd'), ' auto-routing, talk access (room to NPC per location), full topic flow (enter / change / exits; topics render as small nodes beside their NPC), shop ',
+      _kbd('buy'), ' / ', _kbd('sell'), ', item nodes in a bottom band with gain edges (effect ops, loot tables, combat loot, rewards), ',
+      _kbd('use'), ' navigation, and ', _kbd('needs'), ' edges where a ', _kbd('hasItem'),
+      ' condition gates a choice, plus combat win / lose. Interactions with no destination (stay choices, local effects, use / read / equip, extra moves) show as ',
+      _kbd('@'), ' notes under their node. Unlike Overview, it INCLUDES story rooms (dashed border) and ',
+      _kbd('hideOnMap'), ' rooms - it is the author\'s full flow map, not the player\'s.',
+    ]),
     _row('Shapes',         ['Rooms ▭, NPCs ◯, combats ⬡. Click any shape to jump to its editor tab with that entity selected.']),
     _row('Edges',          [_kbd('grey curve'), ' room exits, ', _kbd('dashed orange'), ' combat triggers (enterCombat / exitCombat), ', _kbd('solid green'), ' combat → winRoom, ', _kbd('solid red'), ' combat → loseRoom, ', _kbd('dashed thin'), ' NPC roaming radius.']),
     _row('Media badges',   ['Bottom-right of every node: ', _kbd('I'), ' image (blue), ', _kbd('V'), ' video (purple), ', _kbd('A'), ' audio (green). All coloured via theme tokens - dark mode safe.']),
@@ -614,7 +634,11 @@ const _CtxTab = () => div({})([
   ]),
 
   _section('Data on ctx',
-    _row('ctx.state',      ['Current state snapshot (read-only - never mutate; use setState).']),
+    _row('ctx.state',      [
+      'LIVE view of the store: reads inside an effect chain (multi steps, js bodies) see earlier setState writes from the same action. Read-only - direct writes like ',
+      _kbd('c.state.flags.x = true'), ' bypass the store (no re-render, no persistence, and the object may already be replaced). Mutate via ',
+      _kbd('c.setState(s => ({ flags: { ...s.flags, x: true } }))'), '.',
+    ]),
     _row('ctx.scene',      ['Current scene id. Inside an NPC dialogue, patched to the return location so ', _kbd('back'), ' works.']),
     _row('ctx.history',    ['Array of prior scene ids (newest last). Empty → nowhere to go back to.']),
     _row('ctx.debug',      ['Boolean. Tells default top-bar whether to render the Debug button.']),
@@ -815,6 +839,7 @@ const _StateTab = () => div({})([
     'state.inventory      // { itemId: count }   (count 0 deleted)',
     'state.equipped       // { slot: itemId }    (paper-doll)',
     'state.skills         // [skillId]           (learned moves)',
+    'state.npcVars        // { npcId: { key: value } } - per-NPC declared state (number/string/array/object)',
     '',
     '// Engine bookkeeping',
     'state._scene         // current scene id  (ctx.goto / ctx.back)',
@@ -843,7 +868,9 @@ const _StateTab = () => div({})([
     'Effect-op targets: ',
     _kbd('flags.<key>'), ' → ', _kbd('state.flags[key]'), '; ',
     _kbd('inv.<id>'), ' → ', _kbd('state.inventory[id]'), '; ',
-    _kbd('skills.<id>'), ' → ', _kbd('state.skills'), '. Plain target writes top-level.',
+    _kbd('skills.<id>'), ' → ', _kbd('state.skills'), '; ',
+    _kbd('npcVars.<npcId>.<key>'), ' → ', _kbd('state.npcVars[npcId][key]'), ' (any NPC, from anywhere); ',
+    _kbd('npcSelf.<key>'), ' → same, resolved to THIS NPC only inside its own choices/topics/variant condition. Plain target writes top-level.',
   ]),
 ]);
 

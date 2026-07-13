@@ -65,16 +65,42 @@ const SKILL_OPS = [
   { value: 'learn',  label: 'learn'  },
   { value: 'forget', label: 'forget' },
 ];
+const OBJ_STAT_OPS = [
+  { value: 'set',      label: 'set = (JSON)' },
+  { value: 'setField', label: 'set field' },
+  { value: 'clear',    label: 'clear ({})' },
+];
 
-// Stat kind disambiguates number / string / array writes (engine handles
-// all three; statTypes is `{ key: 'number' | 'string' | 'array' }`).
-// Missing entry defaults to 'number' so legacy projects keep behaviour.
-const _kindOf = statTypes => target =>
+// Look up an npc var's declaration ({ key, type, initial }) from a
+// 'npcVars.<npcId>.<key>' or 'npcSelf.<key>' target string. Null when the
+// npc/var/self-scope no longer exists (stale reference after a delete).
+const _npcVarDecl = vars => target => {
+  if (target.startsWith('npcVars.')) {
+    const rest = target.slice(8);
+    const dot  = rest.indexOf('.');
+    if (dot < 0) return null;
+    const npc = (vars.npcs || []).find(n => n.id === rest.slice(0, dot));
+    return npc?.vars?.find(v => v.key === rest.slice(dot + 1)) || null;
+  }
+  if (target.startsWith('npcSelf.')) {
+    const npc = (vars.npcs || []).find(n => n.id === vars.selfNpcId);
+    return npc?.vars?.find(v => v.key === target.slice(8)) || null;
+  }
+  return null;
+};
+
+// Stat kind disambiguates number / string / array / object writes (engine
+// handles all four for npc vars; plain stats top out at number/string/array
+// via statTypes `{ key: 'number' | 'string' | 'array' }`). Missing entry
+// defaults to 'number' so legacy projects keep behaviour.
+const _kindOf = vars => target =>
   target.startsWith('flags.')  ? 'flag'
   : target.startsWith('inv.')    ? 'inv'
   : target.startsWith('skills.') ? 'skill'
-  : statTypes?.[target] === 'string' ? 'strStat'
-  : statTypes?.[target] === 'array'  ? 'arrStat'
+  : target.startsWith('npcVars.') || target.startsWith('npcSelf.')
+    ? (t => t === 'string' ? 'strStat' : t === 'array' ? 'arrStat' : t === 'object' ? 'objStat' : 'numStat')(_npcVarDecl(vars)(target)?.type || 'number')
+  : vars.statTypes?.[target] === 'string' ? 'strStat'
+  : vars.statTypes?.[target] === 'array'  ? 'arrStat'
   :                                    'numStat';
 
 const _opsForKind = kind =>
@@ -83,6 +109,7 @@ const _opsForKind = kind =>
   : kind === 'skill'   ? SKILL_OPS
   : kind === 'strStat' ? STR_STAT_OPS
   : kind === 'arrStat' ? ARR_STAT_OPS
+  : kind === 'objStat' ? OBJ_STAT_OPS
   :                      NUM_STAT_OPS;
 
 // True when an op carries non-default condition / min / max / etc.
@@ -149,8 +176,49 @@ const _LimitField = ({ label, vars, limit, onChange }) => {
   ]);
 };
 
+// Defaults committed when the TARGET changes. Critical: normalising only
+// in the render (display) leaves the stored op/value stale - the user sees
+// "set = true" while the model still holds { op: 'add', value: 0 }, and
+// the runner then writes flag=false. Selecting the already-displayed
+// option fires no change event, so the mismatch is unrecoverable in the
+// UI. Committing here keeps model and display identical.
+const _retargetOp = vars => o => target => {
+  const kind  = _kindOf(vars)(target);
+  const group = _opsForKind(kind);
+  const op    = group.find(x => x.value === o.op) ? o.op : group[0].value;
+  const value =
+      kind === 'flag'    ? (typeof o.value === 'boolean' ? o.value : true)
+    : kind === 'numStat' ? (Number.isFinite(Number(o.value)) ? Number(o.value) : 0)
+    : kind === 'inv'     ? (Math.max(1, Number(o.value) || 1))
+    : kind === 'skill'   ? ''
+    : kind === 'objStat' ? '{}'
+    : typeof o.value === 'string' ? o.value : '';
+  // `field` only means anything for objStat's setField op - drop it for
+  // every other kind so a leftover value can't silently resurface later.
+  const field = kind === 'objStat' ? (o.field || '') : '';
+  return { ...o, target, op, value, field };
+};
+
 const OpRow = ({ op: o, vars, rowKey, onChange, onRemove }) => {
-  const kind = _kindOf(vars.statTypes)(o.target);
+  const kind = _kindOf(vars)(o.target);
+  // "this NPC" shortcut - only offered when the caller (an NPC's own
+  // choice/topic editor) tells us which npc owns this Effect via
+  // vars.selfNpcId. Stored as the portable npcSelf.<key> so copying a topic
+  // to another NPC keeps pointing at ITS OWN vars, not the original NPC's.
+  const selfNpc = vars.selfNpcId ? (vars.npcs || []).find(n => n.id === vars.selfNpcId) : null;
+  const npcSelfOpts = selfNpc
+    ? (selfNpc.vars || []).map(v => ({
+        value: `npcSelf.${v.key}`,
+        label: `npc (self): ${v.key}${v.type !== 'number' ? ` (${v.type})` : ''}`,
+      }))
+    : [];
+  // Reach into ANY npc's vars from anywhere (rooms, items, combats, other NPCs).
+  const npcGlobalOpts = (vars.npcs || []).flatMap(n =>
+    (n.vars || []).map(v => ({
+      value: `npcVars.${n.id}.${v.key}`,
+      label: `npc: ${n.name || n.id} → ${v.key}${v.type !== 'number' ? ` (${v.type})` : ''}`,
+    }))
+  );
   const targetOpts = [
     { value: '', label: '- pick -' },
     ...vars.stats.map(k => {
@@ -161,10 +229,11 @@ const OpRow = ({ op: o, vars, rowKey, onChange, onRemove }) => {
     ...vars.flags.map(k => ({ value: `flags.${k}`, label: `flag: ${k}` })),
     ...groupedOptions(vars.items || [])(it => ({ value: `inv.${it.id}`, label: `item: ${it.name}` })),
     ...(vars.skills || []).map(sk => ({ value: `skills.${sk.id}`, label: `skill: ${sk.name}` })),
+    ...npcSelfOpts,
+    ...npcGlobalOpts,
   ];
   const opsForKind = _opsForKind(kind);
-  // Normalise op when switching kinds - keep the previous op if the new
-  // group has it (most groups share "set"), else fall back to first.
+  // Display-side safety net only; _retargetOp commits the real value.
   const safeOp = opsForKind.find(x => x.value === o.op) ? o.op : opsForKind[0].value;
   // Clamps only make sense on numeric writes (stat add/sub/set, inv give/take/set).
   const clampable = (kind === 'numStat' && (safeOp === 'add' || safeOp === 'sub' || safeOp === 'set'))
@@ -175,14 +244,16 @@ const OpRow = ({ op: o, vars, rowKey, onChange, onRemove }) => {
   const advFlagged = _isAdvanced(o);
   return div({ style: 'border:1px solid transparent; border-radius:var(--radius); margin-bottom:6px' + (open || advFlagged ? '; border-color:var(--border-2); padding:6px 8px; background:var(--surface-2, transparent)' : '') })([
     div({ style: 'display:grid; grid-template-columns: 1fr 110px 1fr 32px 32px; gap:8px; align-items:center' })([
-      Select({ options: targetOpts, value: o.target, onChange: onText(v => onChange({ ...o, target: v })) }),
+      Select({ options: targetOpts, value: o.target, onChange: onText(v => onChange(_retargetOp(vars)(o)(v))) }),
       Select({ options: opsForKind, value: safeOp, onChange: onText(v => onChange({ ...o, op: v })) }),
       noValueOp
         ? div({ style: 'display:flex; align-items:center; color:var(--text-muted); font-size:12px' })(['(no value)'])
         : kind === 'flag'
           ? Select({
+              // Honest display: anything non-boolean reads as false so what
+              // the author sees is exactly what the runner will write.
               options: [{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }],
-              value: String(o.value),
+              value: o.value === true ? 'true' : 'false',
               onChange: onText(v => onChange({ ...o, value: v === 'true' })),
             })
           : kind === 'strStat'
@@ -197,14 +268,37 @@ const OpRow = ({ op: o, vars, rowKey, onChange, onRemove }) => {
                   onChange:    onText(v => onChange({ ...o, value: v })),
                   placeholder: safeOp === 'set' ? 'a, b, c' : 'one value',
                 })
-              : TextInput({
-                  value: String(o.value ?? ''),
-                  onChange: onText(v => {
-                    const n = Number(v);
-                    onChange({ ...o, value: Number.isFinite(n) && v.trim() !== '' ? n : v });
-                  }),
-                  placeholder: 'number or string',
-                }),
+              : kind === 'objStat' && safeOp === 'setField'
+                ? div({ style: 'display:flex; gap:6px' })([
+                    TextInput({
+                      value:       o.field || '',
+                      onChange:    onText(v => onChange({ ...o, field: v })),
+                      placeholder: 'field',
+                    }),
+                    TextInput({
+                      value:       String(o.value ?? ''),
+                      onChange:    onText(v => {
+                        const n = Number(v);
+                        onChange({ ...o, value: Number.isFinite(n) && v.trim() !== '' ? n : v });
+                      }),
+                      placeholder: 'value',
+                    }),
+                  ])
+                : kind === 'objStat'
+                  ? TextInput({
+                      // 'set' - whole object as JSON; parsed at runtime, invalid JSON no-ops.
+                      value:       typeof o.value === 'string' ? o.value : '{}',
+                      onChange:    onText(v => onChange({ ...o, value: v })),
+                      placeholder: '{"trust": 5}',
+                    })
+                  : TextInput({
+                      value: String(o.value ?? ''),
+                      onChange: onText(v => {
+                        const n = Number(v);
+                        onChange({ ...o, value: Number.isFinite(n) && v.trim() !== '' ? n : v });
+                      }),
+                      placeholder: 'number or string',
+                    }),
       Button({
         variant: open ? 'primary' : 'ghost', size: 'sm',
         onClick: _toggleOpen(rowKey),
@@ -531,7 +625,7 @@ const EffectEditor = ({ effect, onChange, vars = { stats: [], flags: [], items: 
     // Inline preview of the exact JS the Export tab will write for this effect.
     // null means the effect compiles to no action (e.g. mode 'none' or all-empty ops).
     (() => {
-      const fn = effectToFn(e);
+      const fn = effectToFn(e, vars.selfNpcId || null);
       return div({ style: 'margin-top:8px; padding:6px 10px; background:var(--surface-2, rgba(0,0,0,.03)); border-left:3px solid var(--accent); border-radius:4px; font-size:11px; color:var(--text-muted)' })([
         span({ style: 'text-transform:uppercase; letter-spacing:.05em; margin-right:8px' })(['Generates']),
         span({ style: 'font-family:ui-monospace,monospace; color:var(--text); white-space:pre-wrap; word-break:break-word' })([

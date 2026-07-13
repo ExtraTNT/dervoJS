@@ -54,20 +54,90 @@ const ARR_OP_OPTS = [
   { value: 'lenAtLeast',label: 'length ≥ N' },
   { value: 'isEmpty',   label: 'is empty' },
 ];
+const OBJ_OP_OPTS = [
+  { value: 'hasField', label: 'has field' },
+  { value: 'isEmpty',  label: 'is empty' },
+];
 
-const _statKind = statTypes => key =>
-  !key || key.startsWith('flags.') ? 'flag'
-  : statTypes?.[key] === 'string' ? 'str'
-  : statTypes?.[key] === 'array'  ? 'arr'
-  :                                  'num';
+// Look up an npc var's declaration ({ key, type, initial }) from a
+// 'npcVars.<npcId>.<key>' or 'npcSelf.<key>' key string. Null when the
+// npc/var/self-scope no longer exists (stale reference after a delete).
+const _npcVarDecl = vars => key => {
+  if (key.startsWith('npcVars.')) {
+    const rest = key.slice(8);
+    const dot  = rest.indexOf('.');
+    if (dot < 0) return null;
+    const npc = (vars.npcs || []).find(n => n.id === rest.slice(0, dot));
+    return npc?.vars?.find(v => v.key === rest.slice(dot + 1)) || null;
+  }
+  if (key.startsWith('npcSelf.')) {
+    const npc = (vars.npcs || []).find(n => n.id === vars.selfNpcId);
+    return npc?.vars?.find(v => v.key === key.slice(8)) || null;
+  }
+  return null;
+};
+
+const _statKind = vars => key => {
+  if (!key || key.startsWith('flags.')) return 'flag';
+  if (key.startsWith('npcVars.') || key.startsWith('npcSelf.')) {
+    const t = _npcVarDecl(vars)(key)?.type || 'number';
+    return t === 'string' ? 'str' : t === 'array' ? 'arr' : t === 'object' ? 'obj' : 'num';
+  }
+  return vars.statTypes?.[key] === 'string' ? 'str'
+    : vars.statTypes?.[key] === 'array'      ? 'arr'
+    :                                          'num';
+};
 
 const _opsForStatKind = k =>
-  k === 'flag' ? NUM_OP_OPTS : k === 'str' ? STR_OP_OPTS : k === 'arr' ? ARR_OP_OPTS : NUM_OP_OPTS;
+  k === 'flag' ? NUM_OP_OPTS : k === 'str' ? STR_OP_OPTS : k === 'arr' ? ARR_OP_OPTS : k === 'obj' ? OBJ_OP_OPTS : NUM_OP_OPTS;
 
-const ConditionEditor = ({ condition, onChange, vars = { stats: [], flags: [], items: [], statTypes: {} } }) => {
+// Commit op + value defaults when the KEY changes. Display-only
+// normalisation leaves the stored condition stale (the dropdown shows an
+// op the model does not hold, and re-selecting it fires no change event),
+// so the runner evaluates something the author never saw.
+const _rekeyCond = vars => c => key => {
+  const kind  = _statKind(vars)(key);
+  const group = _opsForStatKind(kind);
+  const op    =
+      kind === 'flag' ? (c.op === '==' || c.op === '!=' ? c.op : '==')
+    : group.find(x => x.value === c.op) ? c.op : group[0].value;
+  const value =
+      kind === 'flag' ? (typeof c.value === 'boolean' ? c.value : true)
+    : kind === 'num'  ? (Number.isFinite(Number(c.value)) ? Number(c.value) : 0)
+    : typeof c.value === 'string' ? c.value : '';
+  return { ...c, key, op, value };
+};
+
+// Same commit rule for MODE switches: hasItem needs one of its own ops
+// (preview would evaluate '>=' as false while codegen emits true).
+const _remodeCond = vars => c => mode =>
+    mode === 'hasItem' ? { ...c, mode, op: ['has', 'lacks', 'atleast'].includes(c.op) ? c.op : 'has', count: Math.max(1, Number(c.count) || 1) }
+  : mode === 'simple'  ? _rekeyCond(vars)({ ...c, mode })(c.key)
+  : { ...c, mode };
+
+const ConditionEditor = ({ condition, onChange, vars = { stats: [], flags: [], items: [], statTypes: {}, npcs: [] } }) => {
   const c = condition || { mode: 'always', key: '', op: '>=', value: 0, itemId: '', count: 1, expr: '', p: 0.25 };
   const set = patch => onChange({ ...c, ...patch });
   const p   = _clampP(c.p ?? 0.25);
+
+  // "this NPC" shortcut - only offered when the caller (an NPC's own
+  // choice/topic/variant editor) tells us which npc owns this Condition via
+  // vars.selfNpcId. Stored as the portable npcSelf.<key> so copying a topic
+  // to another NPC keeps pointing at ITS OWN vars, not the original NPC's.
+  const selfNpc = vars.selfNpcId ? (vars.npcs || []).find(n => n.id === vars.selfNpcId) : null;
+  const npcSelfOpts = selfNpc
+    ? (selfNpc.vars || []).map(v => ({
+        value: `npcSelf.${v.key}`,
+        label: `npc (self): ${v.key}${v.type !== 'number' ? ` (${v.type})` : ''}`,
+      }))
+    : [];
+  // Reach into ANY npc's vars from anywhere (rooms, items, combats, other NPCs).
+  const npcGlobalOpts = (vars.npcs || []).flatMap(n =>
+    (n.vars || []).map(v => ({
+      value: `npcVars.${n.id}.${v.key}`,
+      label: `npc: ${n.name || n.id} → ${v.key}${v.type !== 'number' ? ` (${v.type})` : ''}`,
+    }))
+  );
 
   const keyOpts = [
     { value: '', label: '- pick -' },
@@ -77,10 +147,12 @@ const ConditionEditor = ({ condition, onChange, vars = { stats: [], flags: [], i
       return { value: k, label: `stat: ${k}${suffix}` };
     }),
     ...vars.flags.map(k => ({ value: `flags.${k}`, label: `flag: ${k}` })),
+    ...npcSelfOpts,
+    ...npcGlobalOpts,
   ];
 
   const isFlag    = c.key.startsWith('flags.');
-  const statKind  = _statKind(vars.statTypes)(c.key);
+  const statKind  = _statKind(vars)(c.key);
   const opOpts    = isFlag ? NUM_OP_OPTS : _opsForStatKind(statKind);
   // Switching stat (and therefore op group) can leave an op that doesn't
   // exist in the new group - normalise to the first available so the UI
@@ -89,18 +161,19 @@ const ConditionEditor = ({ condition, onChange, vars = { stats: [], flags: [], i
   const noValueOp = safeOp === 'isEmpty';
 
   return div({})([
-    Select({ label: 'Condition', options: MODE_OPTS, value: c.mode, onChange: onText(v => set({ mode: v })) }),
+    Select({ label: 'Condition', options: MODE_OPTS, value: c.mode, onChange: onText(v => onChange(_remodeCond(vars)(c)(v))) }),
 
     ...(c.mode === 'simple'
       ? [div({ style: 'display:grid; grid-template-columns: 1fr 130px 1fr; gap:8px; margin-top:8px' })([
-          Select({ options: keyOpts, value: c.key, onChange: onText(v => set({ key: v })) }),
+          Select({ options: keyOpts, value: c.key, onChange: onText(v => onChange(_rekeyCond(vars)(c)(v))) }),
           Select({ options: opOpts, value: safeOp, onChange: onText(v => set({ op: v })) }),
           noValueOp
             ? div({ style: 'display:flex; align-items:center; color:var(--text-muted); font-size:12px' })(['(no value)'])
             : isFlag
               ? Select({
+                  // Honest display: non-boolean stored values read as false.
                   options: [{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }],
-                  value: String(c.value),
+                  value: c.value === true ? 'true' : 'false',
                   onChange: onText(v => set({ value: v === 'true' })),
                 })
               : statKind === 'str'
@@ -122,14 +195,21 @@ const ConditionEditor = ({ condition, onChange, vars = { stats: [], flags: [], i
                       }),
                       placeholder: safeOp === 'lenAtLeast' ? '1' : 'one value',
                     })
-                  : TextInput({
-                      value: String(c.value ?? ''),
-                      onChange: onText(v => {
-                        const n = Number(v);
-                        set({ value: Number.isFinite(n) && v.trim() !== '' ? n : v });
+                  : statKind === 'obj'
+                    ? TextInput({
+                        // 'hasField' is the only op with a value; isEmpty is noValueOp.
+                        value:       typeof c.value === 'string' ? c.value : '',
+                        onChange:    onText(v => set({ value: v })),
+                        placeholder: 'field name',
+                      })
+                    : TextInput({
+                        value: String(c.value ?? ''),
+                        onChange: onText(v => {
+                          const n = Number(v);
+                          set({ value: Number.isFinite(n) && v.trim() !== '' ? n : v });
+                        }),
+                        placeholder: 'number or string',
                       }),
-                      placeholder: 'number or string',
-                    }),
         ])]
       : []),
 
@@ -194,7 +274,7 @@ const ConditionEditor = ({ condition, onChange, vars = { stats: [], flags: [], i
     div({ style: 'margin-top:8px; padding:6px 10px; background:var(--surface-2, rgba(0,0,0,.03)); border-left:3px solid var(--accent); border-radius:4px; font-size:11px; color:var(--text-muted)' })([
       span({ style: 'text-transform:uppercase; letter-spacing:.05em; margin-right:8px' })(['Generates']),
       span({ style: 'font-family:ui-monospace,monospace; color:var(--text)' })([
-        c.mode === 'always' ? '(no if - always enabled)' : `if: c => ${condToExpr(c)}`,
+        c.mode === 'always' ? '(no if - always enabled)' : `if: c => ${condToExpr(c, 'c.state', vars.selfNpcId || null)}`,
       ]),
     ]),
   ]);

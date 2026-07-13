@@ -17,6 +17,23 @@ import { Just, Nothing, bind, fromMaybe, orElse } from '../lib/odocosjs/src/core
 
 const _q = s => JSON.stringify(s ?? '');
 
+// Split 'npcVars.<npcId>.<key>' into its two parts. npcId comes from slug()
+// (alnum/underscore only) so splitting on the FIRST dot is always correct,
+// even when the var key itself contains one.
+const _splitNpcVarPath = rest => {
+  const dot = rest.indexOf('.');
+  return dot < 0 ? null : { npcId: rest.slice(0, dot), key: rest.slice(dot + 1) };
+};
+
+// Resolve the portable `npcSelf.<key>` shorthand (stored npc-agnostic so a
+// duplicated/copied topic keeps working) into a concrete `npcVars.<id>.<key>`
+// path, using the NPC that owns the Condition/Effect being emitted. Any other
+// path passes through unchanged.
+const _resolveSelfTarget = selfNpcId => path =>
+  path && path.startsWith('npcSelf.') && selfNpcId
+    ? `npcVars.${selfNpcId}.${path.slice(8)}`
+    : path;
+
 // Pure helpers used by the layout fold - both placed here so the IIFE
 // below stays focused on the BFS shape. `tryListM(list)` searches `list`
 // for the first item matching `pred`; returns `Maybe<item>` so the caller
@@ -141,7 +158,7 @@ const _t = (state, text) => {
 // reading `c.state.*`. Per-op condition gates pass `stateExpr: 's'` so the
 // gate sees the in-progress reducer state and earlier ops can flip flags a
 // later op gates on.
-const _condExpr = (cond, stateExpr = 'c.state') => {
+const _condExpr = (cond, stateExpr = 'c.state', selfNpcId = null) => {
   if (!cond || cond.mode === 'always') return 'true';
   if (cond.mode === 'js') {
     // Default state source - emit the user's expression verbatim so the
@@ -153,17 +170,22 @@ const _condExpr = (cond, stateExpr = 'c.state') => {
     return `((c => (${cond.expr || 'true'}))({ ...c, state: ${stateExpr} }))`;
   }
   if (cond.mode === 'simple') {
+    const key = _resolveSelfTarget(selfNpcId)(cond.key);
+    const npcParts = key?.startsWith('npcVars.') ? _splitNpcVarPath(key.slice(8)) : null;
     const left =
-      cond.key?.startsWith('flags.') ? `${stateExpr}.flags?.[${_q(cond.key.slice(6))}]`
-      : cond.key?.startsWith('inv.')  ? `(${stateExpr}.inventory?.[${_q(cond.key.slice(4))}] ?? 0)`
-      : `${stateExpr}[${_q(cond.key)}]`;
+      key?.startsWith('flags.') ? `${stateExpr}.flags?.[${_q(key.slice(6))}]`
+      : key?.startsWith('inv.')  ? `(${stateExpr}.inventory?.[${_q(key.slice(4))}] ?? 0)`
+      : npcParts ? `${stateExpr}.npcVars?.[${_q(npcParts.npcId)}]?.[${_q(npcParts.key)}]`
+      : `${stateExpr}[${_q(key)}]`;
     // String / array ops aren't standard JS operators - emit a small expr.
     if (cond.op === 'contains')   return `(String(${left} ?? '').includes(${_q(String(cond.value ?? ''))}))`;
     if (cond.op === 'startsWith') return `(String(${left} ?? '').startsWith(${_q(String(cond.value ?? ''))}))`;
     if (cond.op === 'includes')   return `(Array.isArray(${left}) && ${left}.includes(${_q(String(cond.value))}))`;
     if (cond.op === 'excludes')   return `(!Array.isArray(${left}) || !${left}.includes(${_q(String(cond.value))}))`;
     if (cond.op === 'lenAtLeast') return `((Array.isArray(${left}) ? ${left}.length : 0) >= ${Number(cond.value) || 0})`;
-    if (cond.op === 'isEmpty')    return `(${left} == null || ${left} === '' || (Array.isArray(${left}) && ${left}.length === 0))`;
+    // hasField/isEmpty use __isObj (baked into scenes.js via _MESSAGE_HELPERS).
+    if (cond.op === 'hasField')   return `(__isObj(${left}) && Object.prototype.hasOwnProperty.call(${left}, ${_q(String(cond.value ?? ''))}))`;
+    if (cond.op === 'isEmpty')    return `(${left} == null || ${left} === '' || (Array.isArray(${left}) && ${left}.length === 0) || (__isObj(${left}) && Object.keys(${left}).length === 0))`;
     const right = typeof cond.value === 'string' ? _q(cond.value) : (cond.value ?? 0);
     return `(${left} ${cond.op} ${right})`;
   }
@@ -207,9 +229,55 @@ const _wrapClamp = (nextExpr, op, { invFloor = false } = {}) => {
 // Compile a single Op (simple-mode) to a sequence of patch keys. Returns
 // `{ key, value }` strings - caller wraps in `next = { ...next, [key]: value }`.
 // Returns null for ops that don't write (no target, toggle on missing kind, …).
-const _opPatchPair = op => {
-  const { target, op: kind, value } = op || {};
+const _opPatchPair = (op, selfNpcId = null) => {
+  const rawTarget = op?.target;
+  const target = _resolveSelfTarget(selfNpcId)(rawTarget);
+  const { op: kind, value } = op || {};
   if (!target) return null;
+  if (target.startsWith('npcVars.')) {
+    // NPC-scoped state. Branches on the CURRENT value's shape at RUNTIME
+    // (mirrors the plain-stat branches below and preview.js's
+    // _writeOpToPatch) so semantics stay identical between preview and
+    // export. Object support (set whole/JSON, setField, clear) has no
+    // equivalent among plain stats. No clamp support (min/max pickers only
+    // reach global numeric stats).
+    const parts = _splitNpcVarPath(target.slice(8));
+    if (!parts) return null;
+    const { npcId, key } = parts;
+    const npcIdLit = _q(npcId), keyLit = _q(key), kindLit = _q(kind), fieldLit = _q(op.field || '');
+    const valueLit = typeof value === 'string' ? _q(value) : (value ?? 0);
+    const nextExpr = `(() => {
+      const bucket = s.npcVars?.[${npcIdLit}] || {};
+      const cur = bucket[${keyLit}];
+      if (Array.isArray(cur)) {
+        if (${kindLit} === 'push') return [...cur, ${_q(String(value))}];
+        if (${kindLit} === 'removeValue') return cur.filter(x => x !== ${_q(String(value))});
+        if (${kindLit} === 'clear') return [];
+        if (${kindLit} === 'set') return String(${valueLit} || '').split(',').map(x => x.trim()).filter(Boolean);
+        return cur;
+      }
+      if (__isObj(cur)) {
+        if (${kindLit} === 'set') { try { const p = JSON.parse(${valueLit}); return __isObj(p) ? p : cur; } catch (_) { return cur; } }
+        if (${kindLit} === 'setField') { const n = Number(${valueLit}); return { ...cur, [${fieldLit}]: (Number.isFinite(n) && String(${valueLit} ?? '').trim() !== '') ? n : ${valueLit} }; }
+        if (${kindLit} === 'clear') return {};
+        return cur;
+      }
+      if (typeof cur === 'string' || (cur === undefined && typeof ${valueLit} === 'string' && ${kindLit} !== 'add' && ${kindLit} !== 'sub')) {
+        if (${kindLit} === 'set') return String(${valueLit} ?? '');
+        if (${kindLit} === 'append') return (cur ?? '') + String(${valueLit} ?? '');
+        if (${kindLit} === 'clear') return '';
+        return cur;
+      }
+      const curN = Number(cur || 0);
+      const n = Number(${valueLit});
+      const isNumeric = Number.isFinite(n);
+      if (${kindLit} === 'set') return isNumeric ? n : ${valueLit};
+      if (${kindLit} === 'add') return curN + (isNumeric ? n : 0);
+      if (${kindLit} === 'sub') return curN - (isNumeric ? n : 0);
+      return curN;
+    })()`;
+    return { key: 'npcVars', value: `{ ...(s.npcVars || {}), ${npcIdLit}: { ...(s.npcVars?.[${npcIdLit}] || {}), [${keyLit}]: ${nextExpr} } }` };
+  }
   if (target.startsWith('flags.')) {
     const k = target.slice(6);
     const next = kind === 'toggle' ? `!(s.flags || {})[${_q(k)}]` : Boolean(value);
@@ -268,25 +336,25 @@ const _opPatchPair = op => {
 // `condition` (gated on the IN-PROGRESS state) and the clamp expressions
 // (also read `s[...]`) can see each other. Later ops in the same effect see
 // earlier ops' writes via `s = next` at the next block's top.
-const _opStmt = op => {
-  const pair = _opPatchPair(op);
+const _opStmt = (op, selfNpcId = null) => {
+  const pair = _opPatchPair(op, selfNpcId);
   if (!pair) return null;
-  const patchKv = (pair.key === 'flags' || pair.key === 'inventory' || pair.key === 'skills')
+  const patchKv = (pair.key === 'flags' || pair.key === 'inventory' || pair.key === 'skills' || pair.key === 'npcVars')
     ? `${pair.key}: ${pair.value}`
     : `[${_q(pair.key)}]: ${pair.value}`;
   const write = `next = { ...next, ${patchKv} };`;
   const cond  = op && op.condition && op.condition.mode && op.condition.mode !== 'always';
   // Per-op condition reads the IN-PROGRESS reducer state (`s`) so earlier
   // ops can flip a flag a later op gates on.
-  const guarded = cond ? `if (${_condExpr(op.condition, 's')}) { ${write} }` : write;
+  const guarded = cond ? `if (${_condExpr(op.condition, 's', selfNpcId)}) { ${write} }` : write;
   return `{ const s = next; ${guarded} }`;
 };
 
 // One weight bonus: `{ guard: c=>bool, amountMode, amountFixed, amountStat }`.
 // The guard is a compiled Condition expression - we wrap it inline so the
 // emitted entry stays self-contained.
-const _emitWeightBonus = bonus => `{ ` +
-  `guard: c => ${_condExpr(bonus.condition)}, ` +
+const _emitWeightBonus = (bonus, selfNpcId = null) => `{ ` +
+  `guard: c => ${_condExpr(bonus.condition, 'c.state', selfNpcId)}, ` +
   `amountMode: ${_q(bonus.amountMode || 'fixed')}, ` +
   `amountFixed: ${Number(bonus.amountFixed) || 0}, ` +
   `amountStat: ${_q(bonus.amountStat || '')} ` +
@@ -296,7 +364,7 @@ const _emitWeightBonus = bonus => `{ ` +
 // weighted-pick / unique / picks dance the preview interpreter does. The
 // runner is a pure function literal, so this composes inside choice actions
 // and combat onWin/onLose like any other Effect.
-const _emitLootEntry = entry => `{ ` +
+const _emitLootEntry = selfNpcId => entry => `{ ` +
   `weight: ${Math.max(0, Number(entry.weight) || 0)}, ` +
   `kind: ${_q(entry.kind || 'item')}, ` +
   `itemId: ${_q(entry.itemId || '')}, ` +
@@ -311,13 +379,13 @@ const _emitLootEntry = entry => `{ ` +
   `skillId: ${_q(entry.skillId || '')}, ` +
   `npcId: ${_q(entry.npcId || '')}, ` +
   `jsBody: ${_q(entry.jsBody || '')}, ` +
-  `bonuses: [${(entry.bonuses || []).map(_emitWeightBonus).join(', ')}], ` +
+  `bonuses: [${(entry.bonuses || []).map(b => _emitWeightBonus(b, selfNpcId)).join(', ')}], ` +
   `message: ${_q(entry.message || '')} ` +
 `}`;
 
-const _emitRandomLoot = rawTable => {
+const _emitRandomLoot = (rawTable, selfNpcId = null) => {
   const table = rawTable || { picks: 1, unique: false, showFlavour: true, entries: [] };
-  const entriesLit = (table.entries || []).map(_emitLootEntry).join(', ');
+  const entriesLit = (table.entries || []).map(_emitLootEntry(selfNpcId)).join(', ');
   const picks = Math.max(1, Number(table.picks) || 1);
   return `c => {
       const _rand = (lo, hi) => { const a = Math.min(lo|0, hi|0), b = Math.max(lo|0, hi|0); return a + Math.floor(Math.random() * (b - a + 1)); };
@@ -349,8 +417,7 @@ const _emitRandomLoot = rawTable => {
           return 'flag ' + e.flagKey + ' = ' + (e.flagValue ? 'true' : 'false');
         }
         if (e.kind === 'navigate' && e.roomId) {
-          c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [e.roomId]: 0 } }));
-          c.goto(e.roomId);
+          c.goto(e.roomId);   // page-idx reset + onEnter fire via onSceneEnter
           return '→ ' + e.roomId;
         }
         if (e.kind === 'learnSkill' && e.skillId) {
@@ -394,25 +461,25 @@ const _emitRandomLoot = rawTable => {
 };
 
 // Compile an Effect into a (c) => void body. Always returns a function literal string.
-const _effectFnCore = effect => {
+const _effectFnCore = (effect, selfNpcId = null) => {
   if (!effect || effect.mode === 'none') return null;
   if (effect.mode === 'js') return `c => { ${effect.body || ''} }`;
   if (effect.mode === 'simple') {
-    const stmts = (effect.ops || []).map(_opStmt).filter(Boolean);
+    const stmts = (effect.ops || []).map(op => _opStmt(op, selfNpcId)).filter(Boolean);
     if (stmts.length === 0) return null;
     return `c => c.setState(start => { let next = start; ${stmts.join(' ')} return next; })`;
   }
   if (effect.mode === 'randomLoot') {
-    return _emitRandomLoot(effect.table);
+    return _emitRandomLoot(effect.table, selfNpcId);
   }
   if (effect.mode === 'navigate' && effect.toRoom) {
-    return `c => { c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [${_q(effect.toRoom)}]: 0 } })); c.goto(${_q(effect.toRoom)}); }`;
+    return `c => { c.goto(${_q(effect.toRoom)}); }`;   // page-idx reset + onEnter via onSceneEnter
   }
   if (effect.mode === 'multi') {
     // Emit each step independently and chain the function literals. Filter
     // out null sub-effects so an empty-simple or none-mode step doesn't break
     // the chain.
-    const stepFns = (effect.steps || []).map(_effectFn).filter(Boolean);
+    const stepFns = (effect.steps || []).map(s => _effectFn(s, selfNpcId)).filter(Boolean);
     if (stepFns.length === 0) return null;
     return `c => { ${stepFns.map(fn => `(${fn})(c);`).join(' ')} }`;
   }
@@ -421,10 +488,10 @@ const _effectFnCore = effect => {
     // nested Effect - recursion handles the nesting. Inline _wt mirrors the
     // randomLoot version so bonus semantics stay identical.
     const opts = (effect.options || []).map(o => {
-      const subFn = _effectFn(o.effect) || '() => {}';
+      const subFn = _effectFn(o.effect, selfNpcId) || '() => {}';
       return `{ ` +
         `weight: ${Math.max(0, Number(o.weight) || 0)}, ` +
-        `bonuses: [${(o.bonuses || []).map(_emitWeightBonus).join(', ')}], ` +
+        `bonuses: [${(o.bonuses || []).map(b => _emitWeightBonus(b, selfNpcId)).join(', ')}], ` +
         `effect: ${subFn} ` +
       `}`;
     }).join(', ');
@@ -456,8 +523,8 @@ const _effectFnCore = effect => {
 // Wrap the core emit to push an Effect.message after the core runs. Returns
 // null if the effect is a no-op AND has no message; otherwise returns the
 // wrapped function literal as a string.
-const _effectFn = effect => {
-  const core = _effectFnCore(effect);
+const _effectFn = (effect, selfNpcId = null) => {
+  const core = _effectFnCore(effect, selfNpcId);
   if (!effect || !effect.message) return core;
   if (!core) return `c => { _pushMsg(c, ${_q(effect.message)}) }`;
   return `c => { (${core})(c); _pushMsg(c, ${_q(effect.message)}); }`;
@@ -470,30 +537,12 @@ const _emitPageLit = pg =>
   `{ text: ${_q(pg.text)}, image: ${_q(pg.image)}, video: ${_q(pg.video)}, advanceLabel: ${_q(pg.advanceLabel || 'More')} }`;
 
 /**
- * Emit the room's onEnter Effect gated by its onEnterCondition. The
- * fragment snapshots `_scene` around the effect and returns from the
- * action if onEnter navigated (enterCombat / talkTo / js goto); without
- * this the trailing c.goto(roomId) would silently override.
- * Inlined inside `action: c => { ... }`; assumes `c` is in scope.
+ * Navigate to a room. The page-idx reset + onEnter gate fire centrally via
+ * the emitted onSceneEnter hook, so this is just a goto. Empty roomId returns
+ * to `back`.
  */
-const _emitRoomEnter = project => roomId => {
-  const target  = (project?.rooms || []).find(r => r.id === roomId);
-  if (!target) return '';
-  const enterFn = _effectFn(target.onEnter);
-  if (!enterFn) return '';
-  const condExpr = _condExpr(target.onEnterCondition || { mode: 'always' });
-  return `{ const live = { ...c, state: c.getState() }; if (${condExpr.replace(/c\.state/g, 'live.state')}) { const _beforeEnter = c.getState()._scene; (${enterFn})(c); if (c.getState()._scene !== _beforeEnter) return; } }`;
-};
-
-/** _pageIdx reset + onEnter gate + goto. Empty roomId returns to `back`. */
-const _emitGotoRoom = project => roomId => {
-  if (!roomId) return `c.setState({ _scene: back });`;
-  return [
-    `c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [${_q(roomId)}]: 0 } }));`,
-    _emitRoomEnter(project)(roomId),
-    `c.goto(${_q(roomId)});`,
-  ].filter(Boolean).join(' ');
-};
+const _emitGotoRoom = roomId =>
+  roomId ? `c.goto(${_q(roomId)});` : `c.setState({ _scene: back });`;
 
 /**
  * Compose `action: c => { ... }` body. With both an effect and a nav
@@ -527,19 +576,20 @@ const _emitExitBack = npcId => {
 // Emit a Choice descriptor literal: { label, if?, action? }. Navigation is
 // handled inside the action (not via `to:`) so we can fire the target room's
 // onEnter Effect through its onEnterCondition gate between action and goto.
-// Curried `ch => project`.
-const _emitChoice = ch => project => {
+// Curried `ch => project`. `selfNpcId` (default null) resolves this choice's
+// `npcSelf.<key>` targets - only non-null for a shop NPC's trailing choices.
+const _emitChoice = (ch, selfNpcId = null) => project => {
   const parts    = [`label: ${_q(ch.label)}`];
   const hasCond  = ch.condition && ch.condition.mode !== 'always';
-  const effectFn = _effectFn(ch.action);
+  const effectFn = _effectFn(ch.action, selfNpcId);
 
-  if (hasCond) parts.push(`if: c => ${_condExpr(ch.condition)}`);
+  if (hasCond) parts.push(`if: c => ${_condExpr(ch.condition, 'c.state', selfNpcId)}`);
 
-  // The action body is (effect) + (page-idx reset + onEnter gate + goto). When
-  // ch.to is empty there's no navigation slice. _emitActionBody handles the
-  // snapshot-and-yield logic so an enterCombat action doesn't get clobbered by
-  // the trailing goto.
-  const navLine = ch.to ? _emitGotoRoom(project)(ch.to) : '';
+  // The action body is (effect) + (goto). When ch.to is empty there's no
+  // navigation slice. _emitActionBody handles the snapshot-and-yield logic so
+  // an enterCombat action doesn't get clobbered by the trailing goto. The
+  // target room's page-idx reset + onEnter fire centrally via onSceneEnter.
+  const navLine = ch.to ? _emitGotoRoom(ch.to) : '';
   if (effectFn || navLine) parts.push(`action: c => { ${_emitActionBody(effectFn)(navLine)} }`);
   return `{ ${parts.join(', ')} }`;
 };
@@ -999,10 +1049,7 @@ const _ccAdvance = (idx, maybeStart) => c => {
   c.setState({ _cc: Object.assign({}, cc, { step: idx + 1, startRoom, done: !next }) });
   if (next) { c.goto('_cc:' + next.id); return; }
   const dest = startRoom || __CC_META_START;
-  if (dest) {
-    c.setState(s => ({ _pageIdx: Object.assign({}, s._pageIdx || {}, { [dest]: 0 }) }));
-    c.goto(dest);
-  }
+  if (dest) c.goto(dest);   // page-idx reset + onEnter via onSceneEnter
 };`;
   const sceneEntries = cc.steps.map((step, idx) =>
     step.type === 'pointBuy'
@@ -1145,7 +1192,22 @@ const scenes = {
   }${ccScenes},
 };
 
-export { scenes };
+// Room entry is centralised through createGame's onSceneEnter hook: it fires
+// once whenever _scene becomes a new value (choice \`to:\`, navigate / loot
+// effects, back(), AND the start room). We reset that room's page index and
+// run its onEnter Effect behind its onEnterCondition gate. Non-room scenes
+// (combat / dialogue / char-creation) aren't in the map, so they no-op.
+const __ROOM_ENTER = {
+  ${project.rooms.map(r => `${_q(r.id)}: { guard: c => ${_condExpr(r.onEnterCondition || { mode: 'always' })}, enter: ${_effectFn(r.onEnter) || '() => {}'} }`).join(',\n  ')}
+};
+const onSceneEnter = (c, id) => {
+  const re = __ROOM_ENTER[id];
+  if (!re) return;
+  c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [id]: 0 } }));
+  if (re.guard(c)) re.enter(c);
+};
+
+export { scenes, onSceneEnter };
 `;
 };
 
@@ -1156,16 +1218,16 @@ export { scenes };
 //   exitRoom    → goto ch.to with onEnter gate (empty = return to caller)
 //   exitCombat  → setup _combat + goto _combat:<id>
 //
-// Curried `ch => npc => project` so call sites read top-to-bottom.
-const _emitTopicChoice = ch => npc => project => {
+// Curried `ch => npc` so call sites read top-to-bottom.
+const _emitTopicChoice = ch => npc => {
   const npcIdLit   = _q(npc.id);
   const topicIdLit = _q(ch.topicId || '');
   const flow       = ch.flow || 'exitBack';
   const hasCond    = ch.condition && ch.condition.mode !== 'always';
-  const effectFn   = _effectFn(ch.action);
+  const effectFn   = _effectFn(ch.action, npc.id);
 
   const parts = [`label: ${_q(ch.label)}`];
-  if (hasCond) parts.push(`if: c => ${_condExpr(ch.condition)}`);
+  if (hasCond) parts.push(`if: c => ${_condExpr(ch.condition, 'c.state', npc.id)}`);
 
   const navLine =
     flow === 'stay'       ? '' :
@@ -1179,10 +1241,10 @@ const _emitTopicChoice = ch => npc => project => {
             `_npcTopicPageIdx: { ...(s._npcTopicPageIdx || {}), [${npcIdLit}]: { ...(s._npcTopicPageIdx?.[${npcIdLit}] || {}), [${topicIdLit}]: 0 } } ` +
           `}));`;
           const target  = (npc.topics || []).find(t => t.id === ch.topicId);
-          const onEnter = target ? _effectFn(target.onEnter) : null;
+          const onEnter = target ? _effectFn(target.onEnter, npc.id) : null;
           return onEnter ? `${push} (${onEnter})(c);` : push;
         })() :
-    flow === 'exitRoom'   ? _emitGotoRoom(project)(ch.to) :
+    flow === 'exitRoom'   ? _emitGotoRoom(ch.to) :
     flow === 'exitCombat' ? _emitGotoCombat(ch.combatId) :
     '';
 
@@ -1191,12 +1253,12 @@ const _emitTopicChoice = ch => npc => project => {
 };
 
 // SIMPLE-mode (non-topic) NPC choice. Same shape as room navigation.
-const _emitSimpleNpcChoice = ch => project => {
+const _emitSimpleNpcChoice = (ch, npcId) => {
   const hasCond  = ch.condition && ch.condition.mode !== 'always';
-  const effectFn = _effectFn(ch.action);
+  const effectFn = _effectFn(ch.action, npcId);
   const parts = [`label: ${_q(ch.label)}`];
-  if (hasCond) parts.push(`if: c => ${_condExpr(ch.condition)}`);
-  parts.push(`action: c => { ${_emitActionBody(effectFn)(_emitGotoRoom(project)(ch.to))} }`);
+  if (hasCond) parts.push(`if: c => ${_condExpr(ch.condition, 'c.state', npcId)}`);
+  parts.push(`action: c => { ${_emitActionBody(effectFn)(_emitGotoRoom(ch.to))} }`);
   return `{ ${parts.join(', ')} }`;
 };
 
@@ -1228,7 +1290,7 @@ const _emitNpcWithVariants = npc => project => {
   const baseFn = _emitNpcDialogue(npc)(project);
   const variantFns = variants.map(v => {
     const eff = _mergeVariant(npc)(v);
-    const condExpr = _condExpr(v.condition);
+    const condExpr = _condExpr(v.condition, 'c.state', npc.id);
     return `{ guard: c => (${condExpr}), dlg: ${_emitNpcDialogue(eff)(project)} }`;
   }).join(',\n      ');
   return `(() => {
@@ -1252,7 +1314,7 @@ const _emitNpcDialogue = npc => project => {
 
   // --- Simple flat dialogue path ---
   if (!npc.advanced) {
-    const choicesLit = npc.choices.map(c => _emitSimpleNpcChoice(c)(project)).join(', ');
+    const choicesLit = npc.choices.map(c => _emitSimpleNpcChoice(c, npc.id)).join(', ');
     const hasChoices = npc.choices.length > 0;
     return `ctx => {
       const back = ctx.scene;
@@ -1281,7 +1343,7 @@ const _emitNpcDialogue = npc => project => {
   const _autoBack = `{ label: 'Back', action: c => ${_emitExitBack(npc.id)} }`;
   const topicRenderLit = topics.map(t => {
     const tPagesLit   = (t.pages || []).map(_emitPageLit).join(', ');
-    const tChoicesLit = (t.choices || []).map(c => _emitTopicChoice(c)(npc)(project)).join(', ');
+    const tChoicesLit = (t.choices || []).map(c => _emitTopicChoice(c)(npc)).join(', ');
     const hasChoices  = (t.choices || []).length > 0;
     return `${_q(t.id)}: { ` +
       `pages: [${tPagesLit}], ` +
@@ -1377,7 +1439,7 @@ const _emitNpcShop = npc => project => {
     const qty     = entry.quantity == null ? 'null' : entry.quantity;
     return `{ itemId: ${_q(entry.itemId)}, name: ${_q(item?.name || entry.itemId)}, image: ${_q(item?.image || '')}, description: ${_q(item?.description || '')}, priceStat: ${_q(stat)}, priceAmount: ${amount}, quantity: ${qty} }`;
   }).join(', ');
-  const tailChoicesLit = npc.choices.map(c => _emitChoice(c)(project)).join(', ');
+  const tailChoicesLit = npc.choices.map(c => _emitChoice(c, npc.id)(project)).join(', ');
   const buy = _emitBuybackCatalogue(npc)(project);
   return `ctx => {
       const back = ctx.scene;
@@ -1542,6 +1604,13 @@ const initialState = ${JSON.stringify({
   inventory:  startingInv,
   equipped:   startingEquipped,
   skills:     startingSkills,
+  // Per-NPC declared state: state.npcVars[npcId][key]. Addressable from
+  // anywhere as `npcVars.<npcId>.<key>`, or from that NPC's own
+  // choices/topics as the `npcSelf.<key>` shorthand.
+  npcVars: Object.fromEntries((project.npcs || []).map(n => [
+    n.id,
+    Object.fromEntries((n.vars || []).map(v => [v.key, v.initial])),
+  ])),
   _pageIdx:    {},
   _npcPageIdx: {},
   _npcGreetingDone: {},
@@ -1784,7 +1853,7 @@ const _renderRoomLink = (w, ctx) => {
   if (!w.roomId) return null;
   return button({
     type: 'button',
-    onclick: () => { ctx.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [w.roomId]: 0 } })); ctx.goto(w.roomId); },
+    onclick: () => ctx.goto(w.roomId),   // page-idx reset + onEnter via onSceneEnter
     style: 'display:flex; align-items:center; gap:8px; width:100%; margin-bottom:8px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; text-align:left; cursor:pointer',
   })([
     ...(w.icon ? [span({ style: 'font-size:16px' })([w.icon])] : []),
@@ -1961,10 +2030,7 @@ const _renderMinimap = (w, ctx) => {
       ? {
           key: n.id,
           style: 'cursor:pointer',
-          onclick: () => {
-            ctx.setState(s => ({ _pageIdx: Object.assign({}, s._pageIdx || {}, { [n.id]: 0 }) }));
-            ctx.goto(n.id);
-          },
+          onclick: () => ctx.goto(n.id),   // page-idx reset + onEnter via onSceneEnter
         }
       : { key: n.id };
     return _svgG(gProps)([
@@ -2061,7 +2127,7 @@ const emitMain = project => {
   return `// AUTO-GENERATED by dervoJS gameEditor.
 ${_extraImports(project, 'main')}import { initStyles } from '../src/styles.js';
 import { createGame } from '../src/game.js';
-import { scenes }       from './scenes.js';
+import { scenes, onSceneEnter } from './scenes.js';
 import { NPCS }         from './world.js';
 import { initialState } from './items.js';
 ${hasSidebar ? "import { sidebar }     from './sidebar.js';\n" : ''}
@@ -2077,6 +2143,7 @@ const game = createGame({
   })()},
   state:  initialState,
   scenes,
+  onSceneEnter,
   npcs:   NPCS,
 ${hasSidebar ? '  sidebar,\n' : ''}${musicArg}  debug:  true,
 });

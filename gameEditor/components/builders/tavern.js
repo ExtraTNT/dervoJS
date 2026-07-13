@@ -414,23 +414,30 @@ const _goodbyeChoice = () => ({
 const build = (project, values) => {
   let next = project;
 
-  // ── 1. Tavern room with a Leave choice that pops history (c.back()) ──
+  // ── 1. Tavern room with a Leave choice ──
+  // When an entry room is known we go there DETERMINISTICALLY (plain `to:`).
+  // c.back() would pop the history stack instead, so the moment the tavern
+  // gains an inner room (tavern → cellar → back to tavern) "Step outside"
+  // would drop the player into the last inner room they came from, not the
+  // street - a one-way bounce that never exits. With no entry room wired we
+  // fall back to a history pop (best effort; author should add a real exit).
   const tavernId = uniqueId(`room_${slug(values.tavernName) || 'tavern'}`, idsOf('rooms')(next));
-  const leaveChoice = {
-    ...emptyChoice(),
-    label:  values.connectFrom ? 'Step outside' : 'Leave the tavern',
-    to:     '',                                     // action handles navigation
-    action: {
-      ...emptyEffect(),
-      mode: 'js',
-      // Pop history when there is any (the common case - player walked in
-      // from somewhere). Fall back to the connecting room if specified, else
-      // just stay put rather than crash.
-      body: values.connectFrom
-        ? `if (c.history && c.history.length) c.back(); else c.goto(${JSON.stringify(values.connectFrom)});`
-        : 'if (c.history && c.history.length) c.back();',
-    },
-  };
+  const leaveChoice = values.connectFrom
+    ? {
+        ...emptyChoice(),
+        label: 'Step outside',
+        to:    values.connectFrom,
+      }
+    : {
+        ...emptyChoice(),
+        label:  'Leave the tavern',
+        to:     '',                                   // action handles navigation
+        action: {
+          ...emptyEffect(),
+          mode: 'js',
+          body: 'if (c.history && c.history.length) c.back();',
+        },
+      };
   const tavern = {
     ...emptyRoom(tavernId),
     title:   values.tavernName || 'The Drunken Goose',
@@ -499,7 +506,7 @@ const build = (project, values) => {
   const serviceCount = restRows.length + drinks.length + cures.length;
   return {
     project: next,
-    summary: `Added "${tavern.title}" + ${barkeep.name} with ${serviceCount} service${serviceCount === 1 ? '' : 's'} (advanced-mode menu, stays after each action). Leave choice ${values.connectFrom ? 'returns to caller' : 'pops history'}.`,
+    summary: `Added "${tavern.title}" + ${barkeep.name} with ${serviceCount} service${serviceCount === 1 ? '' : 's'} (advanced-mode menu, stays after each action). Leave choice ${values.connectFrom ? `goes to "${values.connectFrom}"` : 'pops history'}.`,
   };
 };
 

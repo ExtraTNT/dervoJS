@@ -111,6 +111,7 @@ const _defaultNotFound = id => div({ style: 'padding:24px' })([
  * @param {Object<string, function>}     config.scenes                   id -> (ctx) => vnode.
  * @param {function|Array}               [config.sidebar]                ctx => vnode[] (or static array). Rendered above the debugger.
  * @param {function}                     [config.topBar]                 ctx => vnode. Override the default top bar.
+ * @param {function}                     [config.onSceneEnter]           (ctx, sceneId) => void. Fired once whenever _scene becomes a new value, INCLUDING the initial scene. Use it to run per-scene entry logic (e.g. a room's onEnter Effect) regardless of HOW the scene was reached.
  * @param {boolean}                      [config.debug=true]             Show "⚙ Debug" button in the top bar; clicking opens a floating panel with StateDebugger / RenderProfiler / ListenersDebugger.
  * @param {string}                       [config.saveKey]                Override the localStorage namespace. Defaults to `dervo-game:<title>`.
  * @param {function}                     [config.notFound]               id => vnode. Rendered when state._scene matches no scene.
@@ -124,6 +125,7 @@ const createGame = ({
   npcs     = {},
   sidebar,
   topBar,
+  onSceneEnter,                // (ctx, sceneId) => void - fired once each time _scene becomes a new value, INCLUDING the initial scene. The consumer decides what "entering" a scene means (e.g. run a room's onEnter).
   music,                       // ctx => url|'' - invoked on every state change; engine swaps the bgm <audio> src when the URL changes
   musicVolume = 0.5,           // 0..1, applied once on element creation
   debug    = true,
@@ -158,6 +160,7 @@ const createGame = ({
   let _bgmLastUrl  = null;
   let _bgmPending  = false;
   let _bgmRetry    = null;         // hoisted ref so destroy() can removeEventListener it
+  let _enteredScene = null;        // scene whose onSceneEnter has already fired (see _fireSceneEnter)
   const _ensureBgmEl = () => {
     if (_bgmEl) return _bgmEl;
     _bgmEl = document.createElement('audio');
@@ -241,7 +244,9 @@ const createGame = ({
 
   // Reset to the initial state. Keys added at runtime persist as-is -
   // author should clear them explicitly if a true fresh start is needed.
-  const restart = () => setState(_initial);
+  // Clear _enteredScene so the start scene's onSceneEnter fires again even
+  // when we were already sitting on it.
+  const restart = () => { _enteredScene = null; setState(_initial); };
 
   //  NPCs (no-op when `npcs` is empty) 
   const npcsAt = sceneId =>
@@ -264,36 +269,56 @@ const createGame = ({
   const talkTo = (npcId, returnTo) =>
     setState(s => ({ _scene: `_dialogue:${npcId}:${returnTo ?? s._scene}` }));
 
-  //  ctx passed to every author-supplied function 
-  const _ctx = s => ({
-    state:   s,
+  //  ctx passed to every author-supplied function
+  // `state` is a LIVE getter into the store, not a snapshot: effect chains
+  // (multi steps, js bodies) that read c.state after a setState in the same
+  // action see the fresh value. During a render it equals the render's `s`.
+  // `scene` / `history` stay snapshots from the render that built the ctx;
+  // read `getState()._scene` when post-navigation freshness matters.
+  // State is still immutable: assign via setState, never `c.state.x = y`
+  // (direct writes bypass subscribers, so nothing re-renders or persists).
+  const _ctx = (s, sceneOverride) => ({
+    get state() { return getState(); },
     setState, getState,
     goto, back, restart,
     save, load, hasSave, clearSave, listSlots,
     npcs, npcsAt, tickWorld, talkTo,
-    scene:   s._scene,
+    scene:   sceneOverride ?? s._scene,
     history: s._history,
     debug,                                // exposed so the default topbar can show the Debug button
   });
 
-  //  slot rendering 
+  //  scene-enter hook
+  // The engine has no notion of "rooms" vs pseudo-scenes - it just fires
+  // onSceneEnter(ctx, id) once each time _scene transitions to a new value.
+  // _enteredScene is set BEFORE the hook runs so a hook that navigates
+  // re-fires cleanly for the new id, while a non-navigating hook (which still
+  // triggers this subscriber via its own setState) doesn't loop.
+  const _fireSceneEnter = () => {
+    if (typeof onSceneEnter !== 'function') return;
+    const id = getState()._scene;
+    if (id === _enteredScene) return;
+    _enteredScene = id;
+    onSceneEnter(_ctx(getState()), id);
+  };
+  store.subscribe(_fireSceneEnter);
+
+  //  slot rendering
   // Pseudo-scene ids `_dialogue:<npcId>:<returnTo>` dispatch to the matching
   // NPC's dialogue() function, with ctx.scene patched to the return location
-  // so dialogue navigation can return cleanly.
-  const _resolveScene = id => {
+  // so dialogue navigation can return cleanly. The override is threaded
+  // through _ctx instead of spreading the ctx afterwards - a spread would
+  // collapse the live `state` getter back into a stale snapshot.
+  const _renderScene = s => {
+    const id = s._scene;
     if (typeof id === 'string' && id.startsWith('_dialogue:')) {
       const [, npcId, returnTo] = id.split(':');
       const npc = npcs[npcId];
-      if (npc && typeof npc.dialogue === 'function') {
-        return ctx => npc.dialogue({ ...ctx, scene: returnTo });
-      }
+      if (npc && typeof npc.dialogue === 'function') return npc.dialogue(_ctx(s, returnTo));
+      return notFound(id);
     }
-    return scenes[id];
-  };
-
-  const _renderScene = s => {
-    const fn = _resolveScene(s._scene);
-    return typeof fn === 'function' ? fn(_ctx(s)) : notFound(s._scene);
+    const fn = scenes[id];
+    return typeof fn === 'function' ? fn(_ctx(s)) : notFound(id);
   };
 
   const _renderSidebar = s => {
@@ -337,6 +362,10 @@ const createGame = ({
 
   return {
     mount: root => {
+      // Fire the start scene's onSceneEnter BEFORE the first paint so the
+      // initial render already reflects its onEnter (no one-frame flash). The
+      // subscriber is live by now, so a hook that navigates chains correctly.
+      _fireSceneEnter();
       const result = mount(store)(root)(view);
       // Kick the initial bgm track AFTER the first paint so the audio
       // element lands on the body alongside the rendered scene.

@@ -33,9 +33,31 @@ const _safeFn = (argNames, body) => {
   }
 };
 
+// Split 'npcVars.<npcId>.<key>' into its two parts. npcId comes from slug()
+// (alnum/underscore only) so splitting on the FIRST dot is always correct,
+// even when the var key itself contains one.
+const _splitNpcVarPath = rest => {
+  const dot = rest.indexOf('.');
+  return dot < 0 ? null : { npcId: rest.slice(0, dot), key: rest.slice(dot + 1) };
+};
+
+// Resolve the portable `npcSelf.<key>` shorthand (stored npc-agnostic so a
+// duplicated/copied topic keeps working) into a concrete `npcVars.<id>.<key>`
+// path, using the NPC that owns the Condition/Effect being compiled. Any
+// other path passes through unchanged. selfNpcId is only non-null when
+// compiling a choice/topic/onEnter/variant that belongs to an actual NPC.
+const _resolveSelfTarget = selfNpcId => path =>
+  path && path.startsWith('npcSelf.') && selfNpcId
+    ? `npcVars.${selfNpcId}.${path.slice(8)}`
+    : path;
+
 const _readPath = (state, path) => {
   if (path.startsWith('flags.')) return state.flags?.[path.slice(6)];
   if (path.startsWith('inv.'))   return state.inventory?.[path.slice(4)] || 0;
+  if (path.startsWith('npcVars.')) {
+    const parts = _splitNpcVarPath(path.slice(8));
+    return parts ? state.npcVars?.[parts.npcId]?.[parts.key] : undefined;
+  }
   return state[path];
 };
 
@@ -53,12 +75,13 @@ const _clamp = (n, lo, hi) => {
   return out;
 };
 
-const _writeOpToPatch = (state, op, ctx) => {
-  const { target, op: kind, value } = op;
+const _writeOpToPatch = (state, op, ctx, selfNpcId = null) => {
+  const target = _resolveSelfTarget(selfNpcId)(op.target);
+  const { op: kind, value } = op;
   if (!target) return null;
   // Per-op condition gate. Missing / 'always' condition lets the op through.
   if (op.condition && op.condition.mode && op.condition.mode !== 'always') {
-    const guard = _compileCondition(op.condition);
+    const guard = _compileCondition(op.condition, selfNpcId);
     // Use the live ctx so the guard sees the same shape conditions on choices do.
     const c = ctx || { state };
     if (!guard(c)) return null;
@@ -88,6 +111,54 @@ const _writeOpToPatch = (state, op, ctx) => {
     const inv = { ...(state.inventory || {}) };
     if (next <= 0) delete inv[k]; else inv[k] = next;
     return { inventory: inv };
+  }
+  if (target.startsWith('npcVars.')) {
+    // NPC-scoped state. Branches on the CURRENT value's shape like plain
+    // stats below, plus object support (set whole/JSON, setField, clear) -
+    // objects have no equivalent among top-level stats. No clamp support
+    // (min/max pickers only reach global numeric stats).
+    const parts = _splitNpcVarPath(target.slice(8));
+    if (!parts) return null;
+    const { npcId, key } = parts;
+    const bucket = state.npcVars?.[npcId] || {};
+    const cur = bucket[key];
+    let next;
+    if (Array.isArray(cur)) {
+      if (kind === 'push')        next = [...cur, String(value)];
+      else if (kind === 'removeValue') next = cur.filter(x => x !== String(value));
+      else if (kind === 'clear')  next = [];
+      else if (kind === 'set') {
+        next = Array.isArray(value)
+          ? value.map(String)
+          : String(value || '').split(',').map(s => s.trim()).filter(Boolean);
+      } else return null;
+    } else if (_isObj(cur)) {
+      if (kind === 'set') {
+        try { next = JSON.parse(value); } catch { return null; }
+        if (!_isObj(next)) return null;
+      } else if (kind === 'setField') {
+        if (!op.field) return null;
+        const n = Number(value);
+        next = { ...cur, [op.field]: Number.isFinite(n) && String(value ?? '').trim() !== '' ? n : value };
+      } else if (kind === 'clear') {
+        next = {};
+      } else return null;
+    } else if (typeof cur === 'string' || (cur === undefined && typeof value === 'string' && kind !== 'add' && kind !== 'sub')) {
+      if (kind === 'set')    next = String(value ?? '');
+      else if (kind === 'append') next = (cur ?? '') + String(value ?? '');
+      else if (kind === 'clear')  next = '';
+      else return null;
+    } else {
+      const curN = Number(cur || 0);
+      const n = Number(value);
+      const isNumeric = Number.isFinite(n);
+      next =
+        kind === 'set' ? (isNumeric ? n : value) :
+        kind === 'add' ? curN + (isNumeric ? n : 0) :
+        kind === 'sub' ? curN - (isNumeric ? n : 0) :
+        curN;
+    }
+    return { npcVars: { ...(state.npcVars || {}), [npcId]: { ...bucket, [key]: next } } };
   }
   if (target.startsWith('skills.')) {
     const k = target.slice(7);
@@ -140,11 +211,12 @@ const _writeOpToPatch = (state, op, ctx) => {
 };
 
 // Returns a function (ctx) => boolean
-const _compileCondition = cond => {
+const _compileCondition = (cond, selfNpcId = null) => {
   if (!cond || cond.mode === 'always') return () => true;
   if (cond.mode === 'simple') {
+    const key = _resolveSelfTarget(selfNpcId)(cond.key);
     return c => {
-      const left  = _readPath(c.state, cond.key);
+      const left  = _readPath(c.state, key);
       const right = cond.value;
       switch (cond.op) {
         // numeric comparisons
@@ -161,8 +233,12 @@ const _compileCondition = cond => {
         case 'includes':   return Array.isArray(left) && left.includes(String(right));
         case 'excludes':   return !Array.isArray(left) || !left.includes(String(right));
         case 'lenAtLeast': return (Array.isArray(left) ? left.length : 0) >= (Number(right) || 0);
-        // shared: empty check works for both strings and arrays
-        case 'isEmpty':    return left == null || left === '' || (Array.isArray(left) && left.length === 0);
+        // object-typed npc var comparisons
+        case 'hasField':   return _isObj(left) && Object.prototype.hasOwnProperty.call(left, String(right ?? ''));
+        // shared: empty check works for strings, arrays, and plain objects
+        case 'isEmpty':    return left == null || left === ''
+          || (Array.isArray(left) && left.length === 0)
+          || (_isObj(left) && Object.keys(left).length === 0);
         default:           return false;
       }
     };
@@ -198,10 +274,10 @@ const _randIntRange = (lo, hi) => {
 // A bonus applies when its `condition` evaluates truthy against ctx; the
 // amount is either a literal (`amountFixed`) or the live value of a stat
 // (`amountStat` → state[key]).
-const _resolveWeight = c => entry => {
+const _resolveWeight = (c, selfNpcId = null) => entry => {
   let total = Math.max(0, Number(entry.weight) || 0);
   for (const b of (entry.bonuses || [])) {
-    const guard = _compileCondition(b.condition);
+    const guard = _compileCondition(b.condition, selfNpcId);
     if (!guard(c)) continue;
     const add = b.amountMode === 'stat'
       ? (b.amountStat ? Number(c.state[b.amountStat]) || 0 : 0)
@@ -213,8 +289,8 @@ const _resolveWeight = c => entry => {
 
 // Weighted-random pick over entries with ctx-aware effective weights. Returns
 // the chosen index or -1 if every entry resolves to weight 0.
-const _weightedPick = c => entries => {
-  const weights = entries.map(_resolveWeight(c));
+const _weightedPick = (c, selfNpcId = null) => entries => {
+  const weights = entries.map(_resolveWeight(c, selfNpcId));
   const total   = weights.reduce((a, w) => a + w, 0);
   if (total <= 0) return -1;
   let r = Math.random() * total;
@@ -250,8 +326,7 @@ const _applyLootEntry = (entry, c) => {
     }
     case 'navigate': {
       if (!entry.roomId) return null;
-      c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [entry.roomId]: 0 } }));
-      c.goto(entry.roomId);
+      c.goto(entry.roomId);   // page-idx reset + onEnter fire via the engine onSceneEnter hook
       return `→ ${entry.roomId}`;
     }
     case 'learnSkill': {
@@ -289,7 +364,7 @@ const _applyLootEntry = (entry, c) => {
 // pushed onto `state._lootLog` so combat outcome screens / JS sidebar widgets
 // / room pages can display "Loot: …" if they want. The buffer is bounded
 // (last 8) so it can't grow forever.
-const _compileRandomLoot = rawTable => {
+const _compileRandomLoot = (rawTable, selfNpcId = null) => {
   const table = rawTable || { picks: 1, unique: false, showFlavour: true, entries: [] };
   return c => {
     const picks = Math.max(1, Number(table.picks) || 1);
@@ -297,7 +372,7 @@ const _compileRandomLoot = rawTable => {
     const wins  = [];
     for (let i = 0; i < picks; i++) {
       if (bag.length === 0) break;
-      const idx = _weightedPick(c)(bag);
+      const idx = _weightedPick(c, selfNpcId)(bag);
       if (idx < 0) break;
       const entry = bag[idx];
       const flavour = _applyLootEntry(entry, c);
@@ -405,7 +480,7 @@ const _withMessageOverlay = sceneFn => ctx => {
 // to read the target combat's enemy.hp for the initial state.
 // _compileEffectCore = the unwrapped per-mode runner. _compileEffect wraps it
 // with the message-push tail so EVERY mode gets the same opt-in messaging.
-const _compileEffectCore = (effect, project) => {
+const _compileEffectCore = (effect, project, selfNpcId = null) => {
   if (!effect || effect.mode === 'none') return () => {};
   if (effect.mode === 'simple') {
     return c => {
@@ -414,7 +489,7 @@ const _compileEffectCore = (effect, project) => {
         for (const op of effect.ops || []) {
           // Per-op condition evaluates against the IN-PROGRESS state so earlier
           // ops in the same effect can flip a flag a later op gates on.
-          const patch = _writeOpToPatch(next, op, { ...c, state: next });
+          const patch = _writeOpToPatch(next, op, { ...c, state: next }, selfNpcId);
           if (patch) next = { ...next, ...patch };
         }
         return next;
@@ -422,19 +497,17 @@ const _compileEffectCore = (effect, project) => {
     };
   }
   if (effect.mode === 'randomLoot') {
-    return _compileRandomLoot(effect.table);
+    return _compileRandomLoot(effect.table, selfNpcId);
   }
   if (effect.mode === 'navigate') {
-    return c => {
-      if (!effect.toRoom) return;
-      c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [effect.toRoom]: 0 } }));
-      c.goto(effect.toRoom);
-    };
+    // Page-idx reset + the target room's onEnter fire via the engine's
+    // onSceneEnter hook, so navigate is now just a plain goto.
+    return c => { if (effect.toRoom) c.goto(effect.toRoom); };
   }
   if (effect.mode === 'multi') {
     // Compile each step once; runner fires them in order. Nested multi works
     // by recursion since _compileEffect is the same function.
-    const steps = (effect.steps || []).map(s => _compileEffect(s, project));
+    const steps = (effect.steps || []).map(s => _compileEffect(s, project, selfNpcId));
     return c => { for (const fn of steps) fn(c); };
   }
   if (effect.mode === 'oneOf') {
@@ -444,11 +517,11 @@ const _compileEffectCore = (effect, project) => {
     const opts = (effect.options || []).map(o => ({
       weight:  Number(o.weight) || 0,
       bonuses: o.bonuses || [],
-      effect:  _compileEffect(o.effect, project),
+      effect:  _compileEffect(o.effect, project, selfNpcId),
     }));
     return c => {
       if (opts.length === 0) return;
-      const idx = _weightedPick(c)(opts);
+      const idx = _weightedPick(c, selfNpcId)(opts);
       if (idx < 0) return;
       opts[idx].effect(c);
     };
@@ -494,8 +567,8 @@ const _compileEffectCore = (effect, project) => {
 // Public `_compileEffect` - wraps the core runner with an optional message
 // push. Nested effects (multi/oneOf steps, randomLoot entries) flow through
 // the same wrapper so their own .message fields fire after their core logic.
-const _compileEffect = (effect, project) => {
-  const core = _compileEffectCore(effect, project);
+const _compileEffect = (effect, project, selfNpcId = null) => {
+  const core = _compileEffectCore(effect, project, selfNpcId);
   if (!effect || !effect.message) return core;
   return c => { core(c); _pushMsg(c, effect.message); };
 };
@@ -617,10 +690,7 @@ const _ccAdvance = allSteps => idx => project => maybeStartRoom => c => {
     return;
   }
   const dest = startRoom || project.meta.start || project.rooms[0]?.id;
-  if (dest) {
-    c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [dest]: 0 } }));
-    c.goto(dest);
-  }
+  if (dest) c.goto(dest);   // page-idx reset + onEnter via the onSceneEnter hook
 };
 
 // Point-buy step - render +/- buttons for each stat row; spent points come
@@ -960,16 +1030,12 @@ const _buildWardrobeFn = (room, project) => ctx => {
 };
 
 // Build one Choice descriptor in the engine's shape. Wraps `action` to also
-// reset the target room's page index to 0 on navigation.
-const _buildChoice = (ch, project, fromRoomId) => {
-  const guard  = _compileCondition(ch.condition);
-  const effect = _compileEffect(ch.action, project);
-  // Pre-compile the target room's onEnter gate + effect so navigation fires it.
-  // The engine has no built-in onEnter hook, so we drive the goto ourselves
-  // and inject the room's onEnter between the action and the navigation.
-  const target = ch.to ? project.rooms.find(r => r.id === ch.to) : null;
-  const enterGuard  = target ? _compileCondition(target.onEnterCondition) : () => true;
-  const enterEffect = target ? _compileEffect(target.onEnter, project)    : () => {};
+// The target room's page-idx reset + onEnter gate are handled centrally by the
+// engine's onSceneEnter hook (see buildGameConfig), so this just fires the
+// action and goto's.
+const _buildChoice = (ch, project, fromRoomId, selfNpcId = null) => {
+  const guard  = _compileCondition(ch.condition, selfNpcId);
+  const effect = _compileEffect(ch.action, project, selfNpcId);
   return {
     label: ch.label,
     if:    c => guard(c),
@@ -980,25 +1046,14 @@ const _buildChoice = (ch, project, fromRoomId) => {
       // action's effect dynamically override the destination.
       // NOTE: read the snapshot from `c.getState()._scene` rather than
       // `c.scene`. For dialogue contexts, the engine patches `c.scene` to the
-      // calling-room id (see _resolveScene in src/game.js), so comparing it
+      // calling-room id (see _renderScene in src/game.js), so comparing it
       // against the post-effect canonical `_scene` would always read as
       // "changed" and trigger a spurious yield.
       _startAction(c);
       const before = c.getState()._scene;
       effect(c);
       if (c.getState()._scene !== before) return;
-      if (!ch.to) return;
-      c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [ch.to]: 0 } }));
-      const live = { ...c, state: c.getState() };
-      if (enterGuard(live)) {
-        // Re-snapshot _scene around enterEffect - if the room's onEnter
-        // navigates (enterCombat / talkTo / js goto), the trailing
-        // c.goto(ch.to) below would override and silently cancel it.
-        const beforeEnter = c.getState()._scene;
-        enterEffect(c);
-        if (c.getState()._scene !== beforeEnter) return;
-      }
-      c.goto(ch.to);
+      if (ch.to) c.goto(ch.to);
     },
     // No `to` returned - we already handle navigation in action so the engine
     // doesn't goto twice.
@@ -1162,7 +1217,7 @@ const _buildShopScene = (npc, project) => {
       // Buy / Sell live inline on the cards above. The choices list keeps the
       // NPC's own tail choices + Goodbye so it stays uncluttered.
       choices: [
-        ...npc.choices.map(ch => _buildChoice(ch, project, back)),
+        ...npc.choices.map(ch => _buildChoice(ch, project, back, npc.id)),
         { label: 'Goodbye', action: c => c.setState({ _scene: back }) },
       ],
     })(ctx);
@@ -1198,7 +1253,7 @@ const _npcVariantCache = new WeakMap();
 const _compiledVariants = npc => {
   const cached = _npcVariantCache.get(npc);
   if (cached) return cached;
-  const fresh = npc.variants.map(v => ({ variant: v, guard: _compileCondition(v.condition) }));
+  const fresh = npc.variants.map(v => ({ variant: v, guard: _compileCondition(v.condition, npc.id) }));
   _npcVariantCache.set(npc, fresh);
   return fresh;
 };
@@ -1256,7 +1311,7 @@ const _renderNpcSimple = (npc, project, back, ctx) => {
   }
 
   // Final page - render NPC's flat choices + an auto "Goodbye" when none lead out.
-  const choices = npc.choices.map(ch => _buildSimpleNpcChoice(ch, project, back));
+  const choices = npc.choices.map(ch => _buildSimpleNpcChoice(ch, project, back, npc.id));
   const hasLeavingChoice = npc.choices.length > 0;   // any choice is good enough as an out
   if (!hasLeavingChoice) choices.push({ label: 'Goodbye', action: c => c.setState({ _scene: back }) });
   return Scene({ title: npc.name, body, choices })(ctx);
@@ -1265,9 +1320,9 @@ const _renderNpcSimple = (npc, project, back, ctx) => {
 // Simple-mode choice: navigate to `ch.to` (or stay/return if empty). The action
 // fires regardless. Same logic as a room choice, with the "no target → return
 // to caller" convention.
-const _buildSimpleNpcChoice = (ch, project, back) => {
-  const guard  = _compileCondition(ch.condition);
-  const effect = _compileEffect(ch.action, project);
+const _buildSimpleNpcChoice = (ch, project, back, npcId) => {
+  const guard  = _compileCondition(ch.condition, npcId);
+  const effect = _compileEffect(ch.action, project, npcId);
   return {
     label: ch.label,
     if:    c => guard(c),
@@ -1279,17 +1334,9 @@ const _buildSimpleNpcChoice = (ch, project, back) => {
       const before = c.getState()._scene;
       effect(c);
       if (c.getState()._scene !== before) return;   // effect navigated; yield
+      // Page-idx reset + target onEnter fire via the engine onSceneEnter hook,
+      // whether we goto a room or set _scene back to the caller.
       if (!ch.to) { c.setState({ _scene: back }); return; }
-      const target      = (project.rooms || []).find(r => r.id === ch.to);
-      const enterGuard  = target ? _compileCondition(target.onEnterCondition) : () => true;
-      const enterEffect = target ? _compileEffect(target.onEnter, project)    : () => {};
-      c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [ch.to]: 0 } }));
-      const live = { ...c, state: c.getState() };
-      if (enterGuard(live)) {
-        const beforeEnter = c.getState()._scene;
-        enterEffect(c);
-        if (c.getState()._scene !== beforeEnter) return;
-      }
       c.goto(ch.to);
     },
   };
@@ -1396,8 +1443,8 @@ const _doExitBack = (c, npc, back) => {
 
 // Topic choice → engine descriptor. Each flow translates to a concrete action.
 const _buildTopicChoice = (ch, npc, topic, allTopics, project, back) => {
-  const guard  = _compileCondition(ch.condition);
-  const effect = _compileEffect(ch.action, project);
+  const guard  = _compileCondition(ch.condition, npc.id);
+  const effect = _compileEffect(ch.action, project, npc.id);
   const flow   = ch.flow || 'exitBack';
 
   return {
@@ -1428,22 +1475,13 @@ const _buildTopicChoice = (ch, npc, topic, allTopics, project, back) => {
           _npcTopic:        { ...(s._npcTopic        || {}), [npc.id]: ch.topicId },
           _npcTopicPageIdx: { ...(s._npcTopicPageIdx || {}), [npc.id]: { ...(s._npcTopicPageIdx?.[npc.id] || {}), [ch.topicId]: 0 } },
         }));
-        if (target) _compileEffect(target.onEnter, project)(c);
+        if (target) _compileEffect(target.onEnter, project, npc.id)(c);
         return;
       }
 
       if (flow === 'exitRoom') {
+        // Page-idx reset + target onEnter fire via the engine onSceneEnter hook.
         if (!ch.to) { c.setState({ _scene: back }); return; }
-        const target      = (project.rooms || []).find(r => r.id === ch.to);
-        const enterGuard  = target ? _compileCondition(target.onEnterCondition) : () => true;
-        const enterEffect = target ? _compileEffect(target.onEnter, project)    : () => {};
-        c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [ch.to]: 0 } }));
-        const live = { ...c, state: c.getState() };
-        if (enterGuard(live)) {
-          const beforeEnter = c.getState()._scene;
-          enterEffect(c);
-          if (c.getState()._scene !== beforeEnter) return;
-        }
         c.goto(ch.to);
         return;
       }
@@ -1503,7 +1541,7 @@ const _renderWidget = (w, project, ctx) => {
       const target = project.rooms.find(r => r.id === w.roomId);
       return button({
         type: 'button',
-        onclick: () => { ctx.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [w.roomId]: 0 } })); ctx.goto(w.roomId); },
+        onclick: () => ctx.goto(w.roomId),   // page-idx reset + onEnter via onSceneEnter
         style: 'display:flex; align-items:center; gap:8px; width:100%; margin-bottom:8px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); font-size:13px; text-align:left; cursor:pointer',
         title: target ? `Go to ${target.title || target.id}` : `Missing room: ${w.roomId}`,
       })([
@@ -1916,10 +1954,7 @@ const _renderMinimap = w => project => ctx => {
       ...(canTravel
         ? {
             style: 'cursor:pointer',
-            onclick: () => {
-              ctx.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [n.id]: 0 } }));
-              ctx.goto(n.id);
-            },
+            onclick: () => ctx.goto(n.id),   // page-idx reset + onEnter via onSceneEnter
           }
         : {}),
     })([
@@ -2301,6 +2336,13 @@ const buildGameConfig = rawProject => {
     inventory:  startingInv,
     equipped:   startingEquipped,
     skills:     startingSkills,
+    // Per-NPC declared state: state.npcVars[npcId][key]. Addressable from
+    // anywhere as `npcVars.<npcId>.<key>`, or from that NPC's own
+    // choices/topics as the `npcSelf.<key>` shorthand.
+    npcVars: Object.fromEntries(project.npcs.map(n => [
+      n.id,
+      Object.fromEntries((n.vars || []).map(v => [v.key, v.initial])),
+    ])),
     _pageIdx:    {},
     _npcPageIdx: {},
     _npcGreetingDone: {},  // { [npcId]: bool }    advanced mode: skip greeting on re-enter via change/back
@@ -2337,6 +2379,22 @@ const buildGameConfig = rawProject => {
     return _musicByRoom[id] || _defaultMusic;
   };
 
+  // Room entry is centralised: the engine's onSceneEnter fires once whenever
+  // _scene becomes a new value (choice `to:`, navigate / loot effects, back(),
+  // AND the start room - every path). We reset that room's page index and run
+  // its onEnter Effect behind its onEnterCondition gate. Non-room scenes
+  // (combat / dialogue / char-creation pseudo-ids) aren't in the map -> no-op.
+  const _roomEnter = Object.fromEntries(project.rooms.map(r => [r.id, {
+    guard: _compileCondition(r.onEnterCondition),
+    enter: _compileEffect(r.onEnter, project),
+  }]));
+  const onSceneEnter = (c, id) => {
+    const re = _roomEnter[id];
+    if (!re) return;
+    c.setState(s => ({ _pageIdx: { ...(s._pageIdx || {}), [id]: 0 } }));
+    if (re.guard({ ...c, state: c.getState() })) re.enter(c);
+  };
+
   const sb = project.sidebar || { enabled: false, widgets: [] };
   // When char-creation is active, start the player INSIDE the wizard. The
   // last step's `_ccAdvance` does the final c.goto into meta.start (or the
@@ -2356,6 +2414,7 @@ const buildGameConfig = rawProject => {
     scenes,
     npcs,
     music,
+    onSceneEnter,
     sidebar: sb.enabled && sb.widgets.length ? _renderSidebar(project) : undefined,
     debug:   true,   // floating State Debugger / RenderProfiler / ListenersDebugger panel in the preview
   };

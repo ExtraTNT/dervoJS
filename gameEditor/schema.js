@@ -89,6 +89,25 @@ const _normaliseStat = s => {
   return { key: s?.key || '', type, initial };
 };
 
+// NPC-scoped state declarations - same idea as stats, but namespaced per NPC
+// (state.npcVars[npcId][key]) and one type richer: number | string | array |
+// object. Curried factory to match emptyStat's `type => key` shape.
+const emptyNpcVar = type => key => {
+  const t = ['string', 'array', 'object'].includes(type) ? type : 'number';
+  const initial = t === 'number' ? 0 : t === 'string' ? '' : t === 'array' ? [] : {};
+  return { key, type: t, initial };
+};
+
+const _normaliseNpcVar = v => {
+  const type = ['string', 'array', 'object'].includes(v?.type) ? v.type : 'number';
+  let initial;
+  if (type === 'number')      initial = Number(v?.initial) || 0;
+  else if (type === 'string') initial = typeof v?.initial === 'string' ? v.initial : '';
+  else if (type === 'array')  initial = Array.isArray(v?.initial) ? v.initial.map(String) : [];
+  else                        initial = (v?.initial && typeof v.initial === 'object' && !Array.isArray(v.initial)) ? v.initial : {};
+  return { key: v?.key || '', type, initial };
+};
+
 const emptyCondition = () => ({
   mode: 'always',
   key: '', op: '>=', value: 0,    // simple
@@ -117,6 +136,9 @@ const emptyOp = () => ({
   target:    '',
   op:        'add',
   value:     0,
+  // Only meaningful when op === 'setField' on an object-typed npc var - the
+  // key written INSIDE the object. Ignored by every other target/op combo.
+  field:     '',
   condition: emptyCondition(),
   min:       emptyOpLimit(),
   max:       emptyOpLimit(),
@@ -674,6 +696,11 @@ const emptyNpc = (id = `npc_${_rid()}`) => ({
   entryTopicId:  '',             // ADV: which topic to drop the player into after greeting. '' = topics[0]
   shop:          { stock: [], buyback: emptyBuyback() },  // only used when role === 'shop'
   variants:      [],             // [{ id, name, condition, overrides }] - first-match override; see emptyNpcVariant
+  // Per-NPC state declarations - lives at state.npcVars[npc.id][key] at
+  // runtime. Addressable from anywhere as `npcVars.<npcId>.<key>`, or from
+  // this NPC's own choices/topics as the portable `npcSelf.<key>` shorthand
+  // (resolved to the concrete npcVars.<npcId>.<key> at compile/export time).
+  vars:          [],             // [{ key, type: 'number'|'string'|'array'|'object', initial }]
 });
 
 const emptyProject = () => {
@@ -876,6 +903,7 @@ const normaliseProject = raw => {
                   : { greeting: '', portrait: '', pages: [], choices: [], topics: [], entryTopicId: '' },
               }))
             : [],
+          vars: Array.isArray(n.vars) ? n.vars.map(_normaliseNpcVar) : [],
         }))
       : base.npcs,
     sidebar: raw.sidebar && typeof raw.sidebar === 'object'
@@ -947,7 +975,7 @@ export {
   _rid,
   emptyProject, normaliseProject,
   emptyRoom, emptyWardrobeRoom, emptyInventoryRoom, emptyStoryRoom, emptyNpc, emptyItem, emptyShopEntry, emptyBuyback, emptyBuybackItem, emptyPrice,
-  emptyStat,
+  emptyStat, emptyNpcVar,
   emptyPage, emptyChoice, emptyTopic,
   emptyCondition, emptyEffect, emptyOp, emptyOpLimit,
   emptyLootTable, emptyLootEntry, emptyWeightBonus, emptyOneOfOption,
