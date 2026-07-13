@@ -30,7 +30,7 @@ import { BroadcastPage } from './pages/BroadcastPage.js';
 import { ListPage }      from './pages/ListPage.js';
 import { GridPage }      from './pages/GridPage.js';
 
-initStyles();
+initStyles({ noLink: true});
 document.body.style.cssText = 'margin:0; padding:0; background:var(--bg); color:var(--text); font-family:system-ui, sans-serif';
 document.documentElement.style.boxSizing = 'border-box';
 
