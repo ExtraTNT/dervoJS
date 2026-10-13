@@ -590,9 +590,9 @@ body {
 
 /*  Typography  */
 .typography-layout { display:grid; gap:2rem; align-items:start; }
-.typography-layout.toc-right { grid-template-columns:1fr 200px; }
-.typography-layout.toc-left  { grid-template-columns:200px 1fr; }
-@media(max-width:640px) { .typography-layout.toc-right,.typography-layout.toc-left { grid-template-columns:1fr; } }
+.typography-layout.toc-right { grid-template-columns:minmax(0, 1fr) 200px; }
+.typography-layout.toc-left  { grid-template-columns:200px minmax(0, 1fr); }
+@media(max-width:640px) { .typography-layout.toc-right,.typography-layout.toc-left { grid-template-columns:minmax(0, 1fr); } }
 .typography { line-height:1.75; color:var(--text); }
 .toc-panel  { padding:0; }
 .toc-sticky { position:sticky; top:1rem; }
